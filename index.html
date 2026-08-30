@@ -932,10 +932,14 @@
                 </div>
 
                 <!-- Type Toggle -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 rounded-xl overflow-hidden border border-slate-700 text-[11px] sm:text-xs font-bold">
+                <div class="grid grid-cols-2 sm:grid-cols-5 rounded-xl overflow-hidden border border-slate-700 text-[11px] sm:text-xs font-bold">
                     <button type="button" id="btnTypeSoru" onclick="setEntryType('soru')"
                         class="py-2.5 flex items-center justify-center gap-1.5 bg-blue-600 text-white transition">
-                        <i class="fa-solid fa-pen-to-square"></i> Soru Çözümü
+                        <i class="fa-solid fa-book-open-reader"></i> Öğrenerek Çözme
+                    </button>
+                    <button type="button" id="btnTypeHizli" onclick="setEntryType('hizli')"
+                        class="py-2.5 flex items-center justify-center gap-1.5 bg-slate-800 text-slate-400 transition">
+                        <i class="fa-solid fa-bolt"></i> Hızlı Çözme
                     </button>
                     <button type="button" id="btnTypeNot" onclick="setEntryType('not')"
                         class="py-2.5 flex items-center justify-center gap-1.5 bg-slate-800 text-slate-400 transition">
@@ -985,7 +989,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(İsteğe bağlı)</span></label>
+                        <label id="durationLabel" class="block text-[11px] font-semibold text-slate-300 mb-1">Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(İsteğe bağlı)</span></label>
                         <input type="number" id="inputDuration" min="0" placeholder="45"
                             class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
                     </div>
@@ -3089,6 +3093,7 @@ function setEntryType(type) {
     const bn = document.getElementById('btnTypeNot');
     const bk = document.getElementById('btnTypeKarma');
     const br = document.getElementById('btnTypeReview');
+    const bh = document.getElementById('btnTypeHizli');
     const hint = document.getElementById('modeTopicHint');
 
     const inactiveBtn = 'py-2.5 flex items-center justify-center gap-1.5 bg-slate-800 text-slate-400 transition';
@@ -3096,12 +3101,29 @@ function setEntryType(type) {
     if (bn) bn.className = inactiveBtn;
     if (bk) bk.className = inactiveBtn;
     if (br) br.className = inactiveBtn;
+    if (bh) bh.className = inactiveBtn;
+
+    // Süre alanının ETİKETİ moda göre değişir — aynı kutu iki farklı şeyi ölçüyor
+    // (§4d: çözme hızı ≠ öğrenme hızı). Etiket bunu kayıt anında görünür kılar.
+    const dl = document.getElementById('durationLabel');
+    if (dl) {
+        dl.innerHTML = (type === 'hizli')
+            ? 'Çözme Süresi (Dk) <span class="text-[10px] text-amber-400/80 font-normal">(saf çözüm)</span>'
+            : 'Öğrenme Süresi (Dk) <span class="text-[10px] text-slate-500 font-normal">(çözüm okuma + not dahil)</span>';
+    }
 
     if (type === 'soru') {
         if(sf) sf.classList.remove('hidden');
         if(nf) nf.classList.add('hidden');
         if(bs) bs.className = 'py-2.5 flex items-center justify-center gap-1.5 bg-blue-600 text-white transition';
         if (hint) hint.textContent = '(Sadece Soru Konuları)';
+    } else if (type === 'hizli') {
+        // Veri modelinde bu da bir 'soru' kaydıdır; tek farkı entry.fast = true.
+        // Böylece bütün mevcut D/Y/B, zayıflık ve rapor mantığı olduğu gibi çalışır.
+        if(sf) sf.classList.remove('hidden');
+        if(nf) nf.classList.add('hidden');
+        if(bh) bh.className = 'py-2.5 flex items-center justify-center gap-1.5 bg-amber-600 text-white transition';
+        if (hint) hint.textContent = '(Sadece Soru Konuları — hızlı çözme)';
     } else if (type === 'not') {
         if(sf) sf.classList.add('hidden');
         if(nf) nf.classList.remove('hidden');
@@ -3130,7 +3152,7 @@ function populateTopicOptions() {
     const allGroups = TOPICS_BY_SUBJECT[subject] || [];
     
     let targetGroups = [];
-    if (currentEntryType === 'soru' || currentEntryType === 'review') {
+    if (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'review') {
         targetGroups = allGroups.filter(g => g.group.toLowerCase().includes('soru') || g.group === 'Diğer');
         if (targetGroups.length === 0) targetGroups = allGroups;
     } else if (currentEntryType === 'not') {
@@ -3701,7 +3723,7 @@ function renderPerTopicDataCards() {
         const isSoruGroup = isTopicSoruGroup(subject, tName);
         const hasEnteredQuestions = (Number(state.correct) > 0 || Number(state.wrong) > 0 || Number(state.empty) > 0);
         const isReviewCard = currentEntryType === 'review';
-        const isSoruCard = !isReviewCard && ((currentEntryType === 'soru') || (currentEntryType === 'karma' && (isSoruGroup || hasEnteredQuestions)));
+        const isSoruCard = !isReviewCard && ((currentEntryType === 'soru' || currentEntryType === 'hizli') || (currentEntryType === 'karma' && (isSoruGroup || hasEnteredQuestions)));
 
         const rangeInfo = getTopicPageRangeInfo(subject, tName);
         const fullRangeStr = rangeInfo ? rangeInfo.fullRangeText : '';
@@ -3998,7 +4020,7 @@ function calcOverallSummary() {
 
     const summary = document.getElementById('overallFormSummary');
     if (summary) {
-        if (currentEntryType === 'soru') {
+        if (currentEntryType === 'soru' || currentEntryType === 'hizli') {
             summary.textContent = `Toplam: ${grandTotal} Soru (${grandCorrect} D / ${grandWrong} Y / ${grandEmpty} B)`;
         } else if (currentEntryType === 'review') {
             summary.textContent = `${topicNames.length} Konu için Eski Yanlış Tekrarı Ekleniyor`;
@@ -4568,6 +4590,7 @@ function convertPendingStudioSessions(pending) {
             const entry = {
                 id: Date.now() + Math.floor(Math.random() * 100000),
                 type: 'soru',
+                fast: true,   // Stüdyo seansı SAF ÇÖZMEDİR (§4d) — öğrenme temposuyla karıştırılmaz
                 date: fmtDate(sess.isoDate),
                 isoDate: sess.isoDate || new Date().toISOString().slice(0, 10),
                 subject: 'Karma Test (Stüdyo)',
@@ -4607,6 +4630,7 @@ function convertPendingStudioSessions(pending) {
             const entry = {
                 id: Date.now() + Math.floor(Math.random() * 100000),
                 type: 'soru',
+                fast: true,   // Stüdyo seansı SAF ÇÖZMEDİR (§4d) — öğrenme temposuyla karıştırılmaz
                 date: fmtDate(sess.isoDate),
                 isoDate: sess.isoDate || new Date().toISOString().slice(0, 10),
                 subject: subjName,
@@ -4713,6 +4737,7 @@ function migrateExistingStudioKarmaEntries() {
             const mergedEntry = {
                 id: first.id,
                 type: 'soru',
+                fast: true,   // Stüdyo seansı SAF ÇÖZMEDİR (§4d) — öğrenme temposuyla karıştırılmaz
                 date: first.date,
                 isoDate: first.isoDate,
                 subject: 'Karma Test (Stüdyo)',
@@ -4970,7 +4995,7 @@ async function saveToDrive() {
 
         // Otomatik yerel kaydetme (fotoğrafları uploads/ klasörüne yazar ve diskteki hmgs_2026_data.json'u günceller)
         try {
-            // Yerel sunucu yalnız bilgisayarda (localhost:8000) var. Telefonda / yayinda
+            // Yerel sunucu yalniz bilgisayarda (localhost:8000) var. Telefonda / yayinda
             // bu uc 404 doner; her kayitta bosuna istek atmamak icin eleniyor.
             if (['localhost','127.0.0.1'].includes(location.hostname)) {
                 fetch('/api/save_local_data', {
@@ -6372,21 +6397,34 @@ function renderLogs() {
                         speedBadge = `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${e.duration} dk (Karma Çalışma Süresi)</span>`;
                     } else if (isSoru && e.totalQ > 0) {
                         const secPerQ = Math.round((e.duration * 60) / e.totalQ);
-                        const etiket = isStudio ? `net çözüm ~${secPerQ} sn/soru` : `Soru başı ~${secPerQ} sn`;
+                        // §4d: aynı sayı iki farklı şey demek. Öğrenme kaydında bu "çözme hızı"
+                        // DEĞİL — çözüm okuma + not alma dahil. Etiket bunu açıkça söyler.
+                        const etiket = isStudio ? `net çözüm ~${secPerQ} sn/soru`
+                            : (e.fast ? `çözme ~${secPerQ} sn/soru` : `öğrenme temposu ~${secPerQ} sn/soru`);
                         speedBadge = `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${e.duration} dk (${etiket})</span>`;
                     } else {
                         speedBadge = `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${e.duration} dk Süre</span>`;
                     }
                 }
 
+                // Çalışma modu rozeti — hangi düğmeye basarak kaydettiğin kartta görünür.
+                // İki mod aynı görünürse süre ve yanlış sayıları geri dönüp bakarken
+                // yine birbirine karışır (§4d).
+                const modeBadge = (isSoru && !isKarma && !isStudio)
+                    ? (e.fast
+                        ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"><i class="fa-solid fa-bolt mr-1"></i>Hızlı Çözme</span>`
+                        : `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30"><i class="fa-solid fa-book-open-reader mr-1"></i>Öğrenerek Çözme</span>`)
+                    : '';
+
                 const stats = isSoru && e.totalQ > 0 ? `
                     <div class="flex gap-3 text-[11px] font-medium items-center flex-wrap">
+                        ${modeBadge}
                         <span class="text-slate-300 font-bold"><i class="fa-solid fa-list-ol text-blue-400 mr-0.5"></i> ${e.totalQ} Toplam Soru</span>
                         <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check mr-0.5"></i> ${e.correct} D</span>
                         <span class="text-rose-400 font-semibold"><i class="fa-solid fa-xmark mr-0.5"></i> ${e.wrong} Y</span>
                         ${e.empty ? `<span class="text-amber-400 font-semibold"><i class="fa-solid fa-minus mr-0.5"></i> ${e.empty} B</span>` : ''}
                         ${speedBadge}
-                    </div>` : (speedBadge ? `<div class="text-[11px]">${speedBadge}</div>` : '');
+                    </div>` : (speedBadge ? `<div class="text-[11px] flex gap-2 items-center flex-wrap">${modeBadge}${speedBadge}</div>` : (modeBadge ? `<div class="text-[11px]">${modeBadge}</div>` : ''));
 
                 let breakdownHtml = '';
                 if (e.topicBreakdown && Array.isArray(e.topicBreakdown) && e.topicBreakdown.length > 0) {
@@ -6410,9 +6448,11 @@ function renderLogs() {
                                     <span class="text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20"><i class="fa-solid fa-rotate-left text-[9px] mr-1"></i>Yanlış Tekrarı</span>
                                 </div>` : (isKarma ? `<div class="flex items-center gap-2 text-[10px] font-semibold">
                                     <span class="text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20"><i class="fa-solid fa-layer-group text-[9px] mr-1"></i>Karma Çalışma</span>
-                                </div>` : (isSoru ? `<div class="flex items-center gap-2 text-[10px] font-semibold">
-                                    <span class="text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20"><i class="fa-solid fa-pen-to-square text-[9px] mr-1"></i>Soru Çalışması</span>
-                                </div>` : (e.source === 'kertik' ? `<div class="flex items-center gap-2 text-[10px] font-semibold">
+                                </div>` : (isSoru ? (e.fast ? `<div class="flex items-center gap-2 text-[10px] font-semibold">
+                                    <span class="text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"><i class="fa-solid fa-bolt text-[9px] mr-1"></i>Hızlı Çözme</span>
+                                </div>` : `<div class="flex items-center gap-2 text-[10px] font-semibold">
+                                    <span class="text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20"><i class="fa-solid fa-book-open-reader text-[9px] mr-1"></i>Öğrenerek Çözme</span>
+                                </div>`) : (e.source === 'kertik' ? `<div class="flex items-center gap-2 text-[10px] font-semibold">
                                     <span class="text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"><i class="fa-solid fa-stopwatch text-[9px] mr-1"></i>Odak Seansı</span>
                                 </div>` : `<div class="flex items-center gap-2 text-[10px] font-semibold">
                                     <span class="text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20"><i class="fa-solid fa-book-open text-[9px] mr-1"></i>Konu Çalışması</span>
@@ -6902,9 +6942,13 @@ function saveEntry(event) {
             createdAtIso = existingForTimestamp?.createdAt || new Date().toISOString();
         }
 
+        // 'hizli' bir ARAYÜZ modudur, ayrı bir kayıt tipi DEĞİL. Diske 'soru' olarak
+        // yazılır, tek farkı fast:true. Böylece mevcut bütün D/Y/B, zayıflık, rapor ve
+        // Stüdyo mantığı hiç değişmeden çalışır; ayrım yalnız SÜRE yorumuna girer (§4d).
         let entry = {
             id: editId || Date.now(),
-            type: currentEntryType,
+            type: currentEntryType === 'hizli' ? 'soru' : currentEntryType,
+            fast: currentEntryType === 'hizli',
             date: dateStr,
             isoDate,
             subject,
@@ -6913,10 +6957,10 @@ function saveEntry(event) {
             pages: pagesList.join(', '),
             // Yanlış Tekrarı kayıtları genel D/Y/B ve zayıflık istatistiklerine KARIŞMAZ
             // (bilinçli tercih: bunlar zaten yanlış bilinen sorular, doğruluk oranını çarpıtır).
-            totalQ: (currentEntryType === 'soru' || currentEntryType === 'karma') ? grandTotal : 0,
-            correct: (currentEntryType === 'soru' || currentEntryType === 'karma') ? grandCorrect : 0,
-            wrong: (currentEntryType === 'soru' || currentEntryType === 'karma') ? grandWrong : 0,
-            empty: (currentEntryType === 'soru' || currentEntryType === 'karma') ? grandEmpty : 0,
+            totalQ: (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'karma') ? grandTotal : 0,
+            correct: (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'karma') ? grandCorrect : 0,
+            wrong: (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'karma') ? grandWrong : 0,
+            empty: (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'karma') ? grandEmpty : 0,
             duration,
             dayStatusNote: dayStatusNoteText || null,
             studioNote: existingForTimestamp?.studioNote || null,
@@ -7013,7 +7057,7 @@ function startEdit(id) {
         if (standardEditContainer) standardEditContainer.classList.remove('hidden');
         if (subjSelect) subjSelect.required = true;
 
-        setEntryType(e.type === 'karma' ? 'karma' : (e.type === 'not' ? 'not' : (e.type === 'review' ? 'review' : 'soru')));
+        setEntryType(e.type === 'karma' ? 'karma' : (e.type === 'not' ? 'not' : (e.type === 'review' ? 'review' : (e.fast ? 'hizli' : 'soru'))));
 
         if (e.subject) {
             if (![...subjSelect.options].some(o => o.value === e.subject)) {
@@ -7522,7 +7566,6 @@ function applyStudioImportData(data) {
 
 init();
 </script>
-
 
 
 <!-- ═══ PWA: servis çalışanı (telefonda çevrimdışı açılış + güncelleme) ═══ -->
