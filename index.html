@@ -177,17 +177,103 @@
         .drive-spinner { border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 2px solid #fff; width: 12px; height: 12px; animation: spin 1s linear infinite; display: inline-block; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .task-item { display:flex; align-items:flex-start; gap:0.75rem; padding:0.65rem 0.75rem; background:rgba(15,23,42,0.5); border:1px solid rgba(51,65,85,0.4); border-radius:0.75rem; transition:all 0.2s; cursor:pointer; }
+        .task-item { display:flex; align-items:flex-start; gap:0.75rem; padding:0.8rem 0.85rem; min-height:52px; background:rgba(15,23,42,0.5); border:1px solid rgba(51,65,85,0.4); border-radius:0.85rem; transition:all 0.2s; cursor:pointer; }
+        .task-item:active { background:rgba(30,41,59,0.85); }
         .task-item:hover { border-color:rgba(59,130,246,0.5); background:rgba(30,41,59,0.7); }
         .task-item.done { opacity:0.55; }
         .task-item.done .task-title { text-decoration:line-through; color:#94a3b8; }
         .task-item.done .task-notes { opacity:0.7; }
-        .task-check { width:18px; height:18px; border-radius:5px; border:2px solid #475569; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.2s; margin-top:2px; }
+        .task-check { width:22px; height:22px; border-radius:6px; border:2px solid #475569; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.2s; margin-top:2px; }
         .task-check.checked { background:#10b981; border-color:#10b981; }
 
         /* Yeni Kavramlar rozetleri */
         .concept-item summary::-webkit-details-marker { display:none; }
         .concept-item[open] .concept-caret { transform: rotate(90deg); }
+
+        /* ═══════════════════════════════════════════════════════════
+           MOBİL OPTİMİZASYON — 31 Ağustos 2026
+           Telefon birincil cihaz; masaüstü ikincil. Buradaki kurallar
+           mobilde bozulan üç şeyi çözer: yatay taşma, çift navigasyon,
+           küçük dokunma hedefleri. Masaüstü görünümü aynı kalır.
+           ═══════════════════════════════════════════════════════════ */
+
+        /* Hiçbir şey sayfayı yatayda taşırmasın — bu tek kural, üst bardaki
+           bir taşmanın tüm sayfayı sağa sola kaydırmasını engeller. */
+        html, body { max-width: 100%; overflow-x: hidden; overscroll-behavior-y: contain; }
+
+        /* Çentik/güvenli alan: dolguyu body yerine header taşısın ki
+           sticky header kaydırınca durum çubuğunun altına girmesin. */
+        body { padding-top: 0; }
+        header { padding-top: var(--sat, 0px); }
+
+        /* ── Üst bardaki ikon butonları ──
+           Mobilde yalnız ikon (38px daire), geniş ekranda metin de açılır. */
+        .hdr-icon-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+            height: 40px; min-width: 40px; padding: 0 0.6rem;
+            border-radius: 9999px; border-width: 1px; border-style: solid;
+            font-size: 11px; font-weight: 600; line-height: 1;
+            transition: all 0.2s; flex-shrink: 0;
+        }
+        .hdr-icon-label { display: none; }
+        @media (min-width: 1024px) {
+            .hdr-icon-btn { padding: 0 0.75rem; }
+            .hdr-icon-label { display: inline; }
+        }
+
+        /* ── Alt navigasyon: 5 sekme, 56px dokunma hedefi ── */
+        #mobileNav button { position: relative; min-height: 56px; }
+        #mobileNav button.font-bold::before {
+            content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            width: 26px; height: 3px; border-radius: 0 0 3px 3px;
+            background: currentColor; opacity: 0.95;
+        }
+        #mobileNav button:active { opacity: 0.6; }
+
+        /* ── Dokunma hedefleri ── */
+        @media (max-width: 767px) {
+            input[type="checkbox"] { width: 1.15rem !important; height: 1.15rem !important; flex-shrink: 0; }
+            label:has(> input[type="checkbox"]) { min-height: 40px; }
+            /* İçerik alt navigasyonun ve yüzen butonun altında kalmasın */
+            .main-container-mobile { padding-bottom: calc(7rem + var(--sab, 0px)) !important; }
+            body { padding-bottom: 0; }
+        }
+
+        /* ── Görsel bakım ── */
+        body {
+            background-color: #0b0f19;
+            background-image:
+                radial-gradient(1100px 520px at 50% -240px, rgba(37, 99, 235, 0.16), transparent 70%),
+                radial-gradient(760px 420px at 100% 0%, rgba(79, 70, 229, 0.10), transparent 65%);
+            background-attachment: fixed;
+            -webkit-text-size-adjust: 100%;
+            text-rendering: optimizeLegibility;
+        }
+        header { box-shadow: 0 1px 0 rgba(148, 163, 184, 0.06), 0 8px 24px -16px rgba(0, 0, 0, 0.9); }
+        .glass-card { box-shadow: 0 12px 32px -22px rgba(0, 0, 0, 0.9); }
+
+        /* Yatayda kaydırılabilir alanlarda ivmeli kaydırma + gizli çubuk */
+        .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .scroll-x::-webkit-scrollbar { display: none; }
+
+        /* Klavye erişilebilirliği: görünür odak halkası */
+        :focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; border-radius: 0.5rem; }
+
+        /* iOS'ta input'a odaklanınca sayfanın zoomlamaması için 16px taban */
+        @media (max-width: 767px) {
+            input[type="text"], input[type="number"], input[type="date"], input[type="time"],
+            input[type="search"], input[type="email"], textarea, select { font-size: 16px !important; }
+            /* 16px yazıyla saat alanı dar kalmasın (00:00 kırpılıyordu) */
+            #inputTime { width: 112px !important; }
+
+            /* Uzun uyarı metni: 3 satır, dokununca açılır */
+            .sira-warn-clamp {
+                display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+            }
+            .sira-warn-clamp.sira-warn-open { -webkit-line-clamp: unset; overflow: visible; }
+        }
+
+        ::selection { background: rgba(37, 99, 235, 0.35); color: #fff; }
     </style>
     <!-- HMGS 2025 Fiziksel Kitap Rehberi & Canlı Takip Sync Modülü -->
     <script src="book_guide_data.js"></script>
@@ -283,7 +369,7 @@
 
 <!-- ══════════════ HEADER ══════════════ -->
 <header class="border-b border-slate-800 bg-slate-900/90 sticky top-0 z-40 backdrop-blur-md">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+    <div class="max-w-4xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex justify-between items-center gap-2 sm:gap-3">
         <div class="flex items-center gap-2.5 min-w-0">
             <div class="w-9 h-9 rounded-xl accent-gradient flex items-center justify-center text-white shadow-lg shadow-blue-500/20 flex-shrink-0">
                 <i class="fa-solid fa-scale-balanced text-sm"></i>
@@ -295,32 +381,34 @@
         </div>
 
         <!-- Top Right Actions & Drive Badge -->
-        <div class="flex items-center gap-2 flex-shrink-0">
-            <a href="http://localhost:8765/studio.html#odevler" target="_blank" class="px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-bold text-xs rounded-xl border border-indigo-500/40 transition flex items-center gap-1.5" title="HMGS Stüdyo Ödevler Paneline Git">
+        <!-- Mobilde: ikon-only, sıkışmasın diye metinler md üstünde açılır. -->
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 min-w-0">
+            <a href="http://localhost:8765/studio.html#odevler" target="_blank" class="hidden lg:flex px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-bold text-xs rounded-xl border border-indigo-500/40 transition items-center gap-1.5" title="HMGS Stüdyo Ödevler Paneline Git">
                 <i class="fa-solid fa-clipboard-list text-xs"></i>
                 <span>Stüdyo Ödevleri</span>
             </a>
-            <button id="headerKertikBtn" onclick="openKertikModal()" class="px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/40 transition flex items-center gap-1.5 shadow-sm" title="Kertik Kronometre Dışa Aktarımını İçe Aktar">
-                <i class="fa-solid fa-stopwatch text-xs"></i>
-                <span class="hidden sm:inline">Kertik'ten Aktar</span>
-                <span class="sm:hidden">Kertik</span>
+            <button id="headerKertikBtn" onclick="openKertikModal()" class="hdr-icon-btn bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border-amber-500/40" title="Kertik Kronometre Dışa Aktarımını İçe Aktar" aria-label="Kertik'ten aktar">
+                <i class="fa-solid fa-stopwatch text-sm"></i>
+                <span class="hdr-icon-label">Kertik'ten Aktar</span>
             </button>
-            <button id="headerAddBtn" onclick="openEntryModal()" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center gap-1.5">
-                <i class="fa-solid fa-plus text-xs"></i>
-                <span id="headerAddBtnText">Çalışma Ekle</span>
-            </button>
+            <div id="headerAddWrap" class="hidden md:block">
+                <button id="headerAddBtn" onclick="openEntryModal()" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span id="headerAddBtnText">Çalışma Ekle</span>
+                </button>
+            </div>
 
             <button id="driveBadge" onclick="handleConnectClick()"
-                class="text-[11px] font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1.5 transition border bg-slate-700/60 text-slate-400 border-slate-600 hover:bg-slate-700">
-                <i class="fa-brands fa-google-drive"></i>
-                <span id="driveBadgeText">Bağla</span>
+                class="hdr-icon-btn bg-slate-700/60 text-slate-400 border-slate-600 hover:bg-slate-700" aria-label="Google Drive'a bağla">
+                <i class="fa-brands fa-google-drive text-sm"></i>
+                <span id="driveBadgeText" class="hdr-icon-label">Bağla</span>
             </button>
             <button id="manualSyncBtn" onclick="manualSyncNow()" title="Mevcut veriyi şimdi Drive'a gönder"
-                class="text-[11px] font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1.5 transition border bg-slate-700/60 text-slate-300 border-slate-600 hover:bg-slate-700">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                <span>Gönder</span>
+                class="hdr-icon-btn bg-slate-700/60 text-slate-300 border-slate-600 hover:bg-slate-700" aria-label="Drive'a gönder">
+                <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+                <span class="hdr-icon-label">Gönder</span>
             </button>
-            <span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1">
+            <span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] font-bold px-2 py-1.5 rounded-full flex items-center gap-1 flex-shrink-0 tabular-nums" title="Sınava kalan gün">
                 <i class="fa-regular fa-clock text-[10px]"></i> <span id="daysLeft">—</span>g
             </span>
         </div>
@@ -329,8 +417,8 @@
 
 <main class="max-w-4xl mx-auto px-3 sm:px-4 mt-3 sm:mt-4 space-y-5 main-container-mobile">
 
-    <!-- TAB SWITCHER NAVBAR -->
-    <div class="flex rounded-2xl bg-slate-900/90 border border-slate-800 p-1.5 gap-1.5 text-xs font-bold shadow-xl">
+    <!-- TAB SWITCHER NAVBAR — mobilde gizli, alt navigasyon bunun işini görüyor -->
+    <div class="hidden md:flex rounded-2xl bg-slate-900/90 border border-slate-800 p-1.5 gap-1.5 text-xs font-bold shadow-xl">
         <button type="button" id="tabBtnSira" onclick="switchTab('sira')"
             class="flex-1 py-2.5 rounded-xl flex items-center justify-center gap-2 transition text-slate-400 hover:text-white hover:bg-slate-800/60">
             <i class="fa-solid fa-list-ol text-emerald-400"></i> Sıra <span class="hidden sm:inline">Listesi</span>
@@ -349,7 +437,7 @@
         </button>
         <button type="button" id="tabBtnAsistan" onclick="switchTab('asistan')"
             class="flex-1 py-2.5 rounded-xl flex items-center justify-center gap-2 transition text-slate-400 hover:text-white hover:bg-slate-800/60">
-            <i class="fa-solid fa-sparkles text-purple-400"></i> Asistan <span class="hidden sm:inline">Kutusu</span>
+            <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i> Asistan <span class="hidden sm:inline">Kutusu</span>
             <span id="tabBadge" class="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded-full hidden">0</span>
         </button>
     </div>
@@ -361,7 +449,9 @@
     <div id="viewSira" class="hidden space-y-4">
 
         <div class="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3">
-            <p id="siraWarn" class="text-[13px] text-rose-200 leading-relaxed"></p>
+            <p id="siraWarn" class="text-[13px] text-rose-200 leading-relaxed sira-warn-clamp"></p>
+            <button type="button" id="siraWarnToggle" onclick="toggleSiraWarn()"
+                class="md:hidden mt-2 text-[11px] font-bold text-rose-300/90 underline underline-offset-2 decoration-rose-400/40">devamını göster</button>
         </div>
 
         <!-- BUGÜNÜN PAYI -->
@@ -806,20 +896,21 @@
 </main>
 
 <!-- ══════════════ MOBİL SABİT ALT GEZİNTİ ÇUBUĞU (BOTTOM NAV BAR) ══════════════ -->
-<nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/80 backdrop-blur-xl px-2 py-1.5 flex justify-around items-center touch-action-btn shadow-2xl" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
-    <button type="button" id="mbTabGunluk" onclick="switchTab('gunluk')" class="flex-1 py-1 flex flex-col items-center justify-center gap-0.5 text-blue-500 font-bold transition">
-        <i class="fa-solid fa-book-open text-lg"></i>
-        <span class="text-[10px] font-semibold tracking-tight">Günlük</span>
-    </button>
-
+<!-- ══════════════ MOBİL ALT NAVİGASYON — 5 sekme, hepsi parmakla erişilebilir ══════════════ -->
+<nav id="mobileNav" class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/80 backdrop-blur-xl px-1 flex items-stretch touch-action-btn shadow-2xl" style="padding-bottom: max(0.35rem, env(safe-area-inset-bottom));">
     <button type="button" id="mbTabSira" onclick="switchTab('sira')" class="flex-1 py-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white font-medium transition">
         <i class="fa-solid fa-list-ol text-lg"></i>
         <span class="text-[10px] font-semibold tracking-tight">Sıra</span>
     </button>
 
-    <!-- Central FAB Quick Add Button -->
-    <button type="button" id="mbFabAdd" onclick="openEntryModal()" class="w-12 h-12 -mt-5 rounded-full accent-gradient text-white flex items-center justify-center shadow-lg shadow-blue-500/40 border-2 border-slate-900 active:scale-95 transition flex-shrink-0">
-        <i class="fa-solid fa-plus text-lg"></i>
+    <button type="button" id="mbTabGunluk" onclick="switchTab('gunluk')" class="flex-1 py-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white font-medium transition">
+        <i class="fa-solid fa-book-open text-lg"></i>
+        <span class="text-[10px] font-semibold tracking-tight">Günlük</span>
+    </button>
+
+    <button type="button" id="mbTabTakvim" onclick="switchTab('takvim')" class="flex-1 py-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white font-medium transition">
+        <i class="fa-solid fa-calendar-days text-lg"></i>
+        <span class="text-[10px] font-semibold tracking-tight">Takvim</span>
     </button>
 
     <button type="button" id="mbTabDeneme" onclick="switchTab('deneme')" class="flex-1 py-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white font-medium transition">
@@ -828,11 +919,18 @@
     </button>
 
     <button type="button" id="mbTabAsistan" onclick="switchTab('asistan')" class="flex-1 py-1 flex flex-col items-center justify-center gap-0.5 text-slate-400 hover:text-white font-medium transition relative">
-        <i class="fa-solid fa-sparkles text-lg"></i>
+        <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
         <span class="text-[10px] font-semibold tracking-tight">Asistan</span>
-        <span id="mbTabBadge" class="absolute top-1 right-3 w-2 h-2 bg-purple-500 rounded-full hidden"></span>
+        <span id="mbTabBadge" class="absolute top-1 right-2.5 w-2 h-2 bg-purple-500 rounded-full hidden"></span>
     </button>
 </nav>
+
+<!-- Yüzen hızlı ekleme butonu — aktif sekmeye göre renk ve işlev değiştirir -->
+<button type="button" id="mbFabAdd" onclick="openEntryModal()" aria-label="Hızlı ekle"
+    class="md:hidden fixed right-4 z-40 w-14 h-14 rounded-full accent-gradient text-white flex items-center justify-center shadow-2xl shadow-blue-500/40 border border-white/10 active:scale-90 transition"
+    style="bottom: calc(4.9rem + env(safe-area-inset-bottom));">
+    <i class="fa-solid fa-plus text-xl"></i>
+</button>
 
 <!-- ══════════════ ÇALIŞMA EKLE / DÜZENLE MODALI ══════════════ -->
 <div id="entryModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto mobile-bottom-sheet">
@@ -1331,7 +1429,7 @@
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
             <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
-                    <i class="fa-solid fa-sparkles text-sm"></i>
+                    <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
                 </div>
                 <div>
                     <h3 class="font-extrabold text-white text-sm">Koçluk Mesajı Yaz / Düzenle</h3>
@@ -2978,6 +3076,16 @@ function siraReset() {
     siraSave(); renderSira();
 }
 
+// Sıra sekmesindeki uzun uyarı metni telefonda ekranın yarısını yiyordu:
+// 3 satıra kırp, dokununca aç.
+function toggleSiraWarn() {
+    const p = document.getElementById('siraWarn');
+    const b = document.getElementById('siraWarnToggle');
+    if (!p || !b) return;
+    const open = p.classList.toggle('sira-warn-open');
+    b.textContent = open ? 'kısalt' : 'devamını göster';
+}
+
 function switchTab(tab) {
     activeTab = tab;
     const vSira = document.getElementById('viewSira');
@@ -3072,6 +3180,24 @@ function switchTab(tab) {
             btnAdd.onclick = focusAskQuestionInput;
         }
         renderInboxView();
+    }
+
+    // Yüzen mobil buton, üstteki eylem butonuyla aynı işi yapsın (sekmeye göre renk + işlev)
+    const fab = document.getElementById('mbFabAdd');
+    if (fab) {
+        const fabTheme = {
+            sira:    { bg: 'linear-gradient(135deg,#059669 0%,#10b981 100%)', shadow: '0 10px 30px -8px rgba(16,185,129,.55)' },
+            gunluk:  { bg: 'linear-gradient(135deg,#2563eb 0%,#4f46e5 100%)', shadow: '0 10px 30px -8px rgba(59,130,246,.55)' },
+            takvim:  { bg: 'linear-gradient(135deg,#0284c7 0%,#0ea5e9 100%)', shadow: '0 10px 30px -8px rgba(14,165,233,.55)' },
+            deneme:  { bg: 'linear-gradient(135deg,#d97706 0%,#f59e0b 100%)', shadow: '0 10px 30px -8px rgba(245,158,11,.55)' },
+            asistan: { bg: 'linear-gradient(135deg,#7c3aed 0%,#a855f7 100%)', shadow: '0 10px 30px -8px rgba(168,85,247,.55)' }
+        }[tab];
+        if (fabTheme) { fab.style.background = fabTheme.bg; fab.style.boxShadow = fabTheme.shadow; }
+        // Asistan sekmesinde soru kutusu zaten ekranın altında — yüzen buton onu kapatmasın
+        fab.style.display = (tab === 'asistan') ? 'none' : '';
+        if (btnAdd && btnAdd.onclick) fab.onclick = btnAdd.onclick;
+        const fabIcon = fab.querySelector('i');
+        if (fabIcon) fabIcon.className = (tab === 'asistan' ? 'fa-solid fa-pen text-xl' : 'fa-solid fa-plus text-xl');
     }
 }
 
@@ -4488,10 +4614,10 @@ function setDriveStatus(status) {
     const badge = document.getElementById('driveBadge');
     const text  = document.getElementById('driveBadgeText');
     const classes = {
-        connected: 'text-[11px] font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1.5 transition border bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-        syncing:   'text-[11px] font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1.5 transition border bg-blue-500/10 text-blue-400 border-blue-500/30',
-        error:     'text-[11px] font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1.5 transition border bg-rose-500/10 text-rose-400 border-rose-500/30',
-        offline:   'text-[11px] font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1.5 transition border bg-slate-700/60 text-slate-400 border-slate-600 hover:bg-slate-700'
+        connected: 'hdr-icon-btn bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+        syncing:   'hdr-icon-btn bg-blue-500/10 text-blue-400 border-blue-500/30',
+        error:     'hdr-icon-btn bg-rose-500/10 text-rose-400 border-rose-500/30',
+        offline:   'hdr-icon-btn bg-slate-700/60 text-slate-400 border-slate-600 hover:bg-slate-700'
     };
     badge.className = classes[status] || classes.offline;
     if (status === 'connected') text.textContent = 'Bağlı';
@@ -5327,17 +5453,15 @@ function createTaskElement(task) {
             ${done ? '<i class="fa-solid fa-check text-white text-[8px]"></i>' : ''}
         </div>
         <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between gap-2">
-                <p class="task-title text-xs font-semibold text-white leading-snug">${safeTitle}</p>
+            <div class="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+                <p class="task-title text-[13px] font-semibold text-white leading-snug flex-1 min-w-[58%]">${safeTitle}</p>
                 <div class="flex items-center gap-1.5 flex-shrink-0">
                     ${actionBtnHtml}
                     ${dateLabel}
                 </div>
             </div>
             ${safeNotes ? `
-                <div class="task-notes mt-1.5 p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed font-normal whitespace-pre-wrap break-words">
-                    ${safeNotes}
-                </div>
+                <div class="task-notes mt-1.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-[12px] text-slate-300 leading-relaxed font-normal whitespace-pre-wrap break-words">${safeNotes}</div>
             ` : ''}
         </div>
     `;
@@ -5669,16 +5793,14 @@ function renderGoogleTasks(tasks, listId) {
                 ${done ? '<i class="fa-solid fa-check text-white text-[8px]"></i>' : ''}
             </div>
             <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between gap-2">
-                    <p class="task-title text-xs font-semibold text-white leading-snug">${safeTitle}</p>
+                <div class="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+                    <p class="task-title text-[13px] font-semibold text-white leading-snug flex-1 min-w-[58%]">${safeTitle}</p>
                     <div class="flex items-center gap-1.5 flex-shrink-0">
                         ${dateLabel}
                     </div>
                 </div>
                 ${safeNotes ? `
-                    <div class="task-notes mt-1.5 p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 text-[11px] text-slate-300 leading-relaxed font-normal whitespace-pre-wrap break-words">
-                        ${safeNotes}
-                    </div>
+                    <div class="task-notes mt-1.5 p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80 text-[12px] text-slate-300 leading-relaxed font-normal whitespace-pre-wrap break-words">${safeNotes}</div>
                 ` : ''}
             </div>
         `;
