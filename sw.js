@@ -1,7 +1,7 @@
 /* HMGS 2026 — Service Worker
    Amaç: uygulama telefonda internetsiz de açılsın; Drive trafiği ASLA önbelleğe girmesin. */
 
-const VERSION = 'hmgs-v6';
+const VERSION = 'hmgs-v7';
 const SHELL = VERSION + '-shell';
 
 // Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
