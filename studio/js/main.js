@@ -10,7 +10,9 @@
 import { $, $$, toast } from './ui.js';
 import { initData, initDataAsync, populateData, topicById, questionById } from './data.js';
 import { load, save, daysLeft, state } from './store.js';
-import { requestDriveLoginAndDownload, clearVaultIndexedDB } from './vault-client.js';
+import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress } from './vault-client.js';
+
+
 import * as today from './views/today.js';
 import * as odevler from './views/odevler.js';
 import * as practice from './views/practice.js';
@@ -241,10 +243,12 @@ document.addEventListener('click', async e => {
       try {
         const vault = await requestDriveLoginAndDownload();
         populateData(vault);
-        toast('Kütüphane güncellendi ✓', 'ok');
+        const pSync = await syncStudioProgress(false);
+        toast(pSync ? 'Kütüphane ve ilerleme eşitlendi ✓' : 'Kütüphane güncellendi ✓', 'ok');
         const initial = (location.hash || '#today').slice(1);
         show(VIEWS.includes(initial) ? initial : 'today', false);
       } catch (err) {
+
         console.error('[vault sync error]', err);
         toast(`Bağlantı hatası: ${err.message}`, 'no');
         btn.innerHTML = oldText;
@@ -352,6 +356,12 @@ async function boot() {
     const initial = (location.hash || '#today').slice(1);
     show(VIEWS.includes(initial) ? initial : 'today', false);
     try { history.replaceState({ view: currentView }, '', '#' + currentView); } catch (e) {}
+
+    // Arka planda Drive'daki güncel ilerlemeyi sessizce birleştir
+    syncStudioProgress(false).then(res => {
+      if (res && currentView === 'progress') progress.render($('#view-progress'));
+    }).catch(() => {});
+
 
     // Veri sorunlarını sessizce geçme
     if (rep.brokenTopicIds > 0) console.warn(`[uyarı] ${rep.brokenTopicIds} soru var olmayan bir konuya işaret ediyor.`);
