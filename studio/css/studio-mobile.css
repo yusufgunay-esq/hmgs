@@ -1,0 +1,236 @@
+/* ==========================================================================
+   HMGS STÜDYO — MOBİL KATMAN  (9 Ağustos 2026)
+   studio.css'in ÜSTÜNE yüklenir. Masaüstü görünümü hiç değiştirmez:
+   buradaki her kural bir @media sorgusunun içindedir.
+
+   Neden ayrı dosya: studio.css tek tasarım sistemi dosyası ve içinde
+   dağınık birkaç küçük @media bloğu var. Mobil davranışı tek yerde
+   toplamak, telefonda bir şey bozulduğunda nereye bakılacağını belli eder.
+
+   Hedef cihaz: Pixel 9 Pro XL (CSS genişliği ~412px), Edge/Chrome Android.
+   Kırılma noktası 760px — tablet dikey de mobil düzeni alır.
+   ========================================================================== */
+
+/* ---------- Her genişlikte geçerli dokunma düzeltmeleri ---------- */
+button, .opt, .opt-x, .premise-item, .flow-toc a, .item-card, .opt-btn {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;   /* çift dokunuşta yakınlaştırma gecikmesini kaldırır */
+}
+
+/* Görsel motor ve tablolar hiçbir ekranda yatay taşma yapmasın */
+.visual-legacy { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.hv3-host { max-width: 100%; overflow-x: auto; }
+.hv3-host svg, .visual-slot svg, .visual-slot img { max-width: 100%; height: auto; }
+
+@media (max-width: 760px) {
+
+  /* ===== 1. ÜST ÇUBUK: tek satır, sadece marka + geri sayım ===== */
+  .topbar {
+    gap: 0.75rem;
+    padding: 0.6rem 0.9rem;
+    padding-top: max(0.6rem, env(safe-area-inset-top));
+  }
+  .brand { font-size: 0.9rem; }
+  .countdown { margin-left: auto; font-size: 0.72rem; padding: 0.3rem 0.6rem; }
+
+  /* ===== 2. GEZİNTİ: alta sabit sekme çubuğu =====
+     studio.html'deki mevcut .nav düğmeleri (data-view) olduğu gibi
+     kullanılıyor — JS'e dokunmadan sadece konumlandırılıyor. */
+  .nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0;
+    background: rgba(250, 249, 246, 0.94);
+    backdrop-filter: saturate(180%) blur(16px);
+    border-top: 1px solid var(--line);
+    padding: 0.3rem 0.15rem;
+    padding-bottom: max(0.3rem, env(safe-area-inset-bottom));
+  }
+  .nav button {
+    padding: 0.5rem 0.15rem 0.45rem;
+    border-radius: var(--r-s);
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.15;
+    color: var(--ink-3);
+    text-align: center;
+    min-height: 44px;                /* dokunma hedefi */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nav button:hover { background: none; color: var(--ink-3); }
+  .nav button[aria-current="true"] {
+    background: none;
+    color: var(--accent-ink);
+    box-shadow: inset 0 2px 0 var(--accent);   /* üstte ince aktiflik çizgisi */
+  }
+  .nav button:active { background: var(--bg-hover); }
+
+  /* ===== 3. YERLEŞİM ===== */
+  main { padding: 1.1rem 0.9rem calc(4.75rem + env(safe-area-inset-bottom)); }
+  .wrap, .wrap-read, .read { max-width: 100%; }
+  .card { padding: 1.05rem; border-radius: var(--r-m); }
+  .hero { padding: 1.35rem 1.15rem; }
+  .hero-title { font-size: 1.28rem; }
+  .hero-why { font-size: 0.88rem; margin-bottom: 1.1rem; }
+  h1.page { font-size: 1.28rem; }
+  p.page-sub { margin-bottom: 1.25rem; }
+  .section-label { margin: 1.6rem 0 0.7rem; }
+
+  /* Düğmeler: parmakla basılacak boyda */
+  .btn { padding: 0.75rem 1.15rem; min-height: 46px; }
+  .btn-s { padding: 0.55rem 0.9rem; min-height: 40px; font-size: 0.82rem; }
+  .btn:active:not(:disabled) { transform: scale(0.97); filter: brightness(1.05); }
+  .btn-row { gap: 0.5rem; }
+
+  /* Klavye ipuçları telefonda anlamsız */
+  .kbd, .hint .kbd { display: none; }
+  .q-main .btn-row .hint { display: none; }
+
+  /* ===== 4. SORU EKRANI ===== */
+  .q-head { gap: 0.4rem 0.5rem; margin-bottom: 1rem; font-size: 0.74rem; }
+  .q-timer { margin-left: auto; }
+  .q-progress { margin-bottom: 1rem; }
+
+  .premise-lead, .premise-item { font-size: 1.04rem; line-height: 1.62; }
+  .premise-item { padding: 0.3rem 0.4rem; }        /* eleme için daha geniş hedef */
+  .q-ask { font-size: 1.09rem; margin-bottom: 1.15rem; }
+
+  /* Şıklar: 44px+ hedef, metin seçimi kapalı (eleme dokunuşunda
+     istemsiz metin seçimi çıkmasın diye) */
+  .opts { gap: 0.55rem; }
+  .opt {
+    grid-template-columns: 1.6rem 1fr;
+    gap: 0.7rem;
+    padding: 0.85rem 3rem 0.85rem 0.85rem;   /* sağda eleme düğmesine yer */
+    font-size: 0.95rem;
+    line-height: 1.5;
+    min-height: 52px;
+    align-items: center;
+    -webkit-user-select: none; user-select: none;
+  }
+  .opt:hover:not(.done) { border-color: var(--line); background: var(--bg-raise); }
+  .opt:active:not(.done) { border-color: var(--accent); background: var(--accent-soft); }
+  .opt-k { width: 1.6rem; height: 1.6rem; }
+  .opt-x {
+    top: 50%; right: 0.55rem; transform: translateY(-50%);
+    width: 2rem; height: 2rem; font-size: 0.75rem;
+  }
+
+  /* Geri bildirim: cevaptan sonra alta gelir, yapışkan "Sonraki" düğmesiyle */
+  .feedback { padding: 1.1rem 1rem; border-radius: var(--r-m); font-size: 0.9rem; }
+  .fb-head { gap: 0.55rem; padding-bottom: 0.8rem; margin-bottom: 0.8rem; }
+  .fb-time { font-size: 0.68rem; }
+  .q-side .btn-row {
+    position: sticky;
+    bottom: calc(0.6rem + env(safe-area-inset-bottom));
+    z-index: 30;
+  }
+  .q-side .btn-row .btn {
+    flex: 1;
+    justify-content: center;
+    box-shadow: 0 6px 20px rgba(24, 24, 27, 0.18);
+  }
+
+  /* ===== 5. KONU AKIŞI ===== */
+  .flow-layout { gap: 1.25rem; }
+  .flow-side {
+    background: var(--bg-raise);
+    border: 1px solid var(--line);
+    border-radius: var(--r-m);
+    padding: 0.75rem;
+  }
+  .flow-toc { max-height: 38vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .flow-toc a { padding: 0.55rem 0.6rem; min-height: 40px; }
+  .flow-select { padding: 0.65rem 0.7rem; font-size: 16px; padding-right: 2rem; }  /* 16px: odaklanınca yakınlaştırma olmasın */
+  .read h2 { font-size: 1.42rem; }
+  .read p { font-size: 1.07rem; line-height: 1.72; }
+  .read section { margin-bottom: 2.25rem; }
+  .read .basisline { margin-bottom: 1.75rem; }
+  .reveal-box > button { padding: 0.85rem 0.9rem; min-height: 48px; }
+  .reveal-box > div { padding: 0.9rem; }
+  .trap { padding: 0.8rem 0.9rem; }
+  .cite { padding-left: 0.9rem; }
+
+  /* ===== 6. DENEME ===== */
+  .exam-bar {
+    top: 0;                                  /* üst çubuk mobilde kısa */
+    padding: 0.65rem 0.75rem;
+    gap: 0.6rem;
+    margin-bottom: 1.15rem;
+    border-radius: var(--r-m);
+  }
+  .exam-clock { font-size: 1.05rem; }
+  .exam-map {
+    margin-left: 0;
+    max-width: 100%;
+    width: 100%;
+    max-height: 4.6rem;                      /* ~3 satır; gerisi kaydırılır */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 4px;
+  }
+  .exam-map button { width: 1.75rem; height: 1.75rem; font-size: 0.68rem; }
+
+  .result-net { font-size: 3rem; }
+  .result-hero { padding: 1.75rem 1rem; }
+
+  /* Tablolar: satırlar dar ekranda ezilmesin, yatay kaydırılsın */
+  table.tbl { display: block; overflow-x: auto; white-space: nowrap; }
+  table.tbl th, table.tbl td { padding: 0.5rem 0.55rem; }
+
+  /* ===== 7. DERS SATIRLARI / METRİKLER ===== */
+  .subj {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+    padding: 0.8rem 0.85rem;
+  }
+  .subj-right { flex-wrap: wrap; }
+  .subj-right .btn { width: 100%; }
+  .grid { gap: 0.75rem; }
+  .grid-3 { grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }
+  .metric { padding: 0.9rem 1rem; }
+  .metric-v { font-size: 1.45rem; }
+
+  /* ===== 8. PRATİK ALANI ===== */
+  .drop-targets { grid-template-columns: 1fr; }
+  .classify-pool { padding: 0.75rem; }
+  .item-card { padding: 0.8rem 0.85rem; min-height: 48px; }
+  .opt-btn { padding: 0.6rem 0.9rem; min-height: 42px; font-size: 0.86rem; }
+  .guess-opts { gap: 0.45rem; }
+  .pratik-next { flex-direction: column; align-items: stretch; gap: 0.7rem; text-align: center; }
+  .pratik-next .btn { width: 100%; justify-content: center; }
+  .cr-on, .cr-arka { padding: 1rem; }
+  .cr-bedel { font-size: 1.35rem; }
+  .cr-tur { max-width: 5rem; font-size: 0.64rem; }
+  .select-input, .range-input { font-size: 16px; padding: 0.65rem; }
+
+  /* ===== 9. BOŞ DURUM ===== */
+  .empty { padding: 2rem 0.75rem; }
+}
+
+/* Çok dar cihazlar (≤360px): sekme etiketleri daha da küçülür */
+@media (max-width: 360px) {
+  .nav button { font-size: 0.62rem; padding-left: 0.05rem; padding-right: 0.05rem; }
+  .brand { font-size: 0.82rem; }
+  .countdown { font-size: 0.66rem; }
+}
+
+/* Yatay (manzara) modda alt çubuk ekranın çoğunu yemesin */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  .nav { padding-top: 0.15rem; padding-bottom: max(0.15rem, env(safe-area-inset-bottom)); }
+  .nav button { min-height: 36px; padding-top: 0.3rem; padding-bottom: 0.3rem; }
+  main { padding-bottom: calc(3.75rem + env(safe-area-inset-bottom)); }
+}
+
+/* Ayrı pencere (ana ekrandan açılan uygulama) modu:
+   tarayıcı adres çubuğu yok, üst boşluğu biz veriyoruz. */
+@media (display-mode: standalone) {
+  .topbar { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+  body { overscroll-behavior-y: none; }   /* aşağı çekince sayfa yenilenmesin */
+}
