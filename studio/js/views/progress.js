@@ -95,17 +95,17 @@ export function render() {
         </table>
       </div>
 
-      <div class="section-label">Google Drive Soru & Konu Kasası</div>
+      <div class="section-label">Kütüphane</div>
       <div class="card">
         <p class="hint" style="margin-bottom:0.75rem">
-          Sorular ve konular kişisel Google Drive kasanızdan telefonunuza IndexedDB olarak indirilir ve %100 çevrimdışı çalışır.
-          ${localStorage.getItem('hmgs_vault_last_synced') ? `<br><span style="color:var(--ok);font-size:0.8rem">✓ Son Eşitleme: ${new Date(localStorage.getItem('hmgs_vault_last_synced')).toLocaleString('tr-TR')}</span>` : ''}
+          Çalışma kütüphanesini güncelleyin veya yerel önbelleği temizleyin.
         </p>
         <div class="btn-row">
-          <button class="btn btn-s" data-act="sync-vault">☁️ Drive'dan Kütüphaneyi Yenile</button>
-          <button class="btn btn-2 btn-s" data-act="clear-vault-cache" style="color:var(--warn)">Yerel Önbelleği Temizle</button>
+          <button class="btn btn-s" data-act="sync-vault">Kütüphaneyi Güncelle</button>
+          <button class="btn btn-2 btn-s" data-act="clear-vault-cache" style="color:var(--warn)">Önbelleği Temizle</button>
         </div>
       </div>
+
 
       <div class="section-label">Veri</div>
       <div class="card">
