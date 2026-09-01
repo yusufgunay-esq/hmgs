@@ -236,17 +236,17 @@ document.addEventListener('click', async e => {
     case 'sync-vault': {
       const btn = el;
       const oldText = btn.innerHTML;
-      btn.innerHTML = '⏳ Drive İndiriliyor...';
+      btn.innerHTML = 'Eşitleniyor...';
       btn.disabled = true;
       try {
         const vault = await requestDriveLoginAndDownload();
         populateData(vault);
-        toast(`Kütüphane güncellendi: ${vault.counts.questions} soru, ${vault.counts.topics} konu ✓`, 'ok');
+        toast('Kütüphane güncellendi ✓', 'ok');
         const initial = (location.hash || '#today').slice(1);
         show(VIEWS.includes(initial) ? initial : 'today', false);
       } catch (err) {
         console.error('[vault sync error]', err);
-        toast(`İndirme başarısız: ${err.message}`, 'no');
+        toast(`Bağlantı hatası: ${err.message}`, 'no');
         btn.innerHTML = oldText;
         btn.disabled = false;
       }
@@ -254,9 +254,9 @@ document.addEventListener('click', async e => {
     }
 
     case 'clear-vault-cache': {
-      if (confirm('Telefonunuzdaki çevrimdışı soru/konu kütüphanesi silinecek. Tekrar Drive\'dan indirmeniz gerekecek.\n\nEmin misiniz?')) {
+      if (confirm('Kayıtlı kütüphane silinecek. Tekrar eşitlemeniz gerekecek.\n\nEmin misiniz?')) {
         await clearVaultIndexedDB();
-        toast('Yerel kütüphane temizlendi.');
+        toast('Önbellek temizlendi.');
         location.reload();
       }
       break;
@@ -306,36 +306,31 @@ window.addEventListener('beforeunload', e => {
   if (exam.active()) { e.preventDefault(); e.returnValue = ''; }
 });
 
-/* ---------- Drive Bağlantı Ekranı (İlk Açılış / Mobil PWA) ---------- */
+/* ---------- Kütüphane Eşitleme Ekranı (İlk Açılış) ---------- */
 
 function renderDriveConnectScreen() {
   const host = $('#view-today');
   if (!host) return;
 
   host.innerHTML = `
-    <div class="wrap" style="padding:2.5rem 1rem;max-width:540px;margin:0 auto">
-      <div class="card" style="border-top:4px solid var(--accent);text-align:center;padding:2rem 1.5rem">
-        <div style="font-size:2.8rem;margin-bottom:1rem">⚖️ ☁️</div>
-        <h2 style="font-size:1.35rem;font-weight:800;color:var(--ink);margin-bottom:0.6rem">
-          HMGS Stüdyo Kütüphanesi
+    <div class="wrap" style="padding:4rem 1rem;max-width:380px;margin:0 auto">
+      <div class="card" style="text-align:center;padding:2.5rem 1.5rem">
+        <div style="font-size:2.2rem;margin-bottom:0.75rem">⚖️</div>
+        <h2 style="font-size:1.25rem;font-weight:700;color:var(--ink);margin-bottom:0.5rem">
+          HMGS Stüdyo
         </h2>
-        <p style="color:var(--ink-2);font-size:0.92rem;line-height:1.6;margin-bottom:1.5rem">
-          Soru bankaları (<b>3.065 soru</b>) ve interaktif konu anlatımları (<b>124 konu</b>) telif ve gizlilik güvenliği için şahsi Google Drive kasanızda saklanır.
-          <br><br>
-          Aşağıdaki butona dokunarak kütüphaneyi telefonunuza bir kez indirin. İndirildikten sonra uygulama <b>%100 internetsiz (çevrimdışı)</b> çalışır.
+        <p style="color:var(--ink-2);font-size:0.9rem;line-height:1.5;margin-bottom:1.75rem">
+          Çalışmaya başlamak için kütüphanenizi eşitleyin.
         </p>
 
-        <button class="btn" data-act="drive-connect-vault" style="width:100%;font-size:1rem;padding:0.9rem 1.2rem;justify-content:center;display:flex;align-items:center;gap:0.6rem;font-weight:700">
-          <span>🔑</span> Google Drive ile Kütüphaneyi İndir
+        <button class="btn" data-act="drive-connect-vault" style="width:100%;font-size:0.95rem;padding:0.8rem 1.2rem;justify-content:center;display:flex;align-items:center;gap:0.5rem;font-weight:600">
+          Kütüphaneyi Eşitle
         </button>
-
-        <div style="margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid var(--line);font-size:0.8rem;color:var(--ink-3)">
-          <span>Bağlı Hesap: Google Cloud Client Synced</span> · <span>Offline PWA Hazır</span>
-        </div>
       </div>
     </div>
   `;
 }
+
 
 /* ---------- başlangıç ---------- */
 
