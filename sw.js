@@ -1,7 +1,7 @@
 /* HMGS 2026 — Service Worker
    Amaç: uygulama telefonda internetsiz de açılsın; Drive trafiği ASLA önbelleğe girmesin. */
 
-const VERSION = 'hmgs-v9';
+const VERSION = 'hmgs-v10';
 const SHELL = VERSION + '-shell';
 
 // Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
@@ -62,7 +62,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => !k.startsWith(VERSION)).map(k => caches.delete(k)));
+    await Promise.all(keys.filter(k => k !== SHELL).map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
@@ -82,34 +82,27 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/api/')) return;                      // yerel sunucu uçları
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
-  // Sayfa açılışı: önce ağ, olmazsa önbellekteki kabuk (uçakta da açılır).
-  if (req.mode === 'navigate') {
-    event.respondWith((async () => {
-      try {
-        const fresh = await fetch(req);
-        const cache = await caches.open(SHELL);
-        cache.put('./index.html', fresh.clone());
-        return fresh;
-      } catch (_) {
-        const cached = await caches.match('./index.html');
-        return cached || new Response(
-          '<meta charset="utf-8"><body style="background:#0b0f19;color:#94a3b8;font:16px system-ui;padding:2rem">Bağlantı yok ve önbellek boş. Bir kez internetli açman gerekiyor.</body>',
-          { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-        );
-      }
-    })());
-    return;
-  }
-
-  // Diğer dosyalar: önbellekten ver, arka planda tazele.
+  // Sayfa açılışı ve modül dosyaları: Ağ öncelikli (network-first), bağlantı yoksa önbellek
   event.respondWith((async () => {
-    const cached = await caches.match(req);
-    const network = fetch(req).then(res => {
-      if (res && (res.ok || res.type === 'opaque')) {
-        caches.open(SHELL).then(c => c.put(req, res.clone())).catch(() => {});
+    try {
+      const fresh = await fetch(req);
+      if (fresh && (fresh.ok || fresh.type === 'opaque')) {
+        const cache = await caches.open(SHELL);
+        cache.put(req, fresh.clone()).catch(() => {});
       }
-      return res;
-    }).catch(() => null);
-    return cached || (await network) || new Response('', { status: 504 });
+      return fresh;
+    } catch (_) {
+      const cached = await caches.match(req);
+      if (cached) return cached;
+      if (req.mode === 'navigate') {
+        const fallback = await caches.match('./studio.html') || await caches.match('./index.html');
+        if (fallback) return fallback;
+      }
+      return new Response(
+        '<meta charset="utf-8"><body style="background:#0b0f19;color:#94a3b8;font:16px system-ui;padding:2rem">Bağlantı yok ve önbellek henüz hazır değil. İnternete bağlandığınızda sayfa otomatik yüklenecektir.</body>',
+        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+      );
+    }
   })());
 });
+
