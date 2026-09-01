@@ -75,9 +75,33 @@ export function load() {
   return S;
 }
 
+let stateChangeCallbacks = [];
+let autoSyncTimer = null;
+
+export function onStateChange(cb) {
+  if (typeof cb === 'function') stateChangeCallbacks.push(cb);
+}
+
+export function replaceState(newState) {
+  S = migrate(newState);
+  try {
+    localStorage.setItem(KEY, JSON.stringify(S));
+  } catch (e) {
+    console.error('[store] replaceState yazılamadı:', e);
+  }
+}
+
 export function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify(S));
+    if (stateChangeCallbacks.length > 0) {
+      clearTimeout(autoSyncTimer);
+      autoSyncTimer = setTimeout(() => {
+        stateChangeCallbacks.forEach(cb => {
+          try { cb(S); } catch (err) { console.warn('[store] onStateChange hatası:', err); }
+        });
+      }, 4000);
+    }
   } catch (e) {
     console.error('[store] yazılamadı:', e);
   }
@@ -94,6 +118,7 @@ export function hardReset() {
 export function exportJSON() {
   return JSON.stringify({ ...S, exportedAt: new Date().toISOString() }, null, 2);
 }
+
 
 /* ---------- TELEMETRİ: her cevap kaydedilir ---------- */
 
