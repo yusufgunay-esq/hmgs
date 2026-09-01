@@ -81,8 +81,9 @@ function runAction(a) {
 
 /* ---------- tek olay dinleyici ---------- */
 
-document.addEventListener('click', e => {
+document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act], [data-view]');
+
   if (!el) return;
 
   if (el.dataset.view) { e.preventDefault(); show(el.dataset.view); return; }
