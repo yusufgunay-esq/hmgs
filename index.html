@@ -25,74 +25,7 @@
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    
-<!-- ═══════════════════════════════════════ -->
-<!-- KERTIK IMPORT MODAL -->
-<!-- ═══════════════════════════════════════ -->
-<div id="kertikModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-    <div class="glass-card rounded-3xl p-5 sm:p-6 max-w-2xl w-full space-y-4 border border-amber-500/30 shadow-2xl bg-slate-900/95 max-h-[90vh] flex flex-col">
-        <!-- Modal Header -->
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div class="flex items-center gap-2.5">
-                <div class="w-9 h-9 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                    <i class="fa-solid fa-stopwatch text-sm"></i>
-                </div>
-                <div>
-                    <h3 class="font-extrabold text-white text-sm">Kertik Seanslarını İçe Aktar</h3>
-                    <p class="text-[10px] text-slate-400">Kronometre dışa aktarım dosyasını veya JSON metnini HMGS günlüğüne aktar</p>
-                </div>
-            </div>
-            <button onclick="closeKertikModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
-                <i class="fa-solid fa-xmark text-sm"></i>
-            </button>
-        </div>
 
-        <!-- Tabs: File / Text -->
-        <div class="flex rounded-xl overflow-hidden border border-slate-800 text-xs font-bold">
-            <button type="button" id="tabKertikFile" onclick="setKertikTab('file')" class="flex-1 py-2.5 flex items-center justify-center gap-1.5 bg-amber-600 text-white transition">
-                <i class="fa-solid fa-file-arrow-up"></i> JSON Dosyası Yükle
-            </button>
-            <button type="button" id="tabKertikText" onclick="setKertikTab('text')" class="flex-1 py-2.5 flex items-center justify-center gap-1.5 bg-slate-800 text-slate-400 transition">
-                <i class="fa-solid fa-clipboard"></i> JSON Metni Yapıştır
-            </button>
-        </div>
-
-        <!-- File Tab Content -->
-        <div id="kertikFileArea" class="space-y-3">
-            <div id="dropZone" onclick="document.getElementById('kertikFileInput').click()"
-                class="border-2 border-dashed border-slate-700 hover:border-amber-500/60 rounded-2xl p-6 text-center cursor-pointer transition bg-slate-900/40 hover:bg-slate-900/70">
-                <i class="fa-solid fa-cloud-arrow-up text-3xl text-amber-400 mb-2"></i>
-                <p class="text-sm font-semibold text-slate-200">Kertik JSON dosyasını buraya sürükle veya seç</p>
-                <p class="text-xs text-slate-400 mt-1">Örn: <span class="font-mono text-amber-300">kertik-2026-08-17.json</span></p>
-                <input type="file" id="kertikFileInput" accept=".json,application/json" onchange="handleKertikFile(event)" class="hidden">
-            </div>
-        </div>
-
-        <!-- Text Tab Content -->
-        <div id="kertikTextArea" class="hidden space-y-3">
-            <textarea id="kertikJsonInput" rows="5" placeholder='Kertik uygulamasından kopyaladığın JSON metnini buraya yapıştır...'
-                class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-emerald-400 font-mono focus:outline-none focus:border-amber-500 resize-none custom-scrollbar"></textarea>
-            <button onclick="parseKertikTextInput()" class="w-full bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20">
-                <i class="fa-solid fa-magnifying-glass"></i> Seansları Çözümle &amp; İncele
-            </button>
-        </div>
-
-        <!-- Preview Area -->
-        <div id="kertikPreviewArea" class="hidden flex-1 overflow-hidden flex-col space-y-3 min-h-0">
-            <div class="text-xs text-slate-300 bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
-                <span id="kertikSummaryText" class="font-semibold text-amber-300">0 seans bulundu</span>
-            </div>
-
-            <div id="kertikSessionList" class="overflow-y-auto space-y-2 max-h-60 pr-1 text-xs custom-scrollbar">
-                <!-- Preview cards injected by JS -->
-            </div>
-
-            <div class="pt-2 border-t border-slate-800 flex justify-end gap-2">
-                <button onclick="closeKertikModal()" class="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white bg-slate-800 transition">Kapat</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <script>
         tailwind.config = {
@@ -387,10 +320,7 @@
                 <i class="fa-solid fa-clipboard-list text-xs"></i>
                 <span>Stüdyo Ödevleri</span>
             </a>
-            <button id="headerKertikBtn" onclick="openKertikModal()" class="hdr-icon-btn bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border-amber-500/40" title="Kertik Kronometre Dışa Aktarımını İçe Aktar" aria-label="Kertik'ten aktar">
-                <i class="fa-solid fa-stopwatch text-sm"></i>
-                <span class="hdr-icon-label">Kertik'ten Aktar</span>
-            </button>
+
             <div id="headerAddWrap" class="hidden md:block">
                 <button id="headerAddBtn" onclick="openEntryModal()" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center gap-1.5">
                     <i class="fa-solid fa-plus text-xs"></i>
@@ -584,10 +514,7 @@
                     <p class="text-xs text-slate-400">Çözdüğün soruları, ders notlarını ve saatlik durum hissiyatını kayıt olarak ekle.</p>
                 </div>
                 <div class="flex items-center gap-2 w-full sm:w-auto">
-                    <button type="button" onclick="openKertikModal()" class="flex-1 sm:flex-initial px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap shadow-sm">
-                        <i class="fa-solid fa-stopwatch text-sm"></i>
-                        <span>Kertik'ten Aktar</span>
-                    </button>
+
                     <button type="button" onclick="openEntryModal()" class="flex-1 sm:flex-initial px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-2 whitespace-nowrap">
                     <i class="fa-solid fa-plus-circle text-sm"></i>
                     <span>+ Yeni Çalışma Ekle</span>
@@ -1018,26 +945,29 @@
 
             <!-- Standart Tek-Ders Düzenleme Formu -->
             <div id="standardEditContainer" class="space-y-4">
-                <!-- Kertik Kronometre Entegrasyon Bandı -->
-                <div class="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 px-3.5 py-2 rounded-xl text-xs text-amber-300 shadow-sm">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-stopwatch text-amber-400"></i>
-                        <span class="font-semibold">Kertik Kronometre ile mi çalıştın?</span>
+                <!-- Liste Görevleri & Sıra Hızlı Seçim Bandı -->
+                <div id="modalQuickTasksSection" class="p-3 rounded-2xl bg-gradient-to-r from-sky-950/40 via-slate-900 to-indigo-950/40 border border-sky-500/30 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-sky-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-check text-sky-400"></i> Sıradaki Görevlerden Seç & Otomatik Doldur
+                        </span>
+                        <span id="linkedTaskBadge" class="hidden text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-link text-[9px]"></i> <span id="linkedTaskBadgeText">Bağlı Görev</span>
+                            <button type="button" onclick="unlinkTaskFromModal(event)" class="ml-1 text-slate-400 hover:text-white" title="Bağlantıyı kaldır">&times;</button>
+                        </span>
                     </div>
-                    <button type="button" onclick="openKertikModal()" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg transition text-[11px] shadow-sm flex items-center gap-1.5">
-                        <i class="fa-solid fa-file-import text-[10px]"></i> Kertik'ten Seans / Süre Çek
-                    </button>
+                    <div id="modalQuickTasksContainer" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto custom-scrollbar pt-0.5">
+                        <!-- JS dinamik görev çiplerini çizer -->
+                    </div>
                 </div>
 
+
+
                 <!-- Type Toggle -->
-                <div class="grid grid-cols-2 sm:grid-cols-5 rounded-xl overflow-hidden border border-slate-700 text-[11px] sm:text-xs font-bold">
+                <div class="grid grid-cols-2 sm:grid-cols-4 rounded-xl overflow-hidden border border-slate-700 text-[11px] sm:text-xs font-bold">
                     <button type="button" id="btnTypeSoru" onclick="setEntryType('soru')"
                         class="py-2.5 flex items-center justify-center gap-1.5 bg-blue-600 text-white transition">
-                        <i class="fa-solid fa-book-open-reader"></i> Öğrenerek Çözme
-                    </button>
-                    <button type="button" id="btnTypeHizli" onclick="setEntryType('hizli')"
-                        class="py-2.5 flex items-center justify-center gap-1.5 bg-slate-800 text-slate-400 transition">
-                        <i class="fa-solid fa-bolt"></i> Hızlı Çözme
+                        <i class="fa-solid fa-pen-to-square"></i> Soru Çözümü
                     </button>
                     <button type="button" id="btnTypeNot" onclick="setEntryType('not')"
                         class="py-2.5 flex items-center justify-center gap-1.5 bg-slate-800 text-slate-400 transition">
@@ -1087,7 +1017,13 @@
                         </select>
                     </div>
                     <div>
-                        <label id="durationLabel" class="block text-[11px] font-semibold text-slate-300 mb-1">Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(İsteğe bağlı)</span></label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label id="durationLabel" class="block text-[11px] font-semibold text-slate-300">Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(İsteğe bağlı)</span></label>
+                            <label id="fastSolveContainer" class="flex items-center gap-1.5 cursor-pointer text-[10.5px] font-semibold text-amber-300 select-none hover:text-amber-200 transition" title="Saf soru çözme hızı (çözüm okuma/not alma hariç)">
+                                <input type="checkbox" id="inputIsFastSolve" onchange="toggleFastSolve(this.checked)" class="rounded text-amber-500 focus:ring-amber-400 bg-slate-900 border-slate-600 w-3.5 h-3.5 cursor-pointer accent-amber-500">
+                                <span class="flex items-center gap-1"><i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i> Hızlı Çözme</span>
+                            </label>
+                        </div>
                         <input type="number" id="inputDuration" min="0" placeholder="45"
                             class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
                     </div>
@@ -1484,353 +1420,6 @@
 <script>
 // ═══════════════════════════════════════
 
-// ═══════════════════════════════════════
-// KERTIK KRONOMETRE IMPORT & PARSER ENGINE
-// ═══════════════════════════════════════
-
-const HMGS_SUBJECT_DEFINITIONS = [
-    { name: 'Anayasa Yargısı', keywords: ['anayasa yargisi', 'anayasa mahkemesi', 'aym', 'bireysel basvuru', 'norm denetimi', 'iptal basvurusu', 'itiraz yolu'] },
-    { name: 'İYUK', keywords: ['iyuk', 'idari yargilama usulu', 'iptal davasi', 'tam yargi davasi', 'danistay', 'idare mahkemesi', 'vergi mahkemesi'] },
-    { name: 'CMK', keywords: ['cmk', 'ceza muhakemesi', 'sorusturma', 'kovusturma', 'tutuklama', 'gozalti', 'iddianame', 'kovusturmaya yer olmadigi', 'ifade alma'] },
-    { name: 'MÖHUK', keywords: ['mohuk', 'milletlerarasi ozel hukuk', 'kanunlar ihtilafi', 'yabancilar hukuku', 'vatandaslik', 'tanima ve tenfiz'] },
-    { name: 'Medeni Hukuk', keywords: ['medeni hukuk', 'kisiler hukuku', 'aile hukuku', 'esya hukuku', 'miras hukuku', 'hak ehliyeti', 'fiil ehliyeti', 'vesayet', 'kayyim', 'tkm'] },
-    { name: 'Borçlar Hukuku', keywords: ['borclar hukuku', 'borc iliskisi', 'tbk', 'ifa engelleri', 'haksiz fiil', 'sebepsiz zenginlesme', 'alacakli temerrudu', 'borclu temerrudu', 'vekalet sozlesmesi'] },
-    { name: 'HMK', keywords: ['hmk', 'hukuk muhakemeleri', 'ihtiyati tedbir', 'istinaf', 'temyiz', 'hukuk yargilamasi', 'delil baslangici'] },
-    { name: 'Ticaret Hukuku', keywords: ['ticaret hukuku', 'ttk', 'anonim sirket', 'limited sirket', 'kiymetli evrak', 'bono', 'cek', 'police', 'ticari isletme', 'ticaret sicili'] },
-    { name: 'Ceza Hukuku', keywords: ['ceza hukuku', 'tck', 'sucun unsurlari', 'kast', 'taksir', 'hukuka uygunluk', 'tesebbus', 'istirak', 'ictima', 'ceza genel', 'ceza ozel'] },
-    { name: 'İcra-İflas', keywords: ['icra iflas', 'iik', 'haciz yollari', 'konkordato', 'icra mahkemesi', 'kambiyo senetlerine mahsus'] },
-    { name: 'İş Hukuku', keywords: ['is hukuku', 'kidem tazminati', 'ihbar tazminati', 'ise iade', 'toplu is', 'sendikalar', 'grev', 'lokavt', 'is sozlesmesi'] },
-    { name: 'Vergi Hukuku', keywords: ['vergi hukuku', 'vuk', 'tarh', 'teblig', 'tahakkuk', 'tahsil', 'vergi cezasi', 'vergi kabahatleri'] },
-    { name: 'Milletlerarası Hukuk', keywords: ['milletlerarasi hukuk', 'devletler genel', 'uluslararasi hukuk', 'uluslararasi andlasma', 'birlesmis milletler'] },
-    { name: 'Avukatlık Hukuku', keywords: ['avukatlik hukuku', 'avukatlik kanunu', 'baro', 'tbb', 'avukatlik ucreti', 'disiplin cezasi', 'disiplin cezalari'] },
-    { name: 'Türk Hukuk Tarihi', keywords: ['turk hukuk tarihi', 'hukuk tarihi', 'mecelle', 'osmanli hukuku', 'seri hukuk', 'orfi hukuk', 'tanzimat'] },
-    { name: 'Hukuk Felsefesi ve Sosyolojisi', keywords: ['hukuk felsefesi', 'hukuk sosyolojisi', 'tabii hukuk', 'hukuki pozitivizm', 'adalet teorileri', 'kelsen', 'radbruch'] },
-    { name: 'Genel Kamu Hukuku', keywords: ['genel kamu hukuku', 'genel kamu', 'devlet teorisi', 'egemenlik', 'bodin', 'hobbes', 'locke', 'rousseau', 'montesquieu'] },
-    { name: 'Anayasa Hukuku', keywords: ['anayasa hukuku', 'tbmm', 'cumhurbaskanligi kararnamesi', 'secim hukuku', 'temel hak ve ozgurlukler', 'kanun hukmunde'] },
-    { name: 'İdare Hukuku', keywords: ['idare hukuku', 'idari islem', 'idari sozlesme', 'kamu gorevlileri', 'kamulastirma', 'idari vesayet'] }
-];
-
-function normalizeKertikText(txt) {
-    return (txt || '').replace(/İ/g, 'i').replace(/I/g, 'i').toLowerCase()
-        .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
-        .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
-        .replace(/[^a-z0-9\s]/g, ' ');
-}
-
-const KERTIK_NAME_PAIRS = HMGS_SUBJECT_DEFINITIONS.map(s => ({ norm: normalizeKertikText(s.name), name: s.name })).sort((a, b) => b.norm.length - a.norm.length);
-const KERTIK_KEYWORD_PAIRS = [];
-HMGS_SUBJECT_DEFINITIONS.forEach(s => {
-    s.keywords.forEach(kw => {
-        KERTIK_KEYWORD_PAIRS.push({ norm: normalizeKertikText(kw), name: s.name });
-    });
-});
-KERTIK_KEYWORD_PAIRS.sort((a, b) => b.norm.length - a.norm.length);
-
-function detectSubjectFromKertikNote(note) {
-    const norm = normalizeKertikText(note);
-    for (const p of KERTIK_NAME_PAIRS) {
-        if (norm.includes(p.norm)) return p.name;
-    }
-    for (const p of KERTIK_KEYWORD_PAIRS) {
-        if (norm.includes(p.norm)) return p.name;
-    }
-    return 'Medeni Hukuk'; // default
-}
-
-function getTopicsForSubject(subject) {
-    const groups = (typeof TOPICS_BY_SUBJECT !== 'undefined' && TOPICS_BY_SUBJECT[subject]) ? TOPICS_BY_SUBJECT[subject] : [];
-    const list = [];
-    groups.forEach(g => {
-        (g.items || []).forEach(item => {
-            if (!list.includes(item)) list.push(item);
-        });
-    });
-    return list;
-}
-
-function detectTopicFromKertikNote(subject, note) {
-    const topics = getTopicsForSubject(subject);
-    if (!topics.length || !note) return (topics.length ? topics[0] : (note || ''));
-    const normNote = normalizeKertikText(note);
-    for (const t of topics) {
-        const normT = normalizeKertikText(t);
-        const words = normT.split(' ').filter(w => w.length > 3 && !['hukuku', 'bolum', 'soru', 'bankasi', 'konu', 'anlatimi', 'genel', 'kavrami'].includes(w));
-        if (words.some(w => normNote.includes(w))) {
-            return t;
-        }
-    }
-    return topics[0] || note;
-}
-
-function calcKertikSessionTimes(se) {
-    const startedAt = se.startedAt || Date.now();
-    const end = se.endedAt || (se.events && se.events.length ? se.events[se.events.length - 1].at : startedAt) || startedAt;
-    let brk = 0, bs = null, breaks = 0;
-    
-    if (Array.isArray(se.events)) {
-        for (const e of se.events) {
-            if (e.type === 'break_start') {
-                bs = e.at;
-                breaks++;
-            } else if (e.type === 'break_end' && bs != null) {
-                brk += (e.at - bs);
-                bs = null;
-            }
-        }
-    }
-    if (bs != null) brk += (end - bs);
-    
-    const gross = Math.max(0, end - startedAt);
-    const net = Math.max(0, gross - brk);
-    const netMinutes = Math.max(1, Math.round(net / 60000));
-    const breakMinutes = Math.round(brk / 60000);
-    
-    return { grossMs: gross, brkMs: brk, netMs: net, netMinutes, breakMinutes, breakCount: breaks };
-}
-
-let parsedKertikSessions = [];
-
-function openKertikModal() {
-    const modal = document.getElementById('kertikModal');
-    if (modal) {
-        modal.classList.remove('hidden');
-        setKertikTab('file');
-        document.getElementById('kertikPreviewArea').classList.add('hidden');
-        parsedKertikSessions = [];
-    }
-}
-
-function closeKertikModal() {
-    const modal = document.getElementById('kertikModal');
-    if (modal) {
-        modal.classList.add('hidden');
-        parsedKertikSessions = [];
-    }
-}
-
-function setKertikTab(tab) {
-    const fileArea = document.getElementById('kertikFileArea');
-    const textArea = document.getElementById('kertikTextArea');
-    const tabFile = document.getElementById('tabKertikFile');
-    const tabText = document.getElementById('tabKertikText');
-
-    if (tab === 'file') {
-        fileArea.classList.remove('hidden');
-        textArea.classList.add('hidden');
-        tabFile.className = 'flex-1 py-2.5 flex items-center justify-center gap-1.5 bg-amber-600 text-white transition';
-        tabText.className = 'flex-1 py-2.5 flex items-center justify-center gap-1.5 bg-slate-800 text-slate-400 transition';
-    } else {
-        fileArea.classList.add('hidden');
-        textArea.classList.remove('hidden');
-        tabFile.className = 'flex-1 py-2.5 flex items-center justify-center gap-1.5 bg-slate-800 text-slate-400 transition';
-        tabText.className = 'flex-1 py-2.5 flex items-center justify-center gap-1.5 bg-amber-600 text-white transition';
-    }
-}
-
-function handleKertikFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        processKertikJsonString(e.target.result);
-    };
-    reader.readAsText(file);
-}
-
-function parseKertikTextInput() {
-    const txt = document.getElementById('kertikJsonInput').value.trim();
-    if (!txt) {
-        showToast('Lütfen Kertik JSON metnini yapıştırın.', 'rose');
-        return;
-    }
-    processKertikJsonString(txt);
-}
-
-function processKertikJsonString(jsonStr) {
-    try {
-        const data = JSON.parse(jsonStr);
-        let rawSessions = [];
-
-        if (Array.isArray(data)) {
-            rawSessions = data;
-        } else if (data && Array.isArray(data.sessions)) {
-            rawSessions = data.sessions;
-        } else {
-            showToast('Geçerli bir Kertik JSON formatı bulunamadı ("sessions" dizisi aranıyor).', 'rose');
-            return;
-        }
-
-        if (rawSessions.length === 0) {
-            showToast('JSON verisinde seans kaydı bulunamadı.', 'rose');
-            return;
-        }
-
-        parsedKertikSessions = rawSessions.map(se => {
-            const times = calcKertikSessionTimes(se);
-            const isoDate = se.dayKey || (se.startedAt ? new Date(se.startedAt).toISOString().split('T')[0] : getLocalDateStr());
-            const rawNote = (se.note || '').trim();
-            const detectedSubject = detectSubjectFromKertikNote(rawNote);
-            const detectedTopic = detectTopicFromKertikNote(detectedSubject, rawNote);
-            const isAlreadyImported = (entries || []).some(e => e.kertikId && e.kertikId === se.id);
-            const timeStr = se.startedAt ? hhmmFromIso(new Date(se.startedAt).toISOString()) : '12:00';
-            const startedAtIso = se.startedAt ? new Date(se.startedAt).toISOString() : new Date().toISOString();
-
-            return {
-                kertikId: se.id,
-                startedAt: se.startedAt,
-                startedAtIso: startedAtIso,
-                isoDate: isoDate,
-                date: fmtDate(isoDate),
-                time: timeStr,
-                subject: detectedSubject,
-                topic: detectedTopic,
-                rawNote: rawNote,
-                notes: rawNote,
-                durationMinutes: times.netMinutes,
-                breakMinutes: times.breakMinutes,
-                breakCount: times.breakCount,
-                alreadyImported: isAlreadyImported
-            };
-        });
-
-        parsedKertikSessions.sort((a, b) => (b.isoDate || '').localeCompare(a.isoDate || ''));
-
-        // Tek bir seans varsa doğrudan var olan entryModal paneline aktar ve aç!
-        if (parsedKertikSessions.length === 1) {
-            loadKertikSessionIntoEntryModal(0);
-        } else {
-            renderKertikPreview();
-        }
-
-    } catch (err) {
-        console.error('Kertik JSON parse error:', err);
-        showToast('JSON metni okunamadı. Lütfen geçerli bir JSON yapıştırın.', 'rose');
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-// DOĞRUDAN VAR OLAN entryModal FORMUNA AKTARIM FONKSİYONU
-// ═══════════════════════════════════════════════════════════
-function loadKertikSessionIntoEntryModal(sessionIdx) {
-    const se = parsedKertikSessions[sessionIdx];
-    if (!se) return;
-    
-    closeKertikModal();
-    openEntryModal();
-    
-    // 1. Tarih ve Saat
-    if (se.isoDate) {
-        const dateInput = document.getElementById('inputDate');
-        if (dateInput) dateInput.value = se.isoDate;
-    }
-    if (se.time) {
-        const timeInput = document.getElementById('inputTime');
-        if (timeInput) timeInput.value = se.time;
-    }
-    
-    // 2. Ders Seçimi
-    const subjSelect = document.getElementById('inputSubject');
-    if (subjSelect && se.subject) {
-        subjSelect.value = se.subject;
-    }
-    
-    // 3. Kertik'in Ölçtüğü Net Odak Süresi (Dk)
-    const durInput = document.getElementById('inputDuration');
-    if (durInput) {
-        durInput.value = se.durationMinutes || '';
-    }
-    
-    // 4. Varsayılan Soru Çözümü Modu (Kullanıcı dilerse üstten Konu veya Karma'ya geçebilir)
-    setEntryType('soru');
-    
-    // 5. Tespit edilen konuyu seçili olarak işaretle (Çoklu konu seçimi tam aktif!)
-    selectedTopicsMap = {};
-    if (se.topic) {
-        selectedTopicsMap[se.topic] = {
-            correct: '',
-            wrong: '',
-            empty: '',
-            pages: '',
-            notes: se.rawNote || '',
-            concepts: []
-        };
-    }
-    
-    populateTopicOptions();
-    showToast(`⏱️ Kertik seansı (${se.durationMinutes} dk) çalışma paneline yüklendi!`, 'amber');
-}
-
-function renderKertikPreview() {
-    const previewArea = document.getElementById('kertikPreviewArea');
-    const sessionList = document.getElementById('kertikSessionList');
-    const summaryText = document.getElementById('kertikSummaryText');
-
-    previewArea.classList.remove('hidden');
-    sessionList.innerHTML = '';
-
-    summaryText.innerHTML = `<span class="text-white font-bold">${parsedKertikSessions.length}</span> Kertik seansı bulundu. Eklemek istediğin seansı seç:`;
-
-    parsedKertikSessions.forEach((se, idx) => {
-        const card = document.createElement('div');
-        card.className = `p-3.5 rounded-2xl border flex items-center justify-between gap-3 ${se.alreadyImported ? 'bg-slate-900/40 border-slate-800 opacity-60' : 'bg-slate-800/90 border-slate-700 hover:border-amber-500/50 transition shadow-sm'}`;
-
-        card.innerHTML = `
-            <div class="flex items-center gap-3 min-w-0 flex-1">
-                <div class="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0">
-                    <i class="fa-solid fa-stopwatch text-sm"></i>
-                </div>
-                <div class="min-w-0 space-y-0.5">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="font-bold text-white text-xs">${escapeHtml(se.subject)}</span>
-                        <span class="text-slate-400 font-mono text-[11px]"><i class="fa-regular fa-clock mr-0.5 text-[10px]"></i>${se.date} ${se.time}</span>
-                        ${se.alreadyImported ? '<span class="text-[9px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded font-semibold">Zaten Ekli</span>' : ''}
-                    </div>
-                    <p class="text-[11px] text-slate-300 truncate">${escapeHtml(se.topic || se.rawNote || 'Çalışma Seansı')}</p>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-2.5 flex-shrink-0">
-                <div class="text-right">
-                    <span class="text-xs font-black text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 block font-mono">
-                        ${se.durationMinutes} dk
-                    </span>
-                </div>
-                <button type="button" onclick="loadKertikSessionIntoEntryModal(${idx})" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/30 transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-pen-to-square"></i> Bu Seansı Panele Yükle →
-                </button>
-            </div>
-        `;
-        sessionList.appendChild(card);
-    });
-}
-
-function initKertikDropZone() {
-    const dropZone = document.getElementById('dropZone');
-    if (dropZone) {
-        ['dragenter', 'dragover'].forEach(name => {
-            dropZone.addEventListener(name, (e) => {
-                e.preventDefault(); e.stopPropagation();
-                dropZone.classList.add('border-amber-500', 'bg-amber-500/10');
-            });
-        });
-        ['dragleave', 'drop'].forEach(name => {
-            dropZone.addEventListener(name, (e) => {
-                e.preventDefault(); e.stopPropagation();
-                dropZone.classList.remove('border-amber-500', 'bg-amber-500/10');
-            });
-        });
-        dropZone.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            const file = dt && dt.files && dt.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (re) => processKertikJsonString(re.target.result);
-                reader.readAsText(file);
-            }
-        });
-    }
-}
-
 // CONFIG & STATE
 // ═══════════════════════════════════════
 const DRIVE_FILE = 'hmgs_2026_data.json';
@@ -1945,6 +1534,11 @@ let driveConnected  = false;
 let currentEntryType = 'soru';
 let editingId        = null;
 let activeTab        = 'sira';
+
+let linkedSiraNo = null;
+let linkedSiraIsRev = false;
+let linkedGoogleTaskId = null;
+let linkedGoogleTaskListId = null;
 
 let selectedTopicsMap = {};
 let denemeler = JSON.parse(localStorage.getItem('hmgs_denemeler') || '[]');
@@ -2771,8 +2365,12 @@ function siraBigCard(x) {
         '<p class="text-[12.5px] text-slate-300 leading-relaxed">' + (x.chapter || '') + (x.book ? ' · <span class="text-slate-500">' + x.book + '</span>' : '') + '</p>' +
         '<p class="text-[12.5px] text-slate-400">' + x.mode + '</p>' +
         (x.stop ? '<p class="text-[11.5px] text-amber-400/90"><i class="fa-solid fa-hand text-[10px]"></i> dur: ' + x.stop + '</p>' : '') +
-        '<button onclick="siraComplete(' + x.no + ')" class="w-full mt-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition shadow-lg shadow-emerald-600/20">' +
-          '<i class="fa-solid fa-check mr-1.5"></i>Bitirdim</button></div>';
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">' +
+          '<button onclick="openEntryModalForSira(' + x.no + ')" class="py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs sm:text-sm transition shadow-md shadow-sky-600/20 flex items-center justify-center gap-1.5">' +
+            '<i class="fa-solid fa-pen-to-square"></i>Çalışma Kaydet</button>' +
+          '<button onclick="siraComplete(' + x.no + ')" class="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm transition shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5">' +
+            '<i class="fa-solid fa-check"></i>Hızlı Bitir</button>' +
+        '</div></div>';
 }
 // ── Günün işi: bir KONU kartı. Başlık ders+bölüm, altında tek bir
 //    sayfa aralığı ve tek bir emir. Dilimler içeride ilerleme kutucuğu.
@@ -2810,10 +2408,14 @@ function siraBlockCard(g, primary) {
                 (x.start ? 's.' + x.start + '–' + x.end : 'Stüdyo') + '</label>';
         }).join('') + '</div>';
     }
-    h += '<button onclick="siraCompleteBlock(' + b.id + ')" class="w-full mt-1 py-2.5 rounded-xl ' +
+    const firstUndone = g.items.find(function(x){ return !siraIsDone(x.no); }) || g.items[0];
+    h += '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">' +
+         '<button onclick="openEntryModalForSira(' + firstUndone.no + ')" class="py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs sm:text-sm transition shadow-md shadow-sky-600/20 flex items-center justify-center gap-1.5">' +
+           '<i class="fa-solid fa-pen-to-square"></i>Çalışma Kaydet</button>' +
+         '<button onclick="siraCompleteBlock(' + b.id + ')" class="py-2.5 rounded-xl ' +
          (primary ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-slate-700 hover:bg-slate-600') +
-         ' text-white font-bold text-sm transition">' +
-         '<i class="fa-solid fa-check mr-1.5"></i>Bitirdim</button></div>';
+         ' text-white font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5">' +
+         '<i class="fa-solid fa-check"></i>Hızlı Bitir</button></div></div>';
     return h;
 }
 function siraCompleteBlock(id) {
@@ -2848,7 +2450,9 @@ function siraRevRow(x) {
           '<span class="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 mr-1.5">TEKRAR</span>' +
           x.subject + ' <span class="font-normal text-amber-200/60">· ' + siraRange(x) + '</span></p>' +
           '<p class="text-[10.5px] text-amber-200/50 truncate">yalnız yanlış işaretlediklerini yeniden çöz</p></div>' +
-        '<span class="text-[10.5px] font-mono text-amber-200/50 flex-shrink-0">~' + siraRevQuestions(x) + 'so</span></div>';
+        '<span class="text-[10.5px] font-mono text-amber-200/50 flex-shrink-0">~' + siraRevQuestions(x) + 'so</span>' +
+        '<button type="button" onclick="openEntryModalForSira(' + x.no + ', true)" title="Yanlış Tekrarını Kaydet" class="px-2 py-1 text-[11px] font-semibold text-amber-300 hover:text-white bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 rounded-lg transition flex items-center gap-1 flex-shrink-0"><i class="fa-solid fa-rotate-left text-amber-400"></i> Kaydet</button>' +
+        '</div>';
 }
 function siraSmallRow(x, done) {
     return '<div class="flex items-center gap-2.5 rounded-xl bg-slate-900/40 border border-slate-800 px-3 py-2 ' + (done ? 'opacity-45' : '') + '">' +
@@ -2857,7 +2461,9 @@ function siraSmallRow(x, done) {
         '<div class="flex-1 min-w-0"><p class="text-[12.5px] font-semibold text-slate-200 leading-snug truncate ' + (done ? 'line-through' : '') + '">' +
           x.subject + ' <span class="font-normal text-slate-500">· ' + siraRange(x) + '</span></p>' +
           '<p class="text-[10.5px] text-slate-600 truncate">' + (x.chapter || '') + '</p></div>' +
-        '<span class="text-[10.5px] font-mono text-slate-500 flex-shrink-0">' + x.pages + 's' + (x.questions ? '·' + x.questions + 'so' : '') + '</span></div>';
+        '<span class="text-[10.5px] font-mono text-slate-500 flex-shrink-0 mr-1">' + x.pages + 's' + (x.questions ? '·' + x.questions + 'so' : '') + '</span>' +
+        (done ? '' : '<button type="button" onclick="openEntryModalForSira(' + x.no + ')" title="Çalışma Kaydet" class="px-2 py-1 text-[11px] font-semibold text-sky-300 hover:text-white bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/30 rounded-lg transition flex items-center gap-1 flex-shrink-0"><i class="fa-solid fa-pen-to-square text-sky-400"></i> Kaydet</button>') +
+        '</div>';
 }
 
 function renderSiraToday() {
@@ -3204,6 +2810,263 @@ function switchTab(tab) {
 // ═══════════════════════════════════════
 // WORK ENTRY MODAL & TOPICS LOGIC
 // ═══════════════════════════════════════
+function updateLinkedTaskBadge() {
+    const badge = document.getElementById('linkedTaskBadge');
+    const badgeText = document.getElementById('linkedTaskBadgeText');
+    if (!badge || !badgeText) return;
+    if (linkedSiraNo) {
+        const it = (typeof siraItem === 'function') ? siraItem(linkedSiraNo) : null;
+        badgeText.textContent = `${linkedSiraIsRev ? 'Tekrar' : 'Sıra'} #${linkedSiraNo}: ${it ? it.subject : ''}`;
+        badge.classList.remove('hidden');
+    } else if (linkedGoogleTaskId) {
+        let taskTitle = 'Görev';
+        if (Array.isArray(fetchedGoogleTasks)) {
+            const t = fetchedGoogleTasks.find(x => x.id === linkedGoogleTaskId);
+            if (t && t.title) taskTitle = t.title;
+        }
+        badgeText.textContent = taskTitle.length > 25 ? taskTitle.slice(0, 23) + '...' : taskTitle;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+function unlinkTaskFromModal(event) {
+    if (event) event.stopPropagation();
+    linkedSiraNo = null;
+    linkedSiraIsRev = false;
+    linkedGoogleTaskId = null;
+    linkedGoogleTaskListId = null;
+    updateLinkedTaskBadge();
+    renderModalQuickTasks();
+    if (typeof showToast === 'function') showToast('Görev bağlantısı kaldırıldı', 'slate');
+}
+
+function renderModalQuickTasks() {
+    const section = document.getElementById('modalQuickTasksSection');
+    const container = document.getElementById('modalQuickTasksContainer');
+    if (!section || !container) return;
+
+    container.innerHTML = '';
+    const chips = [];
+
+    // 1. Sıra Listesi items (Today's bucket or next undone items)
+    try {
+        if (typeof siraTodayBucket === 'function') {
+            const b = siraTodayBucket();
+            // Tekrarlar önce
+            (b.reviews || []).forEach(rev => {
+                if (!siraRevIsDone(rev.no)) {
+                    chips.push({
+                        type: 'sira_rev',
+                        id: rev.no,
+                        label: `🔁 Tekrar #${rev.no}: ${rev.subject}`,
+                        sub: `~${siraRevQuestions(rev)}so · ${siraRange(rev)}`,
+                        color: 'amber',
+                        item: rev
+                    });
+                }
+            });
+            // Günün blokları
+            (b.blocks || []).forEach(block => {
+                (block.items || []).forEach(it => {
+                    if (!siraIsDone(it.no)) {
+                        chips.push({
+                            type: 'sira',
+                            id: it.no,
+                            label: `#${it.no} ${it.subject}`,
+                            sub: `${siraRange(it)} · ${it.pages}s${it.questions ? ' · ~' + it.questions + 'so' : ''}`,
+                            color: 'emerald',
+                            item: it
+                        });
+                    }
+                });
+            });
+        }
+    } catch(e) {}
+
+    // Günün payı azsa veya boşsa sıradaki bekleyenleri ekle
+    if (chips.filter(c => c.type === 'sira').length < 4 && typeof SIRA_QUEUE !== 'undefined') {
+        for (const it of SIRA_QUEUE) {
+            if (!siraIsDone(it.no) && !chips.some(c => c.id === it.no)) {
+                chips.push({
+                    type: 'sira',
+                    id: it.no,
+                    label: `#${it.no} ${it.subject}`,
+                    sub: `${siraRange(it)} · ${it.pages}s`,
+                    color: 'sky',
+                    item: it
+                });
+                if (chips.length >= 6) break;
+            }
+        }
+    }
+
+    // 2. Google / Yerel Görevler
+    if (Array.isArray(fetchedGoogleTasks)) {
+        const activeTasks = fetchedGoogleTasks.filter(t => t.status !== 'completed').slice(0, 3);
+        activeTasks.forEach(t => {
+            chips.push({
+                type: 'google_task',
+                id: t.id,
+                label: `📌 ${t.title || 'Görev'}`,
+                sub: t.due ? t.due.split('T')[0] : '',
+                color: 'blue',
+                task: t
+            });
+        });
+    }
+
+    if (chips.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+
+    section.classList.remove('hidden');
+
+    chips.forEach(c => {
+        const isSelected = (c.type.startsWith('sira') && linkedSiraNo === c.id) ||
+                           (c.type === 'google_task' && linkedGoogleTaskId === c.id);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        
+        let colorClasses = 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700 text-slate-300';
+        if (isSelected) {
+            colorClasses = 'bg-sky-600/30 border-sky-400 text-white shadow-sm ring-1 ring-sky-400';
+        } else if (c.color === 'emerald') {
+            colorClasses = 'bg-emerald-950/40 hover:bg-emerald-900/60 border-emerald-500/40 text-emerald-200';
+        } else if (c.color === 'amber') {
+            colorClasses = 'bg-amber-950/40 hover:bg-amber-900/60 border-amber-500/40 text-amber-200';
+        } else if (c.color === 'sky' || c.color === 'blue') {
+            colorClasses = 'bg-sky-950/40 hover:bg-sky-900/60 border-sky-500/40 text-sky-200';
+        }
+
+        btn.className = `px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition flex flex-col items-start text-left leading-tight ${colorClasses}`;
+        btn.innerHTML = `
+            <span class="flex items-center gap-1">
+                ${isSelected ? '<i class="fa-solid fa-circle-check text-sky-400 text-[10px]"></i>' : ''}
+                ${escapeHtml(c.label)}
+            </span>
+            ${c.sub ? `<span class="text-[9.5px] opacity-75 font-normal font-mono mt-0.5">${escapeHtml(c.sub)}</span>` : ''}
+        `;
+
+        btn.onclick = () => {
+            if (c.type === 'sira' || c.type === 'sira_rev') {
+                fillFormFromSiraItem(c.id, c.type === 'sira_rev');
+            } else if (c.type === 'google_task') {
+                fillFormFromTask(c.task);
+            }
+        };
+
+        container.appendChild(btn);
+    });
+}
+
+function openEntryModalForSira(no, isRev = false) {
+    openEntryModal();
+    fillFormFromSiraItem(no, isRev);
+}
+
+function fillFormFromSiraItem(no, isRev = false) {
+    const item = (typeof siraItem === 'function') ? siraItem(no) : null;
+    if (!item) return;
+
+    linkedSiraNo = no;
+    linkedSiraIsRev = !!isRev;
+    linkedGoogleTaskId = null;
+    linkedGoogleTaskListId = null;
+
+    // 1. Dersi seç
+    const subjSelect = document.getElementById('inputSubject');
+    if (subjSelect) {
+        const opts = Array.from(subjSelect.options).map(o => o.value);
+        let foundSubj = opts.find(s => s.toLowerCase() === item.subject.toLowerCase());
+        if (!foundSubj) {
+            if (item.subject.toLowerCase().includes('hmk') || item.subject.toLowerCase().includes('medeni usul')) foundSubj = 'HMK';
+            else if (item.subject.toLowerCase().includes('icra')) foundSubj = 'İcra-İflas';
+            else if (item.subject.toLowerCase().includes('milletlerarası')) foundSubj = 'Milletlerarası Hukuk';
+            else if (item.subject.toLowerCase().includes('kamu')) foundSubj = 'Genel Kamu Hukuku';
+            else if (item.subject.toLowerCase().includes('felsefe')) foundSubj = 'Hukuk Felsefesi ve Sosyolojisi';
+        }
+        subjSelect.value = foundSubj || item.subject;
+    }
+
+    // 2. Çalışma tipini ayarla
+    const isOkuma = !isRev && ((item.mode && item.mode.toLowerCase().includes('okuma')) || !item.questions);
+    if (isRev) {
+        setEntryType('review');
+    } else if (isOkuma) {
+        setEntryType('not');
+    } else {
+        setEntryType('soru');
+    }
+
+    // 3. Konuları güncelle
+    populateTopicOptions();
+
+    // 4. Konu eşleştirme
+    const curSubj = subjSelect ? subjSelect.value : item.subject;
+    const allGroups = (typeof TOPICS_BY_SUBJECT !== 'undefined' && TOPICS_BY_SUBJECT[curSubj]) ? TOPICS_BY_SUBJECT[curSubj] : [];
+    let matchedTopic = '';
+
+    const candidateText = ((item.chapter || '') + ' ' + (item.subject || '')).toLowerCase();
+    for (const g of allGroups) {
+        for (const t of (g.items || [])) {
+            const tLower = t.toLowerCase();
+            if (candidateText.includes(tLower) || tLower.includes((item.chapter || '').toLowerCase())) {
+                matchedTopic = t;
+                break;
+            }
+        }
+        if (matchedTopic) break;
+    }
+
+    if (!matchedTopic && allGroups.length > 0 && allGroups[0].items && allGroups[0].items.length > 0) {
+        matchedTopic = allGroups[0].items[0];
+    } else if (!matchedTopic) {
+        matchedTopic = item.chapter || item.subject;
+    }
+
+    const rangeText = (typeof siraRange === 'function') ? siraRange(item) : (item.start ? `s.${item.start}–${item.end}` : '');
+    selectedTopicsMap = {};
+    selectedTopicsMap[matchedTopic] = {
+        correct: '',
+        wrong: '',
+        empty: '',
+        totalQ: item.questions || undefined,
+        pages: rangeText,
+        notes: '',
+        note: isRev ? `Sıra #${no} Tekrarı (${rangeText})` : `Sıra #${no} (${item.mode || 'Çalışma'})`,
+        concepts: []
+    };
+
+    setTimeout(() => {
+        const cb = document.querySelector(`input[value="${matchedTopic}"]`);
+        if (cb) cb.checked = true;
+        renderPerTopicDataCards();
+    }, 30);
+
+    renderPerTopicDataCards();
+    updateLinkedTaskBadge();
+    renderModalQuickTasks();
+
+    if (typeof showToast === 'function') {
+        showToast(`Sıra #${no} (${item.subject}) forma aktarıldı ✓`, 'emerald');
+    }
+}
+
+function fillFormFromTask(task) {
+    if (!task) return;
+    linkedGoogleTaskId = task.id;
+    linkedGoogleTaskListId = (typeof currentTaskListId !== 'undefined') ? currentTaskListId : '@default';
+    linkedSiraNo = null;
+    linkedSiraIsRev = false;
+
+    quickFillFromTask(task);
+    updateLinkedTaskBadge();
+    renderModalQuickTasks();
+}
+
 function openEntryModal() {
     document.getElementById('entryModal').classList.remove('hidden');
     if (!editingId) {
@@ -3219,6 +3082,12 @@ function openEntryModal() {
         renderModalPhotoPreviews();
         setDefaultDate();
         setEntryType('soru');
+        linkedSiraNo = null;
+        linkedSiraIsRev = false;
+        linkedGoogleTaskId = null;
+        linkedGoogleTaskListId = null;
+        updateLinkedTaskBadge();
+        renderModalQuickTasks();
     }
 }
 
@@ -3232,10 +3101,19 @@ function openEntryModalForDate(dStr) {
 
 function closeEntryModal() {
     document.getElementById('entryModal').classList.add('hidden');
+    linkedSiraNo = null;
+    linkedSiraIsRev = false;
+    linkedGoogleTaskId = null;
+    linkedGoogleTaskListId = null;
     if (editingId) cancelEdit();
 }
 
 function setEntryType(type) {
+    if (type === 'hizli') {
+        type = 'soru';
+        const fastChk = document.getElementById('inputIsFastSolve');
+        if (fastChk) fastChk.checked = true;
+    }
     currentEntryType = type;
     const sf = document.getElementById('soruFields');
     const nf = document.getElementById('notFields');
@@ -3243,55 +3121,80 @@ function setEntryType(type) {
     const bn = document.getElementById('btnTypeNot');
     const bk = document.getElementById('btnTypeKarma');
     const br = document.getElementById('btnTypeReview');
-    const bh = document.getElementById('btnTypeHizli');
-    const hint = document.getElementById('modeTopicHint');
+    const fastCont = document.getElementById('fastSolveContainer');
 
     const inactiveBtn = 'py-2.5 flex items-center justify-center gap-1.5 bg-slate-800 text-slate-400 transition';
     if (bs) bs.className = inactiveBtn;
     if (bn) bn.className = inactiveBtn;
     if (bk) bk.className = inactiveBtn;
     if (br) br.className = inactiveBtn;
-    if (bh) bh.className = inactiveBtn;
 
-    // Süre alanının ETİKETİ moda göre değişir — aynı kutu iki farklı şeyi ölçüyor
-    // (§4d: çözme hızı ≠ öğrenme hızı). Etiket bunu kayıt anında görünür kılar.
-    const dl = document.getElementById('durationLabel');
-    if (dl) {
-        dl.innerHTML = (type === 'hizli')
-            ? 'Çözme Süresi (Dk) <span class="text-[10px] text-amber-400/80 font-normal">(saf çözüm)</span>'
-            : 'Öğrenme Süresi (Dk) <span class="text-[10px] text-slate-500 font-normal">(çözüm okuma + not dahil)</span>';
+    // Hızlı Çözme alt-seçeneği soru ve karma türlerinde görünür
+    if (fastCont) {
+        if (type === 'soru' || type === 'karma') {
+            fastCont.classList.remove('hidden');
+        } else {
+            fastCont.classList.add('hidden');
+        }
     }
+
+    updateDurationAndHintLabels();
 
     if (type === 'soru') {
         if(sf) sf.classList.remove('hidden');
         if(nf) nf.classList.add('hidden');
         if(bs) bs.className = 'py-2.5 flex items-center justify-center gap-1.5 bg-blue-600 text-white transition';
-        if (hint) hint.textContent = '(Sadece Soru Konuları)';
-    } else if (type === 'hizli') {
-        // Veri modelinde bu da bir 'soru' kaydıdır; tek farkı entry.fast = true.
-        // Böylece bütün mevcut D/Y/B, zayıflık ve rapor mantığı olduğu gibi çalışır.
-        if(sf) sf.classList.remove('hidden');
-        if(nf) nf.classList.add('hidden');
-        if(bh) bh.className = 'py-2.5 flex items-center justify-center gap-1.5 bg-amber-600 text-white transition';
-        if (hint) hint.textContent = '(Sadece Soru Konuları — hızlı çözme)';
     } else if (type === 'not') {
         if(sf) sf.classList.add('hidden');
         if(nf) nf.classList.remove('hidden');
         if(bn) bn.className = 'py-2.5 flex items-center justify-center gap-1.5 bg-purple-600 text-white transition';
-        if (hint) hint.textContent = '(Sadece Konu Anlatım Konuları)';
     } else if (type === 'review') {
         if(sf) sf.classList.remove('hidden');
         if(nf) nf.classList.add('hidden');
         if(br) br.className = 'py-2.5 flex items-center justify-center gap-1.5 bg-rose-600 text-white transition';
-        if (hint) hint.textContent = '(Daha önce yanlış yaptığın soruların konuları)';
     } else { // 'karma'
         if(sf) sf.classList.remove('hidden');
         if(nf) nf.classList.remove('hidden');
         if(bk) bk.className = 'py-2.5 flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg transition';
-        if (hint) hint.textContent = '(Tüm Konu ve Soru Başlıkları)';
     }
 
     populateTopicOptions();
+}
+
+function toggleFastSolve(checked) {
+    updateDurationAndHintLabels();
+}
+
+function updateDurationAndHintLabels() {
+    const dl = document.getElementById('durationLabel');
+    const hint = document.getElementById('modeTopicHint');
+    const isFast = !!document.getElementById('inputIsFastSolve')?.checked;
+
+    if (dl) {
+        if (currentEntryType === 'soru') {
+            dl.innerHTML = isFast
+                ? 'Çözme Süresi (Dk) <span class="text-[10px] text-amber-400/90 font-normal">(saf çözüm)</span>'
+                : 'Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(İsteğe bağlı)</span>';
+        } else if (currentEntryType === 'karma') {
+            dl.innerHTML = isFast
+                ? 'Süre (Dk) <span class="text-[10px] text-amber-400/90 font-normal">(hızlı çözme)</span>'
+                : 'Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(Karma süre)</span>';
+        } else {
+            dl.innerHTML = 'Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(İsteğe bağlı)</span>';
+        }
+    }
+
+    if (hint) {
+        if (currentEntryType === 'soru') {
+            hint.textContent = isFast ? '(Sadece Soru Konuları — Hızlı Çözme)' : '(Sadece Soru Konuları)';
+        } else if (currentEntryType === 'not') {
+            hint.textContent = '(Sadece Konu Anlatım Konuları)';
+        } else if (currentEntryType === 'review') {
+            hint.textContent = '(Daha önce yanlış yaptığın soruların konuları)';
+        } else { // karma
+            hint.textContent = '(Tüm Konu ve Soru Başlıkları)';
+        }
+    }
 }
 
 function populateTopicOptions() {
@@ -3302,7 +3205,7 @@ function populateTopicOptions() {
     const allGroups = TOPICS_BY_SUBJECT[subject] || [];
     
     let targetGroups = [];
-    if (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'review') {
+    if (currentEntryType === 'soru' || currentEntryType === 'review') {
         targetGroups = allGroups.filter(g => g.group.toLowerCase().includes('soru') || g.group === 'Diğer');
         if (targetGroups.length === 0) targetGroups = allGroups;
     } else if (currentEntryType === 'not') {
@@ -3873,7 +3776,7 @@ function renderPerTopicDataCards() {
         const isSoruGroup = isTopicSoruGroup(subject, tName);
         const hasEnteredQuestions = (Number(state.correct) > 0 || Number(state.wrong) > 0 || Number(state.empty) > 0);
         const isReviewCard = currentEntryType === 'review';
-        const isSoruCard = !isReviewCard && ((currentEntryType === 'soru' || currentEntryType === 'hizli') || (currentEntryType === 'karma' && (isSoruGroup || hasEnteredQuestions)));
+        const isSoruCard = !isReviewCard && (currentEntryType === 'soru' || (currentEntryType === 'karma' && (isSoruGroup || hasEnteredQuestions)));
 
         const rangeInfo = getTopicPageRangeInfo(subject, tName);
         const fullRangeStr = rangeInfo ? rangeInfo.fullRangeText : '';
@@ -4170,7 +4073,7 @@ function calcOverallSummary() {
 
     const summary = document.getElementById('overallFormSummary');
     if (summary) {
-        if (currentEntryType === 'soru' || currentEntryType === 'hizli') {
+        if (currentEntryType === 'soru') {
             summary.textContent = `Toplam: ${grandTotal} Soru (${grandCorrect} D / ${grandWrong} Y / ${grandEmpty} B)`;
         } else if (currentEntryType === 'review') {
             summary.textContent = `${topicNames.length} Konu için Eski Yanlış Tekrarı Ekleniyor`;
@@ -5473,6 +5376,10 @@ function anyKeywordMatch(str, keywords) {
 }
 
 function quickFillFromTask(task) {
+    linkedGoogleTaskId = task.id;
+    linkedGoogleTaskListId = (typeof currentTaskListId !== 'undefined') ? currentTaskListId : '@default';
+    linkedSiraNo = null;
+    linkedSiraIsRev = false;
     const title = task.title || '';
     const notes = task.notes || task.details || task.description || '';
     const fullText = (title + " " + notes).toLowerCase();
@@ -6559,7 +6466,7 @@ function renderLogs() {
                 const modeBadge = (isSoru && !isKarma && !isStudio)
                     ? (e.fast
                         ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30"><i class="fa-solid fa-bolt mr-1"></i>Hızlı Çözme</span>`
-                        : `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30"><i class="fa-solid fa-book-open-reader mr-1"></i>Öğrenerek Çözme</span>`)
+                        : `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30"><i class="fa-solid fa-pen-to-square mr-1"></i>Soru Çözümü</span>`)
                     : '';
 
                 const stats = isSoru && e.totalQ > 0 ? `
@@ -6597,7 +6504,7 @@ function renderLogs() {
                                 </div>` : (isSoru ? (e.fast ? `<div class="flex items-center gap-2 text-[10px] font-semibold">
                                     <span class="text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"><i class="fa-solid fa-bolt text-[9px] mr-1"></i>Hızlı Çözme</span>
                                 </div>` : `<div class="flex items-center gap-2 text-[10px] font-semibold">
-                                    <span class="text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20"><i class="fa-solid fa-book-open-reader text-[9px] mr-1"></i>Öğrenerek Çözme</span>
+                                    <span class="text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20"><i class="fa-solid fa-pen-to-square text-[9px] mr-1"></i>Soru Çözümü</span>
                                 </div>`) : (e.source === 'kertik' ? `<div class="flex items-center gap-2 text-[10px] font-semibold">
                                     <span class="text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"><i class="fa-solid fa-stopwatch text-[9px] mr-1"></i>Odak Seansı</span>
                                 </div>` : `<div class="flex items-center gap-2 text-[10px] font-semibold">
@@ -7088,13 +6995,12 @@ function saveEntry(event) {
             createdAtIso = existingForTimestamp?.createdAt || new Date().toISOString();
         }
 
-        // 'hizli' bir ARAYÜZ modudur, ayrı bir kayıt tipi DEĞİL. Diske 'soru' olarak
-        // yazılır, tek farkı fast:true. Böylece mevcut bütün D/Y/B, zayıflık, rapor ve
-        // Stüdyo mantığı hiç değişmeden çalışır; ayrım yalnız SÜRE yorumuna girer (§4d).
+        const isFast = (currentEntryType === 'soru' || currentEntryType === 'karma') && !!(document.getElementById('inputIsFastSolve')?.checked);
+
         let entry = {
             id: editId || Date.now(),
-            type: currentEntryType === 'hizli' ? 'soru' : currentEntryType,
-            fast: currentEntryType === 'hizli',
+            type: currentEntryType,
+            fast: isFast,
             date: dateStr,
             isoDate,
             subject,
@@ -7103,10 +7009,10 @@ function saveEntry(event) {
             pages: pagesList.join(', '),
             // Yanlış Tekrarı kayıtları genel D/Y/B ve zayıflık istatistiklerine KARIŞMAZ
             // (bilinçli tercih: bunlar zaten yanlış bilinen sorular, doğruluk oranını çarpıtır).
-            totalQ: (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'karma') ? grandTotal : 0,
-            correct: (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'karma') ? grandCorrect : 0,
-            wrong: (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'karma') ? grandWrong : 0,
-            empty: (currentEntryType === 'soru' || currentEntryType === 'hizli' || currentEntryType === 'karma') ? grandEmpty : 0,
+            totalQ: (currentEntryType === 'soru' || currentEntryType === 'karma') ? grandTotal : 0,
+            correct: (currentEntryType === 'soru' || currentEntryType === 'karma') ? grandCorrect : 0,
+            wrong: (currentEntryType === 'soru' || currentEntryType === 'karma') ? grandWrong : 0,
+            empty: (currentEntryType === 'soru' || currentEntryType === 'karma') ? grandEmpty : 0,
             duration,
             dayStatusNote: dayStatusNoteText || null,
             studioNote: existingForTimestamp?.studioNote || null,
@@ -7134,8 +7040,112 @@ function saveEntry(event) {
         renderLogs(); renderSubjectCards();
         cancelEdit();
 
+        // Otomatik Akıllı Sayfa Aralığı & Dilim Eşleştirme (Kısmi Çalışma Desteği)
+        // Kullanıcı tüm konuyu bitirmese bile (örn. Borçlar s.85-110 yaptıysa),
+        // girilen sayfa aralığına denk gelen bitmiş dilimleri (örn. s.85-98) otomatik tamamla.
+        let completedSiraNos = [];
+        if (typeof SIRA_QUEUE !== 'undefined' && typeof siraIsDone === 'function') {
+            const entrySubjNorm = (entry.subject || '').toLowerCase();
+            
+            // Sayfa aralığını ayrıştır (örn: "s.85-110" -> 85, 110)
+            let userPStart = null, userPEnd = null;
+            const pMatch = (entry.pages || '').match(/(\d+)(?:\s*[-–—]\s*(\d+))?/);
+            if (pMatch) {
+                userPStart = parseInt(pMatch[1], 10);
+                userPEnd = pMatch[2] ? parseInt(pMatch[2], 10) : userPStart;
+            }
+
+            if (linkedSiraNo) {
+                completedSiraNos.push({ no: linkedSiraNo, isRev: linkedSiraIsRev });
+            }
+
+            // Sayfa aralığına tam uyan dilimleri bul
+            if (userPStart !== null && userPEnd !== null) {
+                SIRA_QUEUE.forEach(it => {
+                    if (siraIsDone(it.no)) return;
+                    const itSubjNorm = (it.subject || '').toLowerCase();
+                    const sameSubj = itSubjNorm === entrySubjNorm || 
+                                     (itSubjNorm.includes('hmk') && entrySubjNorm.includes('hmk')) ||
+                                     (itSubjNorm.includes('icra') && entrySubjNorm.includes('icra'));
+                    if (!sameSubj) return;
+
+                    // Eğer maddenin tüm sayfa aralığı kullanıcının çözdüğü aralığın içindeyse
+                    if (it.start && it.end && it.start >= userPStart && it.end <= userPEnd) {
+                        if (!completedSiraNos.some(c => c.no === it.no)) {
+                            completedSiraNos.push({ no: it.no, isRev: false });
+                        }
+                    }
+                });
+            } else if (!linkedSiraNo) {
+                // Sayfa aralığı yoksa metin / konu bazlı eşleştir
+                const matchedItem = SIRA_QUEUE.find(it => {
+                    if (siraIsDone(it.no)) return false;
+                    const itSubjNorm = (it.subject || '').toLowerCase();
+                    const sameSubj = itSubjNorm === entrySubjNorm || 
+                                     (itSubjNorm.includes('hmk') && entrySubjNorm.includes('hmk')) ||
+                                     (itSubjNorm.includes('icra') && entrySubjNorm.includes('icra'));
+                    if (!sameSubj) return false;
+                    if (it.chapter && entry.topic && (entry.topic.toLowerCase().includes(it.chapter.toLowerCase()) || it.chapter.toLowerCase().includes(entry.topic.toLowerCase()))) {
+                        return true;
+                    }
+                    return false;
+                });
+                if (matchedItem && !completedSiraNos.some(c => c.no === matchedItem.no)) {
+                    completedSiraNos.push({ no: matchedItem.no, isRev: false });
+                }
+            }
+        }
+
+        // Bulunan tüm Sıra maddelerini ve Google Görevini otomatik tamamla
+        let completedTaskMsg = '';
+        if (completedSiraNos.length > 0) {
+            const finishedLabels = [];
+            completedSiraNos.forEach(c => {
+                if (c.isRev) {
+                    if (typeof siraRevToggle === 'function' && !siraRevIsDone(c.no)) {
+                        siraRevToggle(c.no, true);
+                        finishedLabels.push(`Tekrar #${c.no}`);
+                    }
+                } else {
+                    if (typeof siraComplete === 'function' && !siraIsDone(c.no)) {
+                        siraComplete(c.no);
+                        finishedLabels.push(`#${c.no}`);
+                    }
+                }
+            });
+            if (finishedLabels.length > 0) {
+                completedTaskMsg = ` & Sıra ${finishedLabels.join(', ')} tamamlandı ✓`;
+            }
+            linkedSiraNo = null;
+            linkedSiraIsRev = false;
+        }
+
+        if (linkedGoogleTaskId) {
+            const taskIdToComplete = linkedGoogleTaskId;
+            const listIdToUse = linkedGoogleTaskListId || (typeof currentTaskListId !== 'undefined' ? currentTaskListId : '@default');
+            if (typeof accessToken !== 'undefined' && accessToken) {
+                fetch(`https://tasks.googleapis.com/tasks/v1/lists/${listIdToUse}/tasks/${taskIdToComplete}`, {
+                    method: 'PATCH',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: 'completed' })
+                }).catch(() => {});
+            }
+            if (Array.isArray(fetchedGoogleTasks)) {
+                const t = fetchedGoogleTasks.find(x => x.id === taskIdToComplete);
+                if (t) t.status = 'completed';
+            }
+            if (typeof renderTodayTasksWidget === 'function') renderTodayTasksWidget();
+            if (typeof activeTab !== 'undefined' && activeTab === 'takvim' && typeof applyTaskFilterAndRender === 'function') applyTaskFilterAndRender();
+            if (!completedTaskMsg) completedTaskMsg = ' & Görev tamamlandı ✓';
+            linkedGoogleTaskId = null;
+            linkedGoogleTaskListId = null;
+        }
+
         await saveToDrive();
-        showToast(editId ? 'Kayıt güncellendi ✓' : 'Kayıt eklendi ✓', 'emerald');
+        showToast(editId ? 'Kayıt güncellendi ✓' : `Kayıt eklendi${completedTaskMsg}`, 'emerald');
     };
 
     process();
@@ -7203,7 +7213,12 @@ function startEdit(id) {
         if (standardEditContainer) standardEditContainer.classList.remove('hidden');
         if (subjSelect) subjSelect.required = true;
 
-        setEntryType(e.type === 'karma' ? 'karma' : (e.type === 'not' ? 'not' : (e.type === 'review' ? 'review' : (e.fast ? 'hizli' : 'soru'))));
+        setEntryType(e.type === 'karma' ? 'karma' : (e.type === 'not' ? 'not' : (e.type === 'review' ? 'review' : 'soru')));
+        const fastChk = document.getElementById('inputIsFastSolve');
+        if (fastChk) {
+            fastChk.checked = !!e.fast;
+            toggleFastSolve(!!e.fast);
+        }
 
         if (e.subject) {
             if (![...subjSelect.options].some(o => o.value === e.subject)) {
@@ -7285,6 +7300,11 @@ function cancelEdit() {
     document.getElementById('entryForm').reset();
     const dNoteInput = document.getElementById('inputDayStatusNote');
     if (dNoteInput) dNoteInput.value = '';
+    const fastChk = document.getElementById('inputIsFastSolve');
+    if (fastChk) {
+        fastChk.checked = false;
+        toggleFastSolve(false);
+    }
     selectedTopicsMap = {};
     populateTopicOptions();
     
@@ -7550,7 +7570,6 @@ function updateCountdown() {
 }
 
 function init() {
-    initKertikDropZone();
     migrateDayNotes();
     renderLogs();
     renderSubjectCards();
