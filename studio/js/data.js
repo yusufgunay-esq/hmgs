@@ -4,7 +4,10 @@
    O(n) tam tarama yerine hazır Map'ler.
    ========================================================================== */
 
+import { loadMasterVault } from './vault-client.js';
+
 export const SUBJECTS = [
+
   { id: 'medeni_hukuk',        name: 'Medeni Hukuk',              tier: 1, examQ: 15 },
   { id: 'borclar_hukuku',      name: 'Borçlar Hukuku',            tier: 1, examQ: 12 },
   { id: 'ticaret_hukuku',      name: 'Ticaret Hukuku',            tier: 1, examQ: 12 },
@@ -53,9 +56,8 @@ export function isV3(kind) {
 /** Geriye dönük uyum: `V3_TYPES.has(x)` çağrıları çalışmaya devam eder. */
 export const V3_TYPES = { has: isV3 };
 
-import { loadMasterVault } from './vault-client.js';
-
 export let TOPICS = [];
+
 export let QUESTIONS = [];
 
 export const topicById = new Map();
