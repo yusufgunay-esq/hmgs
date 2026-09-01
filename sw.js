@@ -1,10 +1,10 @@
 /* HMGS 2026 — Service Worker
    Amaç: uygulama telefonda internetsiz de açılsın; Drive trafiği ASLA önbelleğe girmesin. */
 
-const VERSION = 'hmgs-v5';
+const VERSION = 'hmgs-v6';
 const SHELL = VERSION + '-shell';
 
-// Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları.
+// Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
 const PRECACHE = [
   './',
   './index.html',
@@ -13,9 +13,30 @@ const PRECACHE = [
   './book_guide_ui.js',
   './icon-192.png',
   './icon-512.png',
+  './studio.html',
+  './studio.webmanifest',
+  './js/visual-engines-v3.js',
+  './studio/css/studio.css',
+  './studio/css/studio-mobile.css',
+  './studio/js/main.js',
+  './studio/js/data.js',
+  './studio/js/engine.js',
+  './studio/js/elim.js',
+  './studio/js/store.js',
+  './studio/js/ui.js',
+  './studio/js/book-map.js',
+  './studio/js/vault-client.js',
+  './studio/js/views/today.js',
+  './studio/js/views/odevler.js',
+  './studio/js/views/flow.js',
+  './studio/js/views/practice.js',
+  './studio/js/views/pratik.js',
+  './studio/js/views/exam.js',
+  './studio/js/views/progress.js',
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'
 ];
+
 
 // Bunlar asla önbelleğe alınmaz: kimlik doğrulama ve Drive API canlı olmak zorunda.
 const NEVER_CACHE = [
