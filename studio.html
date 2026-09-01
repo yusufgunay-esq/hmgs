@@ -55,17 +55,13 @@
     <section id="view-progress" class="view"></section>
   </main>
 
-  <!-- Veri katmanı: klasik script, global sabitler tanımlar -->
-  <script src="topics.js"></script>
-  <script src="questions.js"></script>
-  <!-- Etkileşimli görsel motoru (window.HMGSV3) — tek motor, eskisi yüklenmez -->
+  <!-- Etkileşimli görsel motoru (window.HMGSV3) -->
   <script src="js/visual-engines-v3.js"></script>
 
-  <!-- Uygulama: ES modülleri -->
+  <!-- Uygulama: ES modülleri (Vault & IndexedDB Destekli) -->
   <script type="module" src="studio/js/main.js"></script>
 
-  <!-- Servis çalışanı: yalnız güvenli bağlamda (https / localhost) kayıt olur.
-       http://<PC-IP>:8765 ile girildiğinde sessizce atlanır, uygulama normal çalışır. -->
+  <!-- Servis çalışanı: yalnız güvenli bağlamda (https / localhost) kayıt olur. -->
   <script>
     if ('serviceWorker' in navigator && window.isSecureContext) {
       window.addEventListener('load', () => {
@@ -73,22 +69,22 @@
       });
     }
 
-    // file:// protokolü veya modül yüklenme başarısızlığı için güvenlik ağı
-    setTimeout(function() {
-      if (!window.__STUDIO_LOADED__) {
+    // Yalnızca file:// protokolü ile açıldığında uyar (CORS engeli)
+    if (location.protocol === 'file:') {
+      window.addEventListener('DOMContentLoaded', function() {
         var host = document.getElementById('view-today');
-        if (host && (!host.children.length || host.children.length === 0)) {
-          var isFile = location.protocol === 'file:';
+        if (host) {
           host.innerHTML = '<div class="wrap" style="padding:2rem 1rem"><div class="card" style="border-left:4px solid var(--warn);background:#fff">' +
-            '<h3 style="font-size:1.15rem;font-weight:700;margin-bottom:0.6rem;color:var(--ink)">HMGS Stüdyo ' + (isFile ? 'Yerel Sunucu Gerektiriyor' : 'Yükleme Uyarısı') + '</h3>' +
+            '<h3 style="font-size:1.15rem;font-weight:700;margin-bottom:0.6rem;color:var(--ink)">HMGS Stüdyo Yerel Sunucu Gerektiriyor</h3>' +
             '<p style="color:var(--ink-2);font-size:0.92rem;line-height:1.6;margin-bottom:1.2rem">' +
-            (isFile ? 'Uygulama doğrudan dosya sisteminden (<code>file://</code>) açıldığı için tarayıcı güvenlik politikası (CORS) gereği JavaScript modülleri engellendi.' : 'Modül dosyaları yüklenemedi veya uygulama başlatılamadı.') +
+            'Uygulama doğrudan dosya sisteminden (<code>file://</code>) açıldığı için tarayıcı güvenlik politikası (CORS) gereği JavaScript modülleri engellendi.' +
             '<br><br><b>Çözüm:</b> Proje klasöründeki <code>baslat.bat</code> dosyasını çalıştırın veya tarayıcıda <b><a href="http://localhost:8766/studio.html" style="color:var(--accent);text-decoration:underline">http://localhost:8766/studio.html</a></b> adresini açın.</p>' +
             '<a href="http://localhost:8766/studio.html" class="btn" style="text-decoration:none;display:inline-block">http://localhost:8766 Adresine Git</a>' +
             '</div></div>';
         }
-      }
-    }, 600);
+      });
+    }
   </script>
 </body>
 </html>
+
