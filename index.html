@@ -197,7 +197,7 @@
             input[type="text"], input[type="number"], input[type="date"], input[type="time"],
             input[type="search"], input[type="email"], textarea, select { font-size: 16px !important; }
             /* 16px yazıyla saat alanı dar kalmasın (00:00 kırpılıyordu) */
-            #inputTime { width: 112px !important; }
+            #inputTime, #inputStartTime, #inputEndTime { width: 100% !important; min-width: 80px; }
 
             /* Uzun uyarı metni: 3 satır, dokununca açılır */
             .sira-warn-clamp {
@@ -313,13 +313,12 @@
             </div>
         </div>
 
-        <!-- Top Right Actions & Drive Badge -->
-        <!-- Mobilde: ikon-only, sıkışmasın diye metinler md üstünde açılır. -->
         <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 min-w-0">
-            <a href="http://localhost:8765/studio.html#odevler" target="_blank" class="hidden lg:flex px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-bold text-xs rounded-xl border border-indigo-500/40 transition items-center gap-1.5" title="HMGS Stüdyo Ödevler Paneline Git">
-                <i class="fa-solid fa-clipboard-list text-xs"></i>
-                <span>Stüdyo Ödevleri</span>
+            <a href="studio.html" class="flex px-2.5 sm:px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-bold text-xs rounded-xl border border-indigo-500/40 transition items-center gap-1.5" title="HMGS Stüdyo Soru & Konu İstasyonuna Git">
+                <i class="fa-solid fa-scale-balanced text-xs"></i>
+                <span>Stüdyo</span>
             </a>
+
 
             <div id="headerAddWrap" class="hidden md:block">
                 <button id="headerAddBtn" onclick="openEntryModal()" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center gap-1.5">
@@ -935,8 +934,23 @@
                                 <input type="date" id="karmaInputDate" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
                             </div>
                             <div>
-                                <label class="block text-[10px] font-semibold text-slate-400 mb-1">Seans Süresi (Dk)</label>
-                                <input type="number" id="karmaInputDuration" min="0" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-[10px] font-semibold text-slate-400">Seans Süresi</label>
+                                    <span id="karmaDurationTotalBadge" class="text-[9px] text-indigo-400/90 font-medium font-mono"></span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div class="relative flex-1">
+                                        <input type="number" id="karmaInputDurationHours" min="0" placeholder="0" oninput="onKarmaHourMinInputChanged()"
+                                            class="w-full bg-slate-800 border border-slate-700 rounded-xl pl-2 pr-5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-center font-semibold">
+                                        <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-semibold pointer-events-none select-none">sa</span>
+                                    </div>
+                                    <div class="relative flex-1">
+                                        <input type="number" id="karmaInputDurationMinutes" min="0" placeholder="0" oninput="onKarmaHourMinInputChanged()"
+                                            class="w-full bg-slate-800 border border-slate-700 rounded-xl pl-2 pr-5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-center font-semibold">
+                                        <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-semibold pointer-events-none select-none">dk</span>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="karmaInputDuration" value="">
                             </div>
                         </div>
                     </div>
@@ -983,13 +997,11 @@
                     </button>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <!-- Tarih & Ders Seçimi -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-300 mb-1">Tarih</label>
-                        <div class="flex gap-1.5">
-                            <input type="date" id="inputDate" class="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
-                            <input type="time" id="inputTime" title="Saat (elle düzeltilebilir — panel açıldığında otomatik dolar)" class="w-[84px] flex-shrink-0 bg-slate-800 border border-slate-700 rounded-xl px-1.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
-                        </div>
+                        <input type="date" id="inputDate" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
                     </div>
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-300 mb-1">Ders</label>
@@ -1016,16 +1028,69 @@
                             <option value="Diğer">Diğer</option>
                         </select>
                     </div>
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <label id="durationLabel" class="block text-[11px] font-semibold text-slate-300">Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(İsteğe bağlı)</span></label>
-                            <label id="fastSolveContainer" class="flex items-center gap-1.5 cursor-pointer text-[10.5px] font-semibold text-amber-300 select-none hover:text-amber-200 transition" title="Saf soru çözme hızı (çözüm okuma/not alma hariç)">
-                                <input type="checkbox" id="inputIsFastSolve" onchange="toggleFastSolve(this.checked)" class="rounded text-amber-500 focus:ring-amber-400 bg-slate-900 border-slate-600 w-3.5 h-3.5 cursor-pointer accent-amber-500">
-                                <span class="flex items-center gap-1"><i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i> Hızlı Çözme</span>
+                </div>
+
+                <!-- Zaman & Süre Paneli (Kronometre / Seans) -->
+                <div class="p-3.5 bg-slate-950/40 border border-slate-800 rounded-2xl space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                            <i class="fa-regular fa-clock text-blue-400"></i> Çalışma Saatleri & Kronometre Süresi
+                        </span>
+                        <label id="fastSolveContainer" class="flex items-center gap-1.5 cursor-pointer text-[10.5px] font-semibold text-amber-300 select-none hover:text-amber-200 transition" title="Saf soru çözme hızı (çözüm okuma/not alma hariç)">
+                            <input type="checkbox" id="inputIsFastSolve" onchange="toggleFastSolve(this.checked)" class="rounded text-amber-500 focus:ring-amber-400 bg-slate-900 border-slate-600 w-3.5 h-3.5 cursor-pointer accent-amber-500">
+                            <span class="flex items-center gap-1"><i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i> Hızlı Çözme</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[10.5px] font-semibold text-slate-400 mb-1">
+                                <i class="fa-solid fa-play text-blue-400 text-[9px] mr-1"></i>Başlangıç Saati
                             </label>
+                            <input type="time" id="inputStartTime" onchange="onTimeRangeChanged('start')"
+                                class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 text-center font-medium">
                         </div>
-                        <input type="number" id="inputDuration" min="0" placeholder="45"
-                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <div>
+                            <label class="block text-[10.5px] font-semibold text-slate-400 mb-1">
+                                <i class="fa-solid fa-flag-checkered text-indigo-400 text-[9px] mr-1"></i>Bitiş Saati
+                            </label>
+                            <input type="time" id="inputEndTime" onchange="onTimeRangeChanged('end')"
+                                class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 text-center font-medium">
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label id="durationLabel" class="block text-[10.5px] font-bold text-emerald-400">
+                                    <i class="fa-solid fa-stopwatch text-emerald-400 text-[9px] mr-1"></i>Net Süre
+                                </label>
+                                <span id="durationTotalBadge" class="text-[9.5px] text-emerald-400/90 font-medium font-mono"></span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <div class="relative flex-1">
+                                    <input type="number" id="inputDurationHours" min="0" placeholder="0" oninput="onHourMinInputChanged()"
+                                        class="w-full bg-slate-800 border border-emerald-500/50 rounded-xl pl-2 pr-5 py-2 text-xs text-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 text-center font-bold">
+                                    <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-semibold pointer-events-none select-none">sa</span>
+                                </div>
+                                <div class="relative flex-1">
+                                    <input type="number" id="inputDurationMinutes" min="0" placeholder="0" oninput="onHourMinInputChanged()"
+                                        class="w-full bg-slate-800 border border-emerald-500/50 rounded-xl pl-2 pr-5 py-2 text-xs text-emerald-300 placeholder-slate-500 focus:outline-none focus:border-emerald-400 text-center font-bold">
+                                    <span class="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-semibold pointer-events-none select-none">dk</span>
+                                </div>
+                            </div>
+                            <input type="hidden" id="inputDuration" value="">
+                        </div>
+                    </div>
+
+                    <!-- Geriye uyumluluk için gizli inputTime -->
+                    <input type="hidden" id="inputTime" value="">
+
+                    <!-- Otomatik Mola & Süre Özeti Şeridi -->
+                    <div id="timeCalcSummary" class="hidden text-[11px] px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-300 flex items-center justify-between flex-wrap gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span id="timeCalcText"></span>
+                        </div>
+                        <span id="timeCalcBreakBadge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                            <i class="fa-solid fa-mug-hot text-[9px]"></i> <span id="timeCalcBreakText"></span>
+                        </span>
                     </div>
                 </div>
 
@@ -1233,26 +1298,31 @@
                         Net: 0.00
                     </span>
                 </div>
-                <div class="grid grid-cols-4 gap-2">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
-                        <label class="text-[10px] text-slate-300 font-semibold block mb-1">Toplam Soru</label>
-                        <input type="number" id="inputDenemeTotalQ" value="120" min="1" oninput="calcDenemeNet()"
-                            class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-white font-bold text-xs text-center focus:border-amber-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="text-[10px] text-emerald-400 font-bold block mb-1">Doğru (D)</label>
-                        <input type="number" id="inputDenemeCorrect" min="0" placeholder="84" oninput="calcDenemeNet()"
-                            class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-emerald-400 font-bold text-xs text-center focus:border-emerald-500 focus:outline-none">
+                        <label class="text-[10px] text-blue-400 font-bold block mb-1">
+                            <i class="fa-solid fa-list-check mr-0.5"></i> Toplam Soru
+                        </label>
+                        <input type="number" id="inputDenemeTotalQ" value="120" min="1" oninput="onDenemeNumInput('totalQ')"
+                            class="w-full bg-slate-900 border border-blue-500/40 rounded-xl p-2 text-blue-300 font-bold text-xs text-center focus:border-blue-400 focus:outline-none">
                     </div>
                     <div>
                         <label class="text-[10px] text-rose-400 font-bold block mb-1">Yanlış (Y)</label>
-                        <input type="number" id="inputDenemeWrong" min="0" placeholder="24" oninput="calcDenemeNet()"
+                        <input type="number" id="inputDenemeWrong" min="0" placeholder="0" oninput="onDenemeNumInput('wrong')"
                             class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-rose-400 font-bold text-xs text-center focus:border-rose-500 focus:outline-none">
                     </div>
                     <div>
                         <label class="text-[10px] text-amber-400 font-bold block mb-1">Boş (B)</label>
-                        <input type="number" id="inputDenemeEmpty" min="0" placeholder="12" oninput="calcDenemeNet()"
+                        <input type="number" id="inputDenemeEmpty" min="0" placeholder="0" oninput="onDenemeNumInput('empty')"
                             class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-amber-400 font-bold text-xs text-center focus:border-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-emerald-400 font-bold block mb-1 flex items-center justify-between">
+                            <span>Doğru (D)</span>
+                            <span id="denemeAutoCorrectTag" class="text-[8px] font-bold text-emerald-300 bg-emerald-500/20 px-1 py-0.2 rounded border border-emerald-500/30">Oto</span>
+                        </label>
+                        <input type="number" id="inputDenemeCorrect" min="0" placeholder="0" oninput="onDenemeNumInput('correct')"
+                            class="w-full bg-slate-900 border border-emerald-500/40 rounded-xl p-2 text-emerald-400 font-bold text-xs text-center focus:border-emerald-500 focus:outline-none">
                     </div>
                 </div>
             </div>
@@ -3173,14 +3243,14 @@ function updateDurationAndHintLabels() {
     if (dl) {
         if (currentEntryType === 'soru') {
             dl.innerHTML = isFast
-                ? 'Çözme Süresi (Dk) <span class="text-[10px] text-amber-400/90 font-normal">(saf çözüm)</span>'
-                : 'Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(İsteğe bağlı)</span>';
+                ? 'Çözme Süresi <span class="text-[9.5px] text-amber-400/90 font-normal">(saf)</span>'
+                : 'Net Süre';
         } else if (currentEntryType === 'karma') {
             dl.innerHTML = isFast
-                ? 'Süre (Dk) <span class="text-[10px] text-amber-400/90 font-normal">(hızlı çözme)</span>'
-                : 'Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(Karma süre)</span>';
+                ? 'Karma Süre <span class="text-[9.5px] text-amber-400/90 font-normal">(hızlı)</span>'
+                : 'Karma Net Süre';
         } else {
-            dl.innerHTML = 'Süre (Dk) <span class="text-[10px] text-slate-500 font-normal">(İsteğe bağlı)</span>';
+            dl.innerHTML = 'Net Süre';
         }
     }
 
@@ -3881,23 +3951,33 @@ function renderPerTopicDataCards() {
                 ${cardHeader}
 
                 <!-- Per-Topic Inputs Grid -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     <div>
-                        <label class="text-[10px] text-emerald-400 font-bold block mb-1">Doğru (D)</label>
-                        <input type="number" min="0" id="cardCorrect_${idx}" oninput="updateTopicState('${safeJsTopic}', ${idx})" value="${state.correct !== undefined ? state.correct : ''}" placeholder="0"
-                            class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-emerald-400 font-bold text-xs text-center focus:border-emerald-500 focus:outline-none">
+                        <label class="text-[10px] text-blue-400 font-bold block mb-1">
+                            <i class="fa-solid fa-list-check mr-0.5"></i> Toplam (T)
+                        </label>
+                        <input type="number" min="0" id="cardTotalQ_${idx}" oninput="onTopicNumInput('${safeJsTopic}', ${idx}, 'totalQ')" value="${state.totalQ !== undefined && state.totalQ !== '' ? state.totalQ : (tot > 0 ? tot : '')}" placeholder="0"
+                            class="w-full bg-slate-900 border border-blue-500/40 rounded-xl p-2 text-blue-300 font-bold text-xs text-center focus:border-blue-400 focus:outline-none">
                     </div>
                     <div>
                         <label class="text-[10px] text-rose-400 font-bold block mb-1">Yanlış (Y)</label>
-                        <input type="number" min="0" id="cardWrong_${idx}" oninput="updateTopicState('${safeJsTopic}', ${idx})" value="${state.wrong !== undefined ? state.wrong : ''}" placeholder="0"
+                        <input type="number" min="0" id="cardWrong_${idx}" oninput="onTopicNumInput('${safeJsTopic}', ${idx}, 'wrong')" value="${state.wrong !== undefined ? state.wrong : ''}" placeholder="0"
                             class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-rose-400 font-bold text-xs text-center focus:border-rose-500 focus:outline-none">
                     </div>
                     <div>
                         <label class="text-[10px] text-amber-400 font-bold block mb-1">Boş (B)</label>
-                        <input type="number" min="0" id="cardEmpty_${idx}" oninput="updateTopicState('${safeJsTopic}', ${idx})" value="${state.empty !== undefined ? state.empty : ''}" placeholder="0"
+                        <input type="number" min="0" id="cardEmpty_${idx}" oninput="onTopicNumInput('${safeJsTopic}', ${idx}, 'empty')" value="${state.empty !== undefined ? state.empty : ''}" placeholder="0"
                             class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-amber-400 font-bold text-xs text-center focus:border-amber-500 focus:outline-none">
                     </div>
                     <div>
+                        <label class="text-[10px] text-emerald-400 font-bold block mb-1 flex items-center justify-between">
+                            <span>Doğru (D)</span>
+                            <span id="cardAutoCorrectTag_${idx}" class="text-[8px] font-bold text-emerald-300 bg-emerald-500/20 px-1 py-0.2 rounded border border-emerald-500/30 ${state.correct !== undefined && (state.totalQ || tot > 0) ? '' : 'hidden'}">Oto</span>
+                        </label>
+                        <input type="number" min="0" id="cardCorrect_${idx}" oninput="onTopicNumInput('${safeJsTopic}', ${idx}, 'correct')" value="${state.correct !== undefined ? state.correct : ''}" placeholder="0"
+                            class="w-full bg-slate-900 border border-emerald-500/40 rounded-xl p-2 text-emerald-400 font-bold text-xs text-center focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div class="col-span-2 sm:col-span-1">
                         <label class="text-[10px] text-slate-400 font-semibold block mb-1">Sayfa</label>
                         <div class="relative flex items-center">
                             <input type="text" id="cardPages_${idx}" 
@@ -4007,7 +4087,69 @@ function renderPerTopicDataCards() {
     calcOverallSummary();
 }
 
+function onTopicNumInput(topicName, idx, changedField) {
+    const tEl = document.getElementById(`cardTotalQ_${idx}`);
+    const cEl = document.getElementById(`cardCorrect_${idx}`);
+    const wEl = document.getElementById(`cardWrong_${idx}`);
+    const eEl = document.getElementById(`cardEmpty_${idx}`);
+    const autoTag = document.getElementById(`cardAutoCorrectTag_${idx}`);
+
+    const tVal = tEl ? tEl.value.trim() : '';
+    const cVal = cEl ? cEl.value.trim() : '';
+    const wVal = wEl ? wEl.value.trim() : '';
+    const eVal = eEl ? eEl.value.trim() : '';
+
+    const tNum = Number(tVal) || 0;
+    const cNum = Number(cVal) || 0;
+    const wNum = Number(wVal) || 0;
+    const eNum = Number(eVal) || 0;
+
+    const prev = selectedTopicsMap[topicName] || {};
+    let mode = prev.primaryInputMode || (tVal !== '' ? 'total' : 'correct');
+
+    if (changedField === 'totalQ') {
+        mode = 'total';
+        if (tVal !== '' && tNum >= 0) {
+            const calcC = Math.max(0, tNum - wNum - eNum);
+            if (cEl) cEl.value = calcC;
+            if (autoTag) autoTag.classList.remove('hidden');
+        } else if (tVal === '') {
+            if (autoTag) autoTag.classList.add('hidden');
+        }
+    } else if (changedField === 'wrong' || changedField === 'empty') {
+        if (mode === 'correct' && cVal !== '') {
+            // Doğru odaklı: Toplam = Doğru + Yanlış + Boş
+            const calcT = cNum + wNum + eNum;
+            if (tEl) tEl.value = calcT > 0 ? calcT : '';
+            if (autoTag) autoTag.classList.add('hidden');
+        } else {
+            // Toplam odaklı: Doğru = Toplam - Yanlış - Boş
+            if (tVal !== '' && tNum > 0) {
+                const calcC = Math.max(0, tNum - wNum - eNum);
+                if (cEl) cEl.value = calcC;
+                if (autoTag) autoTag.classList.remove('hidden');
+            } else if (cVal !== '') {
+                const calcT = cNum + wNum + eNum;
+                if (tEl) tEl.value = calcT > 0 ? calcT : '';
+            }
+        }
+    } else if (changedField === 'correct') {
+        mode = 'correct';
+        const calcT = cNum + wNum + eNum;
+        if (tEl) tEl.value = calcT > 0 ? calcT : '';
+        if (autoTag) autoTag.classList.add('hidden');
+    }
+
+    if (!selectedTopicsMap[topicName]) {
+        selectedTopicsMap[topicName] = {};
+    }
+    selectedTopicsMap[topicName].primaryInputMode = mode;
+
+    updateTopicState(topicName, idx);
+}
+
 function updateTopicState(topicName, idx) {
+    const tEl = document.getElementById(`cardTotalQ_${idx}`);
     const cEl = document.getElementById(`cardCorrect_${idx}`);
     const wEl = document.getElementById(`cardWrong_${idx}`);
     const eEl = document.getElementById(`cardEmpty_${idx}`);
@@ -4021,13 +4163,16 @@ function updateTopicState(topicName, idx) {
     const c = cEl ? (Number(cEl.value) || 0) : 0;
     const w = wEl ? (Number(wEl.value) || 0) : 0;
     const e = eEl ? (Number(eEl.value) || 0) : 0;
+    const tInput = tEl ? (Number(tEl.value) || 0) : 0;
     const p = pEl ? pEl.value.trim() : '';
     const note = noteEl ? noteEl.value.trim() : '';
     const prev = selectedTopicsMap[topicName] || {};
     const keywords = keywordsOf(prev);
     const n = keywords.join('; ');
     const concepts = kEl ? parseConcepts(kEl.value) : (prev.concepts || []);
-    const tot = c + w + e;
+    
+    // Toplam soru sayısı: kullanıcı girdiyse veya (c+w+e)
+    const tot = tInput > 0 ? tInput : (c + w + e);
 
     const badge = document.getElementById(`cardTotalBadge_${idx}`);
     if (badge) badge.textContent = `${tot} Soru`;
@@ -4039,6 +4184,7 @@ function updateTopicState(topicName, idx) {
     }
 
     selectedTopicsMap[topicName] = {
+        ...prev,
         topic: topicName,
         correct: c,
         wrong: w,
@@ -4086,9 +4232,12 @@ function calcOverallSummary() {
 // ═══════════════════════════════════════
 // DENEME SINAVLARI MODAL & LOGIC
 // ═══════════════════════════════════════
+let denemePrimaryMode = 'total';
+
 function openDenemeModal() {
     document.getElementById('denemeModal').classList.remove('hidden');
     if (!editingDenemeId) {
+        denemePrimaryMode = 'total';
         document.getElementById('denemeForm').reset();
         document.getElementById('denemeModalTitle').textContent = 'Yeni Deneme Sınavı Ekle';
         document.getElementById('denemeSubmitBtnText').textContent = 'Denemeyi Kaydet';
@@ -4122,6 +4271,51 @@ function populateDenemeWrongTopics() {
     });
     html += `<option value="Genel / Diğer">Genel / Diğer Konu</option>`;
     select.innerHTML = html;
+}
+
+function onDenemeNumInput(changedField) {
+    const tEl = document.getElementById('inputDenemeTotalQ');
+    const cEl = document.getElementById('inputDenemeCorrect');
+    const wEl = document.getElementById('inputDenemeWrong');
+    const eEl = document.getElementById('inputDenemeEmpty');
+    const autoTag = document.getElementById('denemeAutoCorrectTag');
+
+    const tVal = tEl ? tEl.value.trim() : '';
+    const cVal = cEl ? cEl.value.trim() : '';
+    const wVal = wEl ? wEl.value.trim() : '';
+    const eVal = eEl ? eEl.value.trim() : '';
+
+    const tNum = Number(tVal) || 0;
+    const cNum = Number(cVal) || 0;
+    const wNum = Number(wVal) || 0;
+    const eNum = Number(eVal) || 0;
+
+    if (changedField === 'totalQ') {
+        denemePrimaryMode = 'total';
+        if (tVal !== '' && tNum >= 0) {
+            const calcC = Math.max(0, tNum - wNum - eNum);
+            if (cEl) cEl.value = calcC;
+            if (autoTag) autoTag.classList.remove('hidden');
+        }
+    } else if (changedField === 'wrong' || changedField === 'empty') {
+        if (denemePrimaryMode === 'correct' && cVal !== '') {
+            const calcT = cNum + wNum + eNum;
+            if (tEl) tEl.value = calcT > 0 ? calcT : 120;
+            if (autoTag) autoTag.classList.add('hidden');
+        } else {
+            const effTot = (tVal !== '' && tNum > 0) ? tNum : 120;
+            const calcC = Math.max(0, effTot - wNum - eNum);
+            if (cEl) cEl.value = calcC;
+            if (autoTag) autoTag.classList.remove('hidden');
+        }
+    } else if (changedField === 'correct') {
+        denemePrimaryMode = 'correct';
+        const calcT = cNum + wNum + eNum;
+        if (tEl) tEl.value = calcT > 0 ? calcT : 120;
+        if (autoTag) autoTag.classList.add('hidden');
+    }
+
+    calcDenemeNet();
 }
 
 function calcDenemeNet() {
@@ -6171,13 +6365,201 @@ async function refreshTasks() {
     await loadTasksFromGoogle();
 }
 
+function calcSpanMinutes(startHHMM, endHHMM) {
+    if (!startHHMM || !endHHMM) return null;
+    const [sh, sm] = startHHMM.split(':').map(Number);
+    const [eh, em] = endHHMM.split(':').map(Number);
+    if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return null;
+    let startMins = sh * 60 + sm;
+    let endMins = eh * 60 + em;
+    if (endMins < startMins) {
+        // Gece yarısını geçen seans (örn: 23:00 -> 01:30)
+        endMins += 24 * 60;
+    }
+    return endMins - startMins;
+}
+
+function formatMinsToHoursStr(mins) {
+    if (mins === null || mins === undefined || isNaN(mins) || Number(mins) <= 0) return '';
+    const totalM = Math.round(Number(mins));
+    const h = Math.floor(totalM / 60);
+    const m = totalM % 60;
+    if (h === 0) return `${m} dk`;
+    if (m === 0) return `${h} sa`;
+    return `${h} sa ${m} dk`;
+}
+
+function syncDurationToHourMinInputs(mins) {
+    const hEl = document.getElementById('inputDurationHours');
+    const mEl = document.getElementById('inputDurationMinutes');
+    const badge = document.getElementById('durationTotalBadge');
+    if (!hEl || !mEl) return;
+
+    if (mins === null || mins === undefined || mins === '' || isNaN(mins) || Number(mins) <= 0) {
+        hEl.value = '';
+        mEl.value = '';
+        if (badge) badge.textContent = '';
+        return;
+    }
+
+    const totalM = Math.max(0, Math.round(Number(mins)));
+    const h = Math.floor(totalM / 60);
+    const m = totalM % 60;
+
+    hEl.value = h > 0 ? h : '';
+    mEl.value = m > 0 ? m : (h > 0 ? '0' : '');
+    if (badge) {
+        badge.textContent = totalM > 0 ? `(${totalM} dk)` : '';
+    }
+}
+
+function onHourMinInputChanged() {
+    const hEl = document.getElementById('inputDurationHours');
+    const mEl = document.getElementById('inputDurationMinutes');
+    const durEl = document.getElementById('inputDuration');
+    const badge = document.getElementById('durationTotalBadge');
+    if (!hEl || !mEl || !durEl) return;
+
+    const h = Math.max(0, parseInt(hEl.value, 10) || 0);
+    const m = Math.max(0, parseInt(mEl.value, 10) || 0);
+    const totalM = h * 60 + m;
+
+    durEl.value = totalM > 0 ? totalM : '';
+    if (badge) {
+        badge.textContent = totalM > 0 ? `(${totalM} dk)` : '';
+    }
+    onNetDurationChanged(false);
+}
+
+function syncKarmaDurationToHourMinInputs(mins) {
+    const hEl = document.getElementById('karmaInputDurationHours');
+    const mEl = document.getElementById('karmaInputDurationMinutes');
+    const badge = document.getElementById('karmaDurationTotalBadge');
+    if (!hEl || !mEl) return;
+
+    if (mins === null || mins === undefined || mins === '' || isNaN(mins) || Number(mins) <= 0) {
+        hEl.value = '';
+        mEl.value = '';
+        if (badge) badge.textContent = '';
+        return;
+    }
+
+    const totalM = Math.max(0, Math.round(Number(mins)));
+    const h = Math.floor(totalM / 60);
+    const m = totalM % 60;
+
+    hEl.value = h > 0 ? h : '';
+    mEl.value = m > 0 ? m : (h > 0 ? '0' : '');
+    if (badge) {
+        badge.textContent = totalM > 0 ? `(${totalM} dk)` : '';
+    }
+}
+
+function onKarmaHourMinInputChanged() {
+    const hEl = document.getElementById('karmaInputDurationHours');
+    const mEl = document.getElementById('karmaInputDurationMinutes');
+    const durEl = document.getElementById('karmaInputDuration');
+    const badge = document.getElementById('karmaDurationTotalBadge');
+    if (!hEl || !mEl || !durEl) return;
+
+    const h = Math.max(0, parseInt(hEl.value, 10) || 0);
+    const m = Math.max(0, parseInt(mEl.value, 10) || 0);
+    const totalM = h * 60 + m;
+
+    durEl.value = totalM > 0 ? totalM : '';
+    if (badge) {
+        badge.textContent = totalM > 0 ? `(${totalM} dk)` : '';
+    }
+}
+
+function updateTimeCalcSummary() {
+    const startEl = document.getElementById('inputStartTime');
+    const endEl = document.getElementById('inputEndTime');
+    const durEl = document.getElementById('inputDuration');
+    const summaryBox = document.getElementById('timeCalcSummary');
+    const summaryText = document.getElementById('timeCalcText');
+    const breakBadge = document.getElementById('timeCalcBreakBadge');
+    const breakText = document.getElementById('timeCalcBreakText');
+    const legacyTime = document.getElementById('inputTime');
+
+    if (legacyTime && startEl) {
+        legacyTime.value = startEl.value || (endEl ? endEl.value : '');
+    }
+
+    const startVal = startEl ? startEl.value : '';
+    const endVal = endEl ? endEl.value : '';
+    const grossMins = calcSpanMinutes(startVal, endVal);
+    const netMins = (durEl && durEl.value !== '') ? Number(durEl.value) : null;
+
+    if (grossMins !== null && grossMins > 0) {
+        if (summaryBox && summaryText) {
+            summaryBox.classList.remove('hidden');
+            let txt = `⏱️ Toplam Seans: <b class="text-white">${grossMins} dk</b> (${formatMinsToHoursStr(grossMins)})`;
+            if (netMins !== null && !isNaN(netMins)) {
+                txt += ` • ⚡ Net Çalışma: <b class="text-emerald-400">${netMins} dk</b> (${formatMinsToHoursStr(netMins)})`;
+                if (grossMins > netMins) {
+                    const diffBreak = grossMins - netMins;
+                    if (breakBadge && breakText) {
+                        breakBadge.classList.remove('hidden');
+                        breakText.textContent = `Otomatik Mola: ${diffBreak} dk (${formatMinsToHoursStr(diffBreak)})`;
+                    }
+                } else if (breakBadge) {
+                    breakBadge.classList.add('hidden');
+                }
+            } else if (breakBadge) {
+                breakBadge.classList.add('hidden');
+            }
+            summaryText.innerHTML = txt;
+        }
+    } else if (netMins !== null && !isNaN(netMins) && netMins > 0) {
+        if (summaryBox && summaryText) {
+            summaryBox.classList.remove('hidden');
+            summaryText.innerHTML = `⚡ Net Çalışma (Kronometre): <b class="text-emerald-400">${netMins} dk</b> (${formatMinsToHoursStr(netMins)})`;
+            if (breakBadge) breakBadge.classList.add('hidden');
+        }
+    } else if (summaryBox) {
+        summaryBox.classList.add('hidden');
+        if (breakBadge) breakBadge.classList.add('hidden');
+    }
+}
+
+function onTimeRangeChanged(source) {
+    const startEl = document.getElementById('inputStartTime');
+    const endEl = document.getElementById('inputEndTime');
+    const durEl = document.getElementById('inputDuration');
+
+    const startVal = startEl ? startEl.value : '';
+    const endVal = endEl ? endEl.value : '';
+    const grossMins = calcSpanMinutes(startVal, endVal);
+
+    if (grossMins !== null && grossMins >= 0) {
+        // Eğer kullanıcı henüz net süre yazmadıysa brüt süreyi varsayılan olarak öner
+        if (durEl && (durEl.value === '' || Number(durEl.value) === 0)) {
+            durEl.value = grossMins > 0 ? grossMins : '';
+        }
+    }
+    updateTimeCalcSummary();
+}
+
+function onNetDurationChanged() {
+    updateTimeCalcSummary();
+}
+
 function setDefaultDate() {
     const inputDate = document.getElementById('inputDate');
     if (inputDate) inputDate.value = getLocalDateStr();
-    // Saat: panel AÇILDIĞI andaki saat — kaydet'e basılana kadar geçen süre (not alırken vs.)
-    // yanlışlıkla kayıt saatine yansımasın. Kullanıcı isterse elle değiştirebilir.
-    const timeInput = document.getElementById('inputTime');
-    if (timeInput) timeInput.value = nowHHMM();
+    
+    const startEl = document.getElementById('inputStartTime');
+    const endEl = document.getElementById('inputEndTime');
+    const durEl = document.getElementById('inputDuration');
+    const legacyTime = document.getElementById('inputTime');
+
+    const now = nowHHMM();
+    if (endEl) endEl.value = now;
+    if (legacyTime) legacyTime.value = now;
+    if (startEl && !startEl.value) startEl.value = '';
+    if (durEl && !durEl.value) durEl.value = '';
+    updateTimeCalcSummary();
 }
 function nowHHMM() {
     const d = new Date();
@@ -6323,8 +6705,9 @@ function renderLogs() {
                 if (e.isStudioKarma || e.subject === 'Karma Test (Stüdyo)') {
                     const card = document.createElement('div');
                     const secPerQ = (e.duration && e.totalQ > 0) ? Math.round((e.duration * 60) / e.totalQ) : null;
+                    const breakInfoKarma = (e.breakDuration && e.breakDuration > 0) ? ` <span class="text-amber-300 font-normal">(${e.breakDuration} dk mola)</span>` : '';
                     const speedInfo = e.duration
-                        ? `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${e.duration} dk (${secPerQ ? `net çözüm ~${secPerQ} sn/soru` : 'Seans Süresi'})</span>`
+                        ? `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${formatMinsToHoursStr(e.duration)} Net (${secPerQ ? `net çözüm ~${secPerQ} sn/soru` : 'Seans Süresi'})${breakInfoKarma}</span>`
                         : '';
 
                     const subBreakdown = e.topicBreakdown || [];
@@ -6382,6 +6765,10 @@ function renderLogs() {
 
                     const updatedBadgeKarma = e.updatedAt ? `<span class="text-[9.5px] text-indigo-400/80 font-normal italic flex items-center gap-1 bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-800/40" title="Son düzenleme: ${fmtDateTime(e.updatedAt)}"><i class="fa-solid fa-pen-to-square text-[8.5px]"></i> düzenlendi</span>` : '';
 
+                    const karmaTimeRange = (e.startTime && e.endTime)
+                        ? `${escapeHtml(e.startTime)} – ${escapeHtml(e.endTime)}`
+                        : (e.startTime ? escapeHtml(e.startTime) : fmtTime(e));
+
                     card.className = "p-4 rounded-2xl border space-y-3 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border-indigo-500/40 shadow-xl mb-3";
                     card.innerHTML = `
                         <div class="flex justify-between items-start gap-2">
@@ -6390,7 +6777,7 @@ function renderLogs() {
                                     <i class="fa-solid fa-layer-group text-indigo-400 mr-1"></i> KARMA TEST (STÜDYO)
                                 </span>
                                 <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-300 border border-violet-500/30"><i class="fa-solid fa-bolt"></i> STÜDYO</span>
-                                <span class="text-[11px] text-slate-400"><i class="fa-regular fa-calendar mr-0.5"></i> ${e.date}${ fmtTime(e) ? ` <span class="text-slate-500 text-[10px]"><i class="fa-regular fa-clock mr-0.5"></i>${fmtTime(e)}</span>` : ''}</span>
+                                <span class="text-[11px] text-slate-400 font-medium"><i class="fa-regular fa-calendar mr-0.5"></i> ${e.date}${ karmaTimeRange ? ` <span class="text-slate-400 text-[10px]"><i class="fa-regular fa-clock mr-0.5"></i>${karmaTimeRange}</span>` : ''}</span>
                                 ${updatedBadgeKarma}
                             </div>
                             <div class="flex items-center gap-2 flex-shrink-0">
@@ -6445,18 +6832,20 @@ function renderLogs() {
                     : '';
 
                 let speedBadge = '';
+                const breakBadge = (e.breakDuration && e.breakDuration > 0) ? ` <span class="text-amber-300 font-normal">(${e.breakDuration} dk mola)</span>` : '';
                 if (e.duration && e.duration > 0) {
+                    const durDisplay = formatMinsToHoursStr(e.duration);
                     if (isKarma) {
-                        speedBadge = `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${e.duration} dk (Karma Çalışma Süresi)</span>`;
+                        speedBadge = `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${durDisplay} Net (Karma Süre)${breakBadge}</span>`;
                     } else if (isSoru && e.totalQ > 0) {
                         const secPerQ = Math.round((e.duration * 60) / e.totalQ);
                         // §4d: aynı sayı iki farklı şey demek. Öğrenme kaydında bu "çözme hızı"
                         // DEĞİL — çözüm okuma + not alma dahil. Etiket bunu açıkça söyler.
                         const etiket = isStudio ? `net çözüm ~${secPerQ} sn/soru`
                             : (e.fast ? `çözme ~${secPerQ} sn/soru` : `öğrenme temposu ~${secPerQ} sn/soru`);
-                        speedBadge = `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${e.duration} dk (${etiket})</span>`;
+                        speedBadge = `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${durDisplay} (${etiket})</span>`;
                     } else {
-                        speedBadge = `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${e.duration} dk Süre</span>`;
+                        speedBadge = `<span class="text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${durDisplay} Süre</span>`;
                     }
                 }
 
@@ -6532,6 +6921,10 @@ function renderLogs() {
 
                 const updatedBadge = e.updatedAt ? `<span class="text-[9.5px] text-slate-400/80 font-normal italic flex items-center gap-1 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/60" title="Son düzenleme: ${fmtDateTime(e.updatedAt)}"><i class="fa-solid fa-pen-to-square text-[8.5px]"></i> düzenlendi</span>` : '';
 
+                const normalTimeRange = (e.startTime && e.endTime)
+                    ? `${escapeHtml(e.startTime)} – ${escapeHtml(e.endTime)}`
+                    : (e.startTime ? escapeHtml(e.startTime) : (fmtTime(e) || '12:00'));
+
                 card.className = "glass-card p-4 rounded-2xl border border-slate-800 space-y-3 mb-3";
                 card.innerHTML = `
                     <div class="flex justify-between items-start gap-2">
@@ -6539,7 +6932,7 @@ function renderLogs() {
                             <span class="text-[11px] font-bold px-2 py-0.5 rounded border ${bc}">${e.subject}</span>
                             ${e.source === 'kertik' ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1" title="Kertik Kronometre ile kaydedildi"><i class="fa-solid fa-stopwatch text-[8.5px]"></i> KERTİK</span>' : ''}
                             ${tl}${studioBadge}
-                            <span class="text-[11px] text-slate-400"><i class="fa-regular fa-clock mr-0.5 text-[10px]"></i> ${fmtTime(e) || '12:00'}</span>
+                            <span class="text-[11px] text-slate-400 font-medium"><i class="fa-regular fa-clock mr-0.5 text-[10px]"></i> ${normalTimeRange}</span>
                             ${updatedBadge}
                         </div>
                         <div class="flex items-center gap-2 flex-shrink-0">
@@ -6975,16 +7368,23 @@ function saveEntry(event) {
             });
         });
 
-        const duration = Number(document.getElementById('inputDuration').value) || null;
+        const startTimeVal = (document.getElementById('inputStartTime')?.value || '').trim();
+        const endTimeVal = (document.getElementById('inputEndTime')?.value || '').trim();
+        const duration = Number(document.getElementById('inputDuration')?.value) || null;
+
+        const grossMins = calcSpanMinutes(startTimeVal, endTimeVal);
+        const autoBreak = (grossMins !== null && duration !== null && grossMins > duration)
+            ? (grossMins - duration)
+            : null;
+        const breakDuration = (autoBreak && autoBreak > 0) ? autoBreak : null;
 
         const finalPhotos = [...modalPhotos];
         const finalPhoto = finalPhotos.length > 0 ? finalPhotos[0] : null;
 
         const existingForTimestamp = editId ? entries.find(x => x.id === editId) : null;
 
-        // Saat damgası: kaydet'e basılma anı DEĞİL, "Tarih/Saat" alanındaki (panel açılınca
-        // dolan, elle de düzenlenebilen) değer esas alınır. Kutu boşsa eski davranışa dön.
-        const stampTimeVal = (document.getElementById('inputTime')?.value || '').trim();
+        // Saat damgası: Başlangıç saati varsa o, yoksa bitiş saati veya legacy inputTime
+        const stampTimeVal = startTimeVal || endTimeVal || (document.getElementById('inputTime')?.value || '').trim();
         let createdAtIso;
         if (stampTimeVal && isoDate) {
             const combined = new Date(`${isoDate}T${stampTimeVal}:00`);
@@ -6995,6 +7395,14 @@ function saveEntry(event) {
             createdAtIso = existingForTimestamp?.createdAt || new Date().toISOString();
         }
 
+        let endedAtIso = null;
+        if (endTimeVal && isoDate) {
+            const combinedEnd = new Date(`${isoDate}T${endTimeVal}:00`);
+            if (!isNaN(combinedEnd.getTime())) {
+                endedAtIso = combinedEnd.toISOString();
+            }
+        }
+
         const isFast = (currentEntryType === 'soru' || currentEntryType === 'karma') && !!(document.getElementById('inputIsFastSolve')?.checked);
 
         let entry = {
@@ -7003,6 +7411,9 @@ function saveEntry(event) {
             fast: isFast,
             date: dateStr,
             isoDate,
+            startTime: startTimeVal || null,
+            endTime: endTimeVal || null,
+            breakDuration: (breakDuration && breakDuration > 0) ? breakDuration : null,
             subject,
             topic: selectedTopicNames.join(', '),
             topicBreakdown,
@@ -7024,6 +7435,7 @@ function saveEntry(event) {
             photo: finalPhoto,
             photos: finalPhotos,
             startedAt: createdAtIso,
+            endedAt: endedAtIso || existingForTimestamp?.endedAt || null,
             createdAt: createdAtIso,
             updatedAt: editId ? new Date().toISOString() : (existingForTimestamp?.updatedAt || null)
         };
@@ -7169,10 +7581,11 @@ function startEdit(id) {
         document.getElementById('karmaInputNotes').value = e.notes || '';
         document.getElementById('karmaInputDate').value = e.isoDate || '';
         document.getElementById('karmaInputDuration').value = e.duration || '';
+        syncKarmaDurationToHourMinInputs(e.duration);
 
         const statsBadge = document.getElementById('karmaEditStatsBadge');
         if (statsBadge) {
-            statsBadge.textContent = `${e.totalQ || 0} Soru (${e.correct || 0}D ${e.wrong || 0}Y) • ${e.duration || 0} dk`;
+            statsBadge.textContent = `${e.totalQ || 0} Soru (${e.correct || 0}D ${e.wrong || 0}Y) • ${formatMinsToHoursStr(e.duration) || '0 dk'}`;
         }
 
         const matrixContainer = document.getElementById('karmaSubjectsMatrix');
@@ -7262,10 +7675,18 @@ function startEdit(id) {
         populateTopicOptions();
 
         document.getElementById('inputDate').value = e.isoDate || '';
-        // Saat: kaydın gerçek saat damgası varsa onu göster, kullanıcı isterse elle düzeltsin.
-        const timeInput = document.getElementById('inputTime');
-        if (timeInput) timeInput.value = hhmmFromIso(e.createdAt || e.startedAt || '');
-        document.getElementById('inputDuration').value = e.duration || '';
+        const startEl = document.getElementById('inputStartTime');
+        const endEl = document.getElementById('inputEndTime');
+        const durEl = document.getElementById('inputDuration');
+
+        if (startEl) startEl.value = e.startTime || hhmmFromIso(e.startedAt || e.createdAt || '');
+        if (endEl) endEl.value = e.endTime || hhmmFromIso(e.endedAt || '');
+        if (durEl) durEl.value = e.duration || '';
+        const legacyTime = document.getElementById('inputTime');
+        if (legacyTime) legacyTime.value = (startEl ? startEl.value : '') || hhmmFromIso(e.createdAt || e.startedAt || '');
+
+        updateTimeCalcSummary();
+
         document.getElementById('inputNotes').value = e.notes || '';
         const dayStatusInput = document.getElementById('inputDayStatusNote');
         if (dayStatusInput) dayStatusInput.value = e.dayStatusNote || '';
