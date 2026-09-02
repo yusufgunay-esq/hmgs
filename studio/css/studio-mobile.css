@@ -11,7 +11,15 @@
    Kırılma noktası 760px — tablet dikey de mobil düzeni alır.
    ========================================================================== */
 
-/* ---------- Her genişlikte geçerli dokunma düzeltmeleri ---------- */
+/* ---------- Her genişlikte geçerli dokunma ve kaydırma düzeltmeleri ---------- */
+html {
+  overflow-x: clip;
+}
+body {
+  overflow-x: clip;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 button, .opt, .opt-x, .premise-item, .flow-toc a, .item-card, .opt-btn {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;   /* çift dokunuşta yakınlaştırma gecikmesini kaldırır */
@@ -232,5 +240,4 @@ button, .opt, .opt-x, .premise-item, .flow-toc a, .item-card, .opt-btn {
    tarayıcı adres çubuğu yok, üst boşluğu biz veriyoruz. */
 @media (display-mode: standalone) {
   .topbar { padding-top: max(0.75rem, env(safe-area-inset-top)); }
-  body { overscroll-behavior-y: none; }   /* aşağı çekince sayfa yenilenmesin */
 }
