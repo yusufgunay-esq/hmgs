@@ -132,13 +132,24 @@
            küçük dokunma hedefleri. Masaüstü görünümü aynı kalır.
            ═══════════════════════════════════════════════════════════ */
 
-        /* Hiçbir şey sayfayı yatayda taşırmasın — bu tek kural, üst bardaki
-           bir taşmanın tüm sayfayı sağa sola kaydırmasını engeller. */
-        html, body { max-width: 100%; overflow-x: hidden; overscroll-behavior-y: contain; }
+        /* Hiçbir şey sayfayı yatayda taşırmasın — clip kullanarak dikey kaydırma (overflow-y)
+           ve mobil dokunma motorunu (touch scrolling) asla kilitlemiyoruz. */
+        html {
+            max-width: 100%;
+            overflow-x: clip;
+        }
+        body {
+            max-width: 100%;
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow-x: clip;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-top: 0;
+        }
 
         /* Çentik/güvenli alan: dolguyu body yerine header taşısın ki
            sticky header kaydırınca durum çubuğunun altına girmesin. */
-        body { padding-top: 0; }
         header { padding-top: var(--sat, 0px); }
 
         /* ── Üst bardaki ikon butonları ──
