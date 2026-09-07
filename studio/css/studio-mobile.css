@@ -50,7 +50,7 @@ button, .opt, .opt-x, .premise-item, .flow-toc a, .item-card, .opt-btn {
     z-index: 60;
     margin: 0;
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     gap: 0;
     background: rgba(250, 249, 246, 0.94);
     backdrop-filter: saturate(180%) blur(16px);
