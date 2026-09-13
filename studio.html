@@ -15,6 +15,33 @@
   <!-- Telefona uygulama olarak kurulum (PWA) -->
   <link rel="manifest" href="studio.webmanifest">
   <meta name="theme-color" content="#FAF9F6">
+  <script>
+    (function() {
+      try {
+        var raw = localStorage.getItem('hmgs_studio_v1');
+        var theme = 'system';
+        var fontSize = 'normal';
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && parsed.settings) {
+            theme = parsed.settings.theme || 'system';
+            fontSize = parsed.settings.fontSize || 'normal';
+          }
+        }
+        var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+        if (fontSize === 'large') {
+          document.documentElement.setAttribute('data-font-size', 'large');
+        }
+        var metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme) metaTheme.setAttribute('content', isDark ? '#0B0E14' : '#FAF9F6');
+      } catch (e) {}
+    })();
+  </script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Stüdyo">
@@ -41,8 +68,20 @@
       <button data-view="exam"     aria-current="false">Deneme</button>
       <button data-view="progress" aria-current="false">İlerleme</button>
     </nav>
-    <a href="index.html" class="nav-portal-link" style="text-decoration:none;font-size:0.75rem;font-weight:700;padding:0.35rem 0.65rem;border-radius:0.5rem;background:rgba(99,102,241,0.12);color:#4f46e5;border:1px solid rgba(99,102,241,0.25);margin-left:auto;margin-right:0.5rem;display:inline-flex;align-items:center;gap:0.3rem" title="HMGS Takip Uygulamasına Dön">📊 Takip</a>
+    <a href="cikmis.html" class="nav-portal-badge emerald" title="240 Çıkmış Soru & ÖSYM Odak Röntgeni">Çıkmış Röntgeni</a>
+    <a href="index.html" class="nav-portal-badge indigo" title="HMGS Portala Dön">Takip</a>
     <span class="countdown" id="countdown">Sınava <b>–</b></span>
+
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btnToggleFontSize" data-act="toggle-font-size" title="Metin Boyutunu Değiştir" aria-label="Metin boyutu">
+        <span style="font-family:var(--sans);font-size:0.72rem;font-weight:700">A±</span>
+      </button>
+      <button class="icon-btn" id="btnToggleTheme" data-act="toggle-theme" title="Karanlık / Aydınlık Tema" aria-label="Tema değiştir">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+    </div>
   </header>
 
   <main>
