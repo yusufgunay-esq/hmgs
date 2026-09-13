@@ -128,7 +128,7 @@ function caseHTML(c) {
   return `
     <div class="reveal-box">
       <button data-act="reveal">
-        <span>⚖️ Pratik olay · ${esc(c.title || 'Uygulama')}</span>
+        <span>Pratik Olay · ${esc(c.title || 'Uygulama')}</span>
         <span class="hint">çözümü göster</span>
       </button>
       <div>
