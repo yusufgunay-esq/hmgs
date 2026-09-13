@@ -9,6 +9,117 @@ import { SUBJECTS, subjectName, integrity, topicById } from '../data.js';
 import { state, exportJSON, hardReset, PASS_CORRECT, TARGET_SEC, save } from '../store.js';
 import { allSubjectMastery, MASTERY_LABEL, srsSummary, BOXES } from '../engine.js';
 
+let cachedProfil = null;
+try {
+  const localStr = typeof localStorage !== 'undefined' ? localStorage.getItem('hmgs_profil_cache') : null;
+  if (localStr) cachedProfil = JSON.parse(localStr);
+} catch (_) {}
+
+async function fetchProfil() {
+  try {
+    const res = await fetch('/api/profil');
+    if (res.ok) {
+      const data = await res.json();
+      cachedProfil = data;
+      try { localStorage.setItem('hmgs_profil_cache', JSON.stringify(data)); } catch (_) {}
+      const block = $('#profile-block');
+      if (block) {
+        block.innerHTML = renderProfileContent(data);
+      }
+    }
+  } catch (_) {}
+}
+
+function renderProfileContent(p) {
+  if (!p) {
+    return `<div class="card" style="margin-bottom:1.5rem;padding:1rem;">
+      <p class="hint">Bilişsel profil verisi hesaplanıyor...</p>
+    </div>`;
+  }
+
+  const proj = p.projections || {};
+  const sc = proj.scenarios || {};
+  const spd = p.speed || {};
+  const act = p.single_action || {};
+  const flags = (p.flags || []).filter(f => f.seviye === 'kritik');
+
+  return `
+    <div class="section-label">Bilişsel Profil ve Net Projeksiyonu (${p.days_to_exam || 14} Gün Kaldı)</div>
+    <div class="card" style="margin-bottom:1.5rem;padding:1.25rem;">
+      
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;padding-bottom:1rem;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:0.8rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Ölçülen Kısım</div>
+          <div style="font-size:1.3rem;font-weight:700;color:var(--ink-1);margin-top:0.2rem">56 Soru <span style="font-size:0.95rem;font-weight:500;color:var(--ok)">(${proj.measured_net || 42.8} net)</span></div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Ölçülmeyen Karanlık Kısım</div>
+          <div style="font-size:1.3rem;font-weight:700;color:var(--warn);margin-top:0.2rem">64 Soru <span style="font-size:0.85rem;font-weight:400;color:var(--ink-3)">(sıfır kayıt)</span></div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.05em;font-weight:600">Bitirilebilirlik Sınırı</div>
+          <div style="font-size:1.3rem;font-weight:700;color:var(--no);margin-top:0.2rem">${spd.reachable_questions || 78} / 120 Soru <span style="font-size:0.85rem;font-weight:400;color:var(--ink-3)">(${spd.unattempted_questions || 42} kâğıtta kalıyor)</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:1.25rem;">
+        <div style="font-size:0.85rem;font-weight:600;color:var(--ink-2);margin-bottom:0.75rem">Bilinmeyen 64 Soruda İsabet Senaryoları</div>
+        <div class="grid grid-4" style="gap:0.75rem">
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center">
+            <div style="font-size:0.75rem;color:var(--ink-3)">Taban %35 İsabet</div>
+            <div style="font-size:1.2rem;font-weight:700;color:var(--ink-1);margin:0.25rem 0">${sc['35'] || 65.2} net</div>
+            <div style="font-size:0.7rem;color:var(--no)">Baraj altı (-18,8)</div>
+          </div>
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center">
+            <div style="font-size:0.75rem;color:var(--ink-3)">Mezun %45 İsabet</div>
+            <div style="font-size:1.2rem;font-weight:700;color:var(--ink-1);margin:0.25rem 0">${sc['45'] || 71.6} net</div>
+            <div style="font-size:0.7rem;color:var(--no)">Baraj altı (-12,4)</div>
+          </div>
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center">
+            <div style="font-size:0.75rem;color:var(--ink-3)">İyi %55 İsabet</div>
+            <div style="font-size:1.2rem;font-weight:700;color:var(--ink-1);margin:0.25rem 0">${sc['55'] || 78.0} net</div>
+            <div style="font-size:0.7rem;color:var(--warn)">Baraj altı (-6,0)</div>
+          </div>
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:0.75rem;text-align:center">
+            <div style="font-size:0.75rem;color:var(--ink-3)">Güçlü %60 İsabet</div>
+            <div style="font-size:1.2rem;font-weight:700;color:var(--ink-1);margin:0.25rem 0">${sc['60'] || 81.2} net</div>
+            <div style="font-size:0.7rem;color:var(--warn)">Baraj sınırında (-2,8)</div>
+          </div>
+        </div>
+        <div style="font-size:0.8rem;color:var(--ink-3);margin-top:0.6rem;text-align:right">
+          Baraj 84 net için bilinmeyenlerde gereken isabet: <strong>%${proj.required_accuracy_for_84 || 64.4}</strong> | Hedef 96 net: <strong>%${proj.required_accuracy_for_96 || 83.1}</strong>
+        </div>
+      </div>
+
+      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <div style="font-size:0.85rem;font-weight:600;color:var(--ink-2);margin-bottom:0.75rem">Kritik Bilişsel ve Davranışsal Bayraklar</div>
+        <div style="display:flex;flex-direction:column;gap:0.5rem">
+          ${flags.map(f => `
+            <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:0.5rem 0.75rem">
+              <div>
+                <span style="font-family:monospace;font-size:0.75rem;font-weight:700;color:var(--no);background:rgba(239,68,68,0.1);padding:2px 6px;border-radius:4px;margin-right:0.5rem">${esc(f.kod)}</span>
+                <span style="font-size:0.85rem;font-weight:600;color:var(--ink-1)">${esc(f.baslik)}</span>
+                <div style="font-size:0.75rem;color:var(--ink-3);margin-top:2px">${esc(f.kanit)}</div>
+              </div>
+              ${f.etki_net ? `<div style="font-size:0.85rem;font-weight:700;color:var(--no);white-space:nowrap;margin-left:1rem">-${f.etki_net} net</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div style="margin-top:1.25rem;background:var(--bg-card);border:1.5px solid var(--accent);border-radius:8px;padding:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
+          <span style="font-size:0.75rem;font-weight:700;letter-spacing:0.05em;color:var(--accent);text-transform:uppercase">En Yüksek Getirili Tek Eylem</span>
+          <span style="font-size:0.85rem;font-weight:700;color:var(--ok);background:rgba(34,197,94,0.1);padding:2px 8px;border-radius:4px">+${act.net_getiri || 32.8} Net Potansiyeli</span>
+        </div>
+        <div style="font-size:0.95rem;font-weight:700;color:var(--ink-1);margin-bottom:0.25rem">${esc(act.baslik || '')}</div>
+        <div style="font-size:0.85rem;color:var(--ink-2);line-height:1.4">${esc(act.gerekce || '')}</div>
+      </div>
+
+    </div>
+  `;
+}
+
 export function render() {
   const host = $('#view-progress');
   if (!host) return;
@@ -27,7 +138,11 @@ export function render() {
   host.innerHTML = `
     <div class="wrap">
       <h1 class="page">İlerleme</h1>
-      <p class="page-sub">Buradaki her sayı ham cevap günlüğünden hesaplanır — hiçbiri elle girilmez.</p>
+      <p class="page-sub">Buradaki her sayı ham cevap günlüğünden ve kâğıt oturumlarından hesaplanır, hiçbiri elle girilmez.</p>
+
+      <div id="profile-block">
+        ${renderProfileContent(cachedProfil)}
+      </div>
 
       <div class="grid grid-3">
         <div class="metric">
@@ -116,6 +231,8 @@ export function render() {
         </div>
       </div>
     </div>`;
+
+  fetchProfil();
 }
 
 function examHistory(exams) {
