@@ -21,8 +21,11 @@ let lastResult = null;
 export function start() {
   const checkbox = document.getElementById('exam-only-tagged');
   const onlyTagged = checkbox ? checkbox.checked : false;
-  const { questions, shortfall } = buildExamSet(onlyTagged);
-  return beginExam(questions, { shortfall, label: onlyTagged ? 'Karma deneme (Konu Etiketli)' : 'Karma deneme', real: null });
+  const scopeEl = document.querySelector('input[name="exam-scope"]:checked');
+  const scope = scopeEl ? scopeEl.value : 'core';
+  const { questions, shortfall } = buildExamSet(onlyTagged, scope);
+  const scopeLabel = scope === 'core' ? 'HMGS Çekirdek' : 'Tüm Havuz';
+  return beginExam(questions, { shortfall, label: `Karma deneme (${scopeLabel})`, real: null });
 }
 
 /**
@@ -103,6 +106,19 @@ export function render() {
           <strong>HMGS'de yanlış cezası yoktur.</strong> Bilmediğin soruda bile en olası şıkkı işaretlemek her zaman
           boş bırakmaktan iyidir. Sonuç raporunda boş bıraktığın soru varsa uyarılacaksın.
         </p>
+        <div style="margin-bottom:1.1rem; display:flex; flex-direction:column; gap:0.4rem; font-size:0.9rem;">
+          <span style="font-weight:600; color:var(--ink);">Soru Derinliği / Kapsam:</span>
+          <div style="display:flex; gap:1.25rem; align-items:center;">
+            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+              <input type="radio" name="exam-scope" value="core" checked style="accent-color:var(--accent);">
+              <span>HMGS Çekirdek (Önerilen)</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+              <input type="radio" name="exam-scope" value="all" style="accent-color:var(--accent);">
+              <span>Tüm Havuz (İleri Düzey Dahil)</span>
+            </label>
+          </div>
+        </div>
         <div style="margin-bottom:1.2rem; display:flex; align-items:center; gap:0.5rem; font-size:0.9rem;">
           <input type="checkbox" id="exam-only-tagged" style="width:1.2rem; height:1.2rem; margin:0; accent-color:var(--accent);" checked>
           <label for="exam-only-tagged" style="color:var(--ink-1); cursor:pointer; font-weight:500;">Sadece konusu belli olan (kalite güvenceli) sorulardan oluştur</label>
@@ -138,6 +154,8 @@ export function render() {
         <div class="q-head">
           <span>Soru ${E.i + 1} / ${E.questions.length}</span>
           <span>${esc(subjectName(q.subjectId))}</span>
+          ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
+          ${q.difficulty && q.difficulty !== 'etiketsiz' ? `<span class="chip">${esc(q.difficulty)}</span>` : ''}
           <button class="btn btn-2 btn-s" data-act="exam-mark" style="margin-left:auto">
             ${E.marked.has(E.i) ? 'İşareti kaldır' : 'Sonra dön'}
           </button>
@@ -336,7 +354,7 @@ function resultBlock(r, compact) {
       <div class="btn-row" style="margin-top:1.5rem">
         <button class="btn" data-act="go-today">Bugün ekranına dön</button>
         <button class="btn btn-2" data-act="exam-review-wrong">Yanlışları hemen çöz (${r.wrongIds.length})</button>
-        <button class="btn btn-2" data-act="exam-export-stats" style="background:#2563eb;color:#fff;font-weight:700">📋 Takip Uygulamasına Aktar (Kopyala)</button>
+        <button class="btn btn-2" data-act="exam-export-stats" style="background:var(--accent);color:#fff;font-weight:700">Takip Uygulamasına Aktar (Kopyala)</button>
       </div>
     </div>`;
 }
@@ -424,7 +442,7 @@ export function exportStats() {
 
   const jsonStr = JSON.stringify(exportPayload, null, 2);
   navigator.clipboard.writeText(jsonStr).then(() => {
-    toast('📋 Deneme istatistikleri panoya kopyalandı! Takip uygulamasından yapıştırabilirsiniz.');
+    toast('Deneme istatistikleri panoya kopyalandı. Takip uygulamasından yapıştırabilirsiniz.');
   }).catch(() => {
     prompt('İstatistikleri kopyalayın:', jsonStr);
   });
