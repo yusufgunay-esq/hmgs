@@ -42,8 +42,8 @@ export function richBlock(s) {
   // 2. Satır içi veya bitişik A), B), C), D), E) şık tahlillerini bağımsız satırlara taşı
   raw = raw.replace(/(?:^|[\s;.,•–—])(?:\()?([A-Ea-e])\)\s+/g, '\n$1) ');
 
-  // 3. 'A seçeneği:' veya 'A şıkkı:' ifadelerini bağımsız satırlara taşı
-  raw = raw.replace(/(?:^|[\s;.,•–—])([A-E]\s+(?:seçeneği|şıkkı)[:\s])/gi, '\n$1 ');
+  // 3. 'A seçeneği:' veya 'A şıkkı:' / 'A şıkkında:' ifadelerini bağımsız satırlara taşı
+  raw = raw.replace(/(?:^|[\s;.,•–—])([A-E]\s+(?:seçeneği|seçeneğinde|şıkkı|şıkkında)[:\s]?)/gi, '\n$1 ');
 
   // 4. Roma rakamlı öncülleri (I., II., III...) bağımsız satırlara taşı
   raw = raw.replace(/(?:^|[\s;.,•–—])((?:I{1,3}|IV|V|VI{0,3}|IX|X)\.)\s+/g, '\n$1 ');
@@ -91,8 +91,8 @@ export function richBlock(s) {
       continue;
     }
 
-    // Şık Tahlili: "A seçeneği: ..." veya "B şıkkı ..."
-    const mOptNamed = ln.match(/^([A-E])\s+(seçeneği|şıkkı)[:\s]\s*(.*)$/i);
+    // Şık Tahlili: "A seçeneği: ...", "B şıkkı ...", "C şıkkında ..."
+    const mOptNamed = ln.match(/^([A-E])\s+(seçeneği|seçeneğinde|şıkkı|şıkkında)[:\s]?\s*(.*)$/i);
     if (mOptNamed) {
       flush();
       const letter = mOptNamed[1].toUpperCase();
