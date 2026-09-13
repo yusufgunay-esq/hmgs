@@ -456,7 +456,7 @@ export async function pushSession() {
   const highlights = (hlEl?.value || '').trim();
   S.highlights = highlights;
 
-  // Notu ve highlight'ı localStorage'daki seans kaydına işle (id ile — sıraya güvenme).
+  // Notu ve highlight'ı localStorage'daki seans kaydına işle (id ile; sıraya güvenme).
   const sess = state().sessions.find(x => x.id === S.sessionId);
   if (sess) {
     sess.note = note;
@@ -465,37 +465,38 @@ export async function pushSession() {
   }
 
   S.pushState = 'busy';
-  setSyncUI(true, 'Gönderiliyor…');
+  setSyncUI(true, 'Kaydediliyor…');
 
+  const targetSess = sess || {
+    id: S.sessionId || ('sess_' + Date.now()),
+    note,
+    highlights,
+    isoDate: new Date().toISOString().slice(0, 10),
+    mode: S.mode,
+    label: S.label,
+    total: S.questions ? S.questions.length : 0
+  };
+
+  // 1. Tarayıcı içi Takip kuyruğuna yaz (aynı origin / GitHub Pages anında görür)
+  queueSessionForTakip(targetSess);
+
+  // 2. Varsa yerel sunucuya arka planda sessizce haber ver
+  notifyLocalServerIfAny();
+
+  // 3. Tarayıcıda aktif Google Drive oturumu varsa doğrudan Drive'a yaz
+  let driveSynced = false;
   try {
-    // Önce güncel liste (notu ve highlight'ı ile birlikte) export dosyasına yazılsın.
-    const saveRes = await fetch('/api/save-sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessions: state().sessions })
-    });
-    if (!saveRes.ok) throw new Error('Seanslar yerel dosyaya yazılamadı.');
+    driveSynced = await pushSessionToDriveDirectly(targetSess);
+  } catch (_) {}
 
-    const res = await fetch('/api/push-sessions', { method: 'POST' });
-    const data = await res.json().catch(() => ({ status: 'error', message: 'Sunucu yanıtı okunamadı.' }));
-
-    if (data.status === 'ok') {
-      S.pushState = 'ok';
-      S.pushMsg = 'Takip uygulamasını açtığında kayıt orada olacak.';
-      render();
-      toast('Seans HMGS Takip kuyruğuna gönderildi ✓');
-    } else {
-      S.pushState = 'err';
-      S.pushMsg = data.message || 'Gönderilemedi.';
-      setSyncUI(false, S.pushMsg);
-      toast('Gönderilemedi — not kaydedildi, sonra tekrar deneyebilirsin.');
-    }
-  } catch (e) {
-    S.pushState = 'err';
-    S.pushMsg = 'Stüdyo sunucusuna ulaşılamadı (baslat.bat ile açtın mı?).';
-    setSyncUI(false, S.pushMsg);
-    toast('Gönderilemedi — not kaydedildi.');
+  S.pushState = 'ok';
+  if (driveSynced) {
+    S.pushMsg = 'Takip uygulamasına ve Google Drive bulutuna aktarıldı.';
+  } else {
+    S.pushMsg = 'Takip kuyruğuna kaydedildi (uygulama açıldığında eşitlenecek).';
   }
+  render();
+  toast('Seans Takip kaydına eklendi ✓');
 }
 
 function setSyncUI(busy, msg) {
@@ -604,22 +605,161 @@ function finalizeSession() {
   save();
   // Seans sonu ekranındaki "Takip'e gönder" paneli notu bu id ile bulup yazar.
   S.sessionId = result.id;
-  pushSessionsToServer();
+
+  // Kullanıcı hiçbir ek not girmese dahi seans asla kaybolmasın:
+  // Seansı otomatik olarak yerel Takip kuyruğuna ekle ve varsa doğrudan Drive'a ilet.
+  queueSessionForTakip(result);
+  pushSessionToDriveDirectly(result).catch(() => {});
+  notifyLocalServerIfAny();
 }
 
 /**
- * Güncel seans listesini yerel Stüdyo sunucusuna (studio_server.py,
- * /api/save-sessions) gönderir — bu dosyayı HMGS_Takip_App/sync/hmgs-sync.mjs
- * (sessions-push) okuyup Drive kuyruğuna ekler. Sunucu çalışmıyorsa (ör. eski
- * `python -m http.server` ile açılmışsa) sessizce başarısız olur; oturum zaten
- * localStorage'a kaydedildi, sadece otomatik aktarım o durumda çalışmaz.
+ * Seansı doğrudan tarayıcı içi localStorage kuyruğuna (hmgs_pending_studio_sessions)
+ * kaydeder veya mevcut kaydı günceller.
+ * Takip uygulaması (aynı origin / GitHub Pages) açıldığında bu kuyruğu okuyup
+ * anında çalışma kaydına (entries[]) çevirir.
  */
-function pushSessionsToServer() {
+function queueSessionForTakip(sess) {
+  if (!sess || !sess.id) return;
+  try {
+    const KEY = 'hmgs_pending_studio_sessions';
+    let queue = [];
+    try {
+      queue = JSON.parse(localStorage.getItem(KEY) || '[]');
+      if (!Array.isArray(queue)) queue = [];
+    } catch (_) {
+      queue = [];
+    }
+    const idx = queue.findIndex(x => x.id === sess.id);
+    if (idx >= 0) {
+      queue[idx] = sess;
+    } else {
+      queue.push(sess);
+    }
+    localStorage.setItem(KEY, JSON.stringify(queue));
+  } catch (e) {
+    console.warn('[sync] Yerel Takip kuyruğuna yazma uyarısı:', e);
+  }
+}
+
+/**
+ * Tarayıcıda veya oturumda kayıtlı bir Google Drive erişim jetonu arar.
+ * 1. vault-client aktif jetonu (sessionStorage / bellek)
+ * 2. Takip uygulamasının localStorage'a yazdığı hmgs_gtoken
+ */
+function getAnyGoogleToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const st = sessionStorage.getItem('hmgs_access_token');
+    if (st) return st;
+  } catch (_) {}
+  try {
+    const raw = localStorage.getItem('hmgs_gtoken');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.t) {
+        if (!parsed.exp || Date.now() < parsed.exp) {
+          return parsed.t;
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+/**
+ * Tarayıcıda aktif Google token varsa, seansı doğrudan Google Drive'daki
+ * hmgs_2026_data.json dosyasının pendingStudioSessions[] kuyruğuna ekler/günceller.
+ * Böylece farklı cihazlar arasında (ör. masaüstünden telefona) anında eşitlenir.
+ */
+async function pushSessionToDriveDirectly(sess) {
+  if (!sess || !sess.id) return false;
+  const token = getAnyGoogleToken();
+  if (!token) return false;
+
+  try {
+    let fileId = null;
+    const q = encodeURIComponent("name='hmgs_2026_data.json' and trashed=false");
+
+    // 1. Önce appDataFolder içinde hmgs_2026_data.json ara
+    let res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.files && data.files.length > 0) {
+        fileId = data.files[0].id;
+      }
+    }
+
+    // appDataFolder'da yoksa kök Drive'da ara (eski sürüm uyumu)
+    if (!fileId) {
+      res = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.files && data.files.length > 0) {
+          fileId = data.files[0].id;
+        }
+      }
+    }
+
+    if (!fileId) return false;
+
+    // 2. Dosyanın mevcut içeriğini oku
+    const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!dlRes.ok) return false;
+
+    const remoteData = await dlRes.json();
+    if (!remoteData || typeof remoteData !== 'object') return false;
+
+    if (!Array.isArray(remoteData.pendingStudioSessions)) {
+      remoteData.pendingStudioSessions = [];
+    }
+
+    const idx = remoteData.pendingStudioSessions.findIndex(s => s.id === sess.id);
+    if (idx >= 0) {
+      remoteData.pendingStudioSessions[idx] = sess;
+    } else {
+      remoteData.pendingStudioSessions.push(sess);
+    }
+
+    // 3. Dosyayı PATCH ile Drive'a geri yaz
+    const patchRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=UTF-8'
+      },
+      body: JSON.stringify(remoteData, null, 2)
+    });
+
+    return patchRes.ok;
+  } catch (err) {
+    console.warn('[sync] Google Drive doğrudan kuyruk güncelleme uyarısı:', err);
+    return false;
+  }
+}
+
+/**
+ * Geliştirme ortamında (yalnızca localhost üzerinde) yerel studio_server varsa
+ * arka planda sessizce haberdar eder. Hata verirse asla kullanıcıya yansıtmaz.
+ */
+function notifyLocalServerIfAny() {
+  if (typeof window === 'undefined') return;
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (!isLocal) return;
+
   try {
     fetch('/api/save-sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessions: state().sessions })
     }).catch(() => {});
-  } catch (_) { /* fetch bile yoksa sessizce geç */ }
+  } catch (_) {}
 }
