@@ -72,6 +72,11 @@ function show(view, push = true) {
   }
 
   currentView = view;
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.setAttribute('data-view', view);
+    document.body.classList.toggle('view-practice', view === 'practice');
+    document.body.classList.toggle('in-session', view === 'practice' && practice.hasSession());
+  }
   VIEWS.forEach(v => $('#view-' + v)?.classList.toggle('on', v === view));
   $$('.nav button').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === view)));
 
@@ -249,6 +254,7 @@ document.addEventListener('click', async e => {
     /* --- soru çözme --- */
     case 'pick':         practice.pick(el.dataset.key); break;
     case 'dontknow':     practice.dontKnow(); break;
+    case 'ask-gemini':   practice.askGemini(); break;
     case 'next':         practice.next(); break;
     case 'next-logic':   practice.nextLogic(); break;
     case 'toggle-logic': practice.toggleLogic(); break;
@@ -348,6 +354,7 @@ document.addEventListener('keydown', e => {
     : ({ '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E' })[k];
 
   if (currentView === 'practice') {
+    if (k === 'G') { practice.askGemini(); e.preventDefault(); return; }
     if (practice.isAnswered()) {
       if (e.key === 'Enter' || e.key === ' ') { practice.next(); e.preventDefault(); }
       else if (k === 'M') { practice.nextLogic(); e.preventDefault(); }
