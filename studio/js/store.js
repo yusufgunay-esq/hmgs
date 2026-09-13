@@ -137,6 +137,7 @@ export function recordAnswer(q, chosen, ms, mode) {
     chosen: chosen,
     correctKey: q.correct,
     ok: chosen === q.correct,
+    logicGuess: false,
     ms: Math.max(0, Math.round(ms)),
     attempt: prior + 1,
     mode,
@@ -145,6 +146,19 @@ export function recordAnswer(q, chosen, ms, mode) {
   S.answers.push(row);
   return row;
 }
+
+/**
+ * Son verilen cevabın mantık/konu-eksik bayrağını günceller.
+ * @param {boolean} flag
+ */
+export function markLastAnswerLogic(flag = true) {
+  if (!S.answers.length) return null;
+  const last = S.answers[S.answers.length - 1];
+  last.logicGuess = !!flag;
+  save();
+  return last;
+}
+
 
 /**
  * Pratik alanında doldurulan bir hücreyi kaydeder.
