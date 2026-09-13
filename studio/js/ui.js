@@ -16,75 +16,135 @@ export function esc(s) {
 
 /** Kaynak metinlerdeki `backtick` ve **kalın** işaretlerini güvenle işaretlemeye çevirir. */
 export function rich(s) {
-  let out = esc(s);
-  
-  // 1. Time Limits (Süreler)
-  out = out.replace(/\b(\d+)\s+(GÜN|AY|YIL|HAFTA)İ?\b/gi, '<strong class="hl-time">$1 $2</strong>');
-  
-  // 2. Legal References (Kanun Maddeleri)
-  out = out.replace(/\b(?:İİK|TMK|HMK|TBK|TCK|CMK|İYUK|AY|KVKK)\s+m\.\s*\d+(?:\/\d+)?[a-z]?\b/g, '<span class="hl-law">$&</span>');
-  
-  // 3. ALL CAPS Emphasis (Büyük Harfler)
-  // Split by HTML tags to avoid messing up classes we just added
-  const parts = out.split(/(<[^>]+>)/);
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 0) { // Text nodes
-      parts[i] = parts[i].replace(/\b([A-ZİĞÜŞÖÇ]{5,}|[A-ZİĞÜŞÖÇ]{3,}(?:\s+[A-ZİĞÜŞÖÇ]{3,})+)\b/g, '<strong class="hl-cap">$1</strong>');
-    }
-  }
-  out = parts.join('');
-
+  const out = esc(s);
   return out
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<mark>$1</mark>');
 }
 
 /**
- * Blok seviyesi metin — konu anlatımı için.
- * Kaynak metindeki yapıyı EKRANDA da yapı olarak gösterir:
- *   satır sonu            → ayrı paragraf
- *   "- " ile başlayan satır → madde işaretli liste
- *   "1) " / "1." ile başlayan → numaralı liste
- *   "Şu → Bu" içeren satır  → karşılaştırma satırı (sol/sağ)
- *   ">" ile başlayan satır  → vurgu kutusu (altın kural)
- * Inline `kod` ve **kalın** işaretleri korunur.
- * Sebep: 30 Tem — "5 unsuru vardır: 1)...2)...3)" tek paragrafa tıkılıyordu (bkz. log/2026-07-30_60_kelime_hatasi.md).
+ * Blok seviyesi metin — konu anlatımı ve soru gerekçeleri için akıllı yapılandırıcı.
+ *   - Şık tahlilleri (A, B, C, D, E) → bağımsız `.rb-opt-block` blokları (harf korunur)
+ *   - Roma rakamlı öncüller (I., II., III...) → `.rb-roman-block`
+ *   - Madde işaretleri (- • *) → `ul.rb-list`
+ *   - Numaralı adımlar (1., 2...) → `ol.rb-list`
+ *   - Karşılaştırma ("Şu → Bu") → `.rb-row`
+ *   - Altın kural ("> ...") → `.rb-box`
+ *   - Uzun boğuk paragrafları nefes alan parçalara ayırır.
  */
 export function richBlock(s) {
   let raw = String(s ?? '').trim();
-  
-  // 1. Otomatik Formatlayıcı (Boğukluk Giderici)
-  // İç içe geçmiş listeleri (1), (2), a), (a) bul ve Markdown bullet list'e çevir
-  raw = raw.replace(/(?:,\s*|;\s*|\.\s+|\s+)(?:\(\d{1,2}\)|\d{1,2}\)|\([a-h]\)|[a-h]\))\s+(?=[A-ZİĞÜŞÖÇ0-9])/g, '\n- ');
-  
-  // Bullets (•, Ø, ○) metin içinde yan yana duruyorsa dikey satır sonlarına çevir
-  raw = raw.replace(/(?:\s*•\s*|\s*Ø\s*|\s*○\s*)/g, '\n- ');
+  if (!raw) return '';
 
-  // Eğer metin hala çok uzun ve hiç paragraf/satır sonu içermiyorsa, güvenli cümle sonlarından böl
-  if (raw.length > 250 && !raw.includes('\n')) {
-    raw = raw.replace(/(?<=[a-zğüşıöç]{3,}[.!?;])\s+(?=[A-ZİĞÜŞÖÇ])/g, '\n\n');
+  // 1. Heceleme / Tire birleştirme (OCR ve satır sonu bozulmalarını düzeltir)
+  raw = raw.replace(/([a-zçğıöşüA-ZÇĞİÖŞÜ]+)-\s+([a-zçğıöşüA-ZÇĞİÖŞÜ]+)/g, '$1$2');
+
+  // 2. Satır içi veya bitişik A), B), C), D), E) şık tahlillerini bağımsız satırlara taşı
+  raw = raw.replace(/(?:^|[\s;.,•–—])(?:\()?([A-Ea-e])\)\s+/g, '\n$1) ');
+
+  // 3. 'A seçeneği:' veya 'A şıkkı:' ifadelerini bağımsız satırlara taşı
+  raw = raw.replace(/(?:^|[\s;.,•–—])([A-E]\s+(?:seçeneği|şıkkı)[:\s])/gi, '\n$1 ');
+
+  // 4. Roma rakamlı öncülleri (I., II., III...) bağımsız satırlara taşı
+  raw = raw.replace(/(?:^|[\s;.,•–—])((?:I{1,3}|IV|V|VI{0,3}|IX|X)\.)\s+/g, '\n$1 ');
+
+  // 5. Madde imlerini (•, Ø, ○, *) bağımsız satırlara dönüştür
+  raw = raw.replace(/(?:\s*[•Ø○]\s*|\s+\*\s+)/g, '\n- ');
+
+  // 6. Satır bazında inceleme ve uzun boğuk cümleleri ayırma
+  const rawLines = raw.split(/\n/);
+  const lines = [];
+  for (let l of rawLines) {
+    l = l.trim();
+    if (!l) continue;
+    // Eğer satır çok uzun (>200 karakter) ve bir şık/madde başlangıcı değilse, güvenli cümle sonlarından böl
+    if (l.length > 200 && !l.match(/^(?:[A-Ea-e]\)|\d+[.)]|[-•*]|(?:I{1,3}|IV|V|VI{0,3}|IX|X)\.)/)) {
+      const parts = l.replace(/(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ])/g, '\n\n').split(/\n/);
+      for (const p of parts) {
+        const pt = p.trim();
+        if (pt) lines.push(pt);
+      }
+    } else {
+      lines.push(l);
+    }
   }
 
-  const lines = raw.split(/\n/).map(l => l.trim());
-  const out = []; let list = null, listTag = null;
-  const flush = () => { if (list) { out.push(`<${listTag} class="rb-list">${list.join('')}</${listTag}>`); list = null; listTag = null; } };
+  const out = [];
+  let list = null, listTag = null;
+  const flush = () => {
+    if (list) {
+      out.push(`<${listTag} class="rb-list">${list.join('')}</${listTag}>`);
+      list = null;
+      listTag = null;
+    }
+  };
 
   for (const ln of lines) {
     if (!ln) { flush(); continue; }
-    const mUl = ln.match(/^[-•Ø○]\s+(.*)$/);
-    const mOl = ln.match(/^(\d+|[a-zıiöüçşğ])[).]\s+(.*)$/i);
-    const mBox = ln.match(/^>\s*(.*)$/);
-    if (mUl || mOl) {
-      const tag = mUl ? 'ul' : 'ol';
-      if (listTag && listTag !== tag) flush();
-      listTag = tag; list = list || [];
-      list.push(`<li>${rich(mUl ? mUl[1] : mOl[2])}</li>`);
+
+    // Şık Tahlili: "A) ..." veya "a) ..." (Harf asla silinmez veya sayıya dönüştürülmez!)
+    const mOpt = ln.match(/^([A-Ea-e])\)\s*(.*)$/);
+    if (mOpt) {
+      flush();
+      const letter = mOpt[1].toUpperCase();
+      out.push(`<div class="rb-opt-block"><span class="rb-opt-letter">${letter}</span><div class="rb-opt-text">${rich(mOpt[2])}</div></div>`);
       continue;
     }
+
+    // Şık Tahlili: "A seçeneği: ..." veya "B şıkkı ..."
+    const mOptNamed = ln.match(/^([A-E])\s+(seçeneği|şıkkı)[:\s]\s*(.*)$/i);
+    if (mOptNamed) {
+      flush();
+      const letter = mOptNamed[1].toUpperCase();
+      out.push(`<div class="rb-opt-block"><span class="rb-opt-letter">${letter}</span><div class="rb-opt-text"><strong>${letter} ${mOptNamed[2]}:</strong> ${rich(mOptNamed[3])}</div></div>`);
+      continue;
+    }
+
+    // Roma Rakamlı Öncül: "I. ...", "II. ...", "III. ..."
+    const mRoman = ln.match(/^((?:I{1,3}|IV|V|VI{0,3}|IX|X)\.)\s*(.*)$/);
+    if (mRoman) {
+      flush();
+      out.push(`<div class="rb-roman-block"><span class="rb-roman-num">${mRoman[1]}</span><div class="rb-roman-text">${rich(mRoman[2])}</div></div>`);
+      continue;
+    }
+
+    // Madde İşaretli Liste: "- ...", "• ..."
+    const mUl = ln.match(/^[-•Ø○*]\s+(.*)$/);
+    if (mUl) {
+      if (listTag && listTag !== 'ul') flush();
+      listTag = 'ul';
+      list = list || [];
+      list.push(`<li>${rich(mUl[1])}</li>`);
+      continue;
+    }
+
+    // Numaralı Liste: "1. ...", "2) ..." (Sadece saf rakamlar)
+    const mOl = ln.match(/^(\d+)[.)]\s+(.*)$/);
+    if (mOl) {
+      if (listTag && listTag !== 'ol') flush();
+      listTag = 'ol';
+      list = list || [];
+      list.push(`<li>${rich(mOl[2])}</li>`);
+      continue;
+    }
+
     flush();
-    if (mBox) { out.push(`<div class="rb-box">${rich(mBox[1])}</div>`); continue; }
+
+    // Altın Kural / Vurgu Kutusu: "> ..."
+    const mBox = ln.match(/^>\s*(.*)$/);
+    if (mBox) {
+      out.push(`<div class="rb-box">${rich(mBox[1])}</div>`);
+      continue;
+    }
+
+    // Karşılaştırma Satırı: "Sol → Sağ"
     const mCmp = ln.match(/^(.{1,60}?)\s+→\s+(.*)$/);
-    if (mCmp) { out.push(`<div class="rb-row"><span class="rb-k">${rich(mCmp[1])}</span><span class="rb-v">${rich(mCmp[2])}</span></div>`); continue; }
+    if (mCmp) {
+      out.push(`<div class="rb-row"><span class="rb-k">${rich(mCmp[1])}</span><span class="rb-v">${rich(mCmp[2])}</span></div>`);
+      continue;
+    }
+
+    // Standart Paragraf
     out.push(`<p>${rich(ln)}</p>`);
   }
   flush();
