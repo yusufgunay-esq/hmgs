@@ -6,28 +6,37 @@
 
 import { loadMasterVault } from './vault-client.js';
 
+/* examQ = ÖLÇÜLDÜ, tahmin değil (11 Eylül 2026).
+   Kaynak: elimizdeki iki gerçek sınavın 238 sorusunun ders etiketleri
+   (hmgs_2026_nisan 120 + hmgs_2025_eylul 118), 120'ye ölçeklenip en büyük
+   kalan yöntemiyle tam sayıya yuvarlandı; toplam tam 120.
+   Önceki tablo elle tahmindi ve dört yerde kayıyordu: Vergi 3→5,
+   Milletlerarası 3→5, Borçlar 12→14 eksik sayılıyordu; buna karşılık
+   Vergi Usul 3→1 ve MÖHUK 3→1 fazla sayılıyordu. Bu tablo karma setin
+   ders payını belirlediği için sapma doğrudan çalışma dağılımına geçiyordu.
+   Sınav etiketleri değişirse burayı ölçümle güncelle, elle değil. */
 export const SUBJECTS = [
 
   { id: 'medeni_hukuk',        name: 'Medeni Hukuk',              tier: 1, examQ: 15 },
-  { id: 'borclar_hukuku',      name: 'Borçlar Hukuku',            tier: 1, examQ: 12 },
-  { id: 'ticaret_hukuku',      name: 'Ticaret Hukuku',            tier: 1, examQ: 12 },
+  { id: 'borclar_hukuku',      name: 'Borçlar Hukuku',            tier: 1, examQ: 14 },
   { id: 'hmk',                 name: 'Medeni Usul Hukuku (HMK)',  tier: 1, examQ: 12 },
+  { id: 'ticaret_hukuku',      name: 'Ticaret Hukuku',            tier: 1, examQ: 11 },
   { id: 'ceza_hukuku',         name: 'Ceza Hukuku',               tier: 2, examQ: 9  },
   { id: 'anayasa_hukuku',      name: 'Anayasa Hukuku',            tier: 2, examQ: 6  },
   { id: 'idare_hukuku',        name: 'İdare Hukuku',              tier: 2, examQ: 6  },
   { id: 'icra_iflas',          name: 'İcra ve İflas Hukuku',      tier: 2, examQ: 6  },
   { id: 'cmk',                 name: 'Ceza Muhakemesi (CMK)',     tier: 2, examQ: 6  },
   { id: 'is_hukuku',           name: 'İş ve Sosyal Güvenlik',     tier: 2, examQ: 6  },
+  { id: 'vergi_hukuku',        name: 'Vergi Hukuku',              tier: 3, examQ: 5  },
+  { id: 'milletlerarasi_hukuk',name: 'Milletlerarası Hukuk',      tier: 3, examQ: 5  },
+  { id: 'avukatlik',           name: 'Avukatlık Hukuku',          tier: 3, examQ: 3  },
   { id: 'anayasa_yargisi',     name: 'Anayasa Yargısı',           tier: 3, examQ: 3  },
   { id: 'iyuk',                name: 'İdari Yargılama Usulü',     tier: 3, examQ: 3  },
-  { id: 'vergi_hukuku',        name: 'Vergi Hukuku',              tier: 3, examQ: 3  },
-  { id: 'vergi_usul',          name: 'Vergi Usul Hukuku',         tier: 3, examQ: 3  },
-  { id: 'avukatlik',           name: 'Avukatlık Hukuku',          tier: 3, examQ: 3  },
   { id: 'hukuk_felsefesi',     name: 'Hukuk Felsefesi ve Sos.',   tier: 3, examQ: 3  },
   { id: 'hukuk_tarihi',        name: 'Türk Hukuk Tarihi',         tier: 3, examQ: 3  },
-  { id: 'milletlerarasi_hukuk',name: 'Milletlerarası Hukuk',      tier: 3, examQ: 3  },
-  { id: 'mohuk',               name: 'Milletlerarası Özel Hukuk', tier: 3, examQ: 3  },
-  { id: 'genel_kamu',          name: 'Genel Kamu Hukuku',         tier: 3, examQ: 3  }
+  { id: 'genel_kamu',          name: 'Genel Kamu Hukuku',         tier: 3, examQ: 2  },
+  { id: 'mohuk',               name: 'Milletlerarası Özel Hukuk', tier: 3, examQ: 1  },
+  { id: 'vergi_usul',          name: 'Vergi Usul Hukuku',         tier: 3, examQ: 1  }
 ];
 
 export const SUBJECT_BY_ID = new Map(SUBJECTS.map(s => [s.id, s]));
@@ -65,6 +74,7 @@ export const topicsBySubject = new Map();
 export const questionsBySubject = new Map();
 export const questionsByTopic = new Map();
 export const questionById = new Map();
+export const questionsByTarget = new Map();
 
 function push(map, key, val) {
   if (!map.has(key)) map.set(key, []);
@@ -99,6 +109,7 @@ export function populateData(vaultData) {
   questionsBySubject.clear();
   questionsByTopic.clear();
   questionById.clear();
+  questionsByTarget.clear();
 
   TOPICS.sort((a, b) => (a.order || 0) - (b.order || 0));
 
@@ -110,6 +121,8 @@ export function populateData(vaultData) {
     questionById.set(q.id, q);
     push(questionsBySubject, q.subjectId, q);
     if (q.topicId && topicById.has(q.topicId)) push(questionsByTopic, q.topicId, q);
+    const target = q.examTarget || 'hmgs_core';
+    push(questionsByTarget, target, q);
   });
 
   return integrity();
@@ -162,17 +175,32 @@ export function integrity() {
 }
 
 export const topicsOf = id => topicsBySubject.get(id) || [];
-export const questionsOf = id => questionsBySubject.get(id) || [];
-export const questionsOfTopic = id => questionsByTopic.get(id) || [];
-export const questionsOfTopics = (ids = []) => {
+export const questionsOf = (id, scope = 'all') => {
+  const list = questionsBySubject.get(id) || [];
+  if (scope === 'core') return list.filter(q => q.examTarget === 'hmgs_core');
+  return list;
+};
+export const questionsOfTopic = (id, scope = 'all') => {
+  const list = questionsByTopic.get(id) || [];
+  if (scope === 'core') return list.filter(q => q.examTarget === 'hmgs_core');
+  return list;
+};
+export const questionsOfTopics = (ids = [], scope = 'all') => {
   const set = new Set(ids);
   const out = [];
   for (const id of set) {
     const qs = questionsByTopic.get(id) || [];
-    out.push(...qs);
+    for (const q of qs) {
+      if (scope === 'all' || q.examTarget === 'hmgs_core') out.push(q);
+    }
   }
   return out;
 };
+
+export function filterQuestions(pool, scope = 'core') {
+  if (scope === 'all') return pool;
+  return pool.filter(q => q.examTarget === 'hmgs_core');
+}
 
 /** Deterministik olmayan karıştırma (Fisher-Yates). */
 export function shuffle(arr) {
@@ -188,13 +216,19 @@ export function shuffle(arr) {
  * Gerçek sınav dağılımına göre deneme seti kurar.
  * Havuz yetersizse eksiği rapor eder — sessizce dolgu yapmaz.
  */
-export function buildExamSet(onlyTagged = false) {
+export function buildExamSet(onlyTagged = false, scope = 'core') {
   const picked = [];
   const shortfall = [];
   SUBJECTS.forEach(s => {
-    let rawPool = questionsOf(s.id);
+    let rawPool = questionsOf(s.id, scope);
     if (onlyTagged) {
       rawPool = rawPool.filter(q => q.topicId && topicById.has(q.topicId));
+    }
+    if (rawPool.length < s.examQ && scope === 'core') {
+      rawPool = questionsOf(s.id, 'all');
+      if (onlyTagged) {
+        rawPool = rawPool.filter(q => q.topicId && topicById.has(q.topicId));
+      }
     }
     const pool = shuffle(rawPool);
     const take = pool.slice(0, s.examQ);
