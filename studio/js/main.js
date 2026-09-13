@@ -247,11 +247,13 @@ document.addEventListener('click', async e => {
     }
 
     /* --- soru çözme --- */
-    case 'pick':     practice.pick(el.dataset.key); break;
-    case 'dontknow': practice.dontKnow(); break;
-    case 'next':     practice.next(); break;
-    case 'quit':     practice.quit(); break;
-    case 'again':    if (!practice.repeatSession()) show('today'); break;
+    case 'pick':         practice.pick(el.dataset.key); break;
+    case 'dontknow':     practice.dontKnow(); break;
+    case 'next':         practice.next(); break;
+    case 'next-logic':   practice.nextLogic(); break;
+    case 'toggle-logic': practice.toggleLogic(); break;
+    case 'quit':         practice.quit(); break;
+    case 'again':        if (!practice.repeatSession()) show('today'); break;
     case 'push-session': practice.pushSession(); break;
 
     /* --- şık / öncül eleme (pratik + sınav ortak) --- */
@@ -346,9 +348,13 @@ document.addEventListener('keydown', e => {
     : ({ '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E' })[k];
 
   if (currentView === 'practice') {
-    if (letter) { practice.pick(letter); e.preventDefault(); }
-    else if (e.key === 'Enter' || e.key === ' ') { practice.next(); e.preventDefault(); }
-    else if (k === 'B') { practice.dontKnow(); e.preventDefault(); }
+    if (practice.isAnswered()) {
+      if (e.key === 'Enter' || e.key === ' ') { practice.next(); e.preventDefault(); }
+      else if (k === 'M') { practice.nextLogic(); e.preventDefault(); }
+    } else {
+      if (letter) { practice.pick(letter); e.preventDefault(); }
+      else if (k === 'B') { practice.dontKnow(); e.preventDefault(); }
+    }
   } else if (currentView === 'exam' && exam.active()) {
     if (letter) { exam.pick(letter); e.preventDefault(); }
     else if (e.key === 'ArrowRight') { exam.next(); e.preventDefault(); }
