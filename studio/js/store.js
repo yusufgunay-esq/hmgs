@@ -40,7 +40,7 @@ function blank() {
     drills: [],
     /** Devam eden deneme (yarıda kalırsa geri dönülebilir) */
     examInProgress: null,
-    settings: { dailyTarget: 40 }
+    settings: { dailyTarget: 40, theme: 'system', fontSize: 'normal' }
   };
 }
 
@@ -241,3 +241,13 @@ export function streak() {
 }
 
 export function lastExam() { return S.exams.length ? S.exams[S.exams.length - 1] : null; }
+
+export function getSettings() {
+  return S.settings || { dailyTarget: 40, theme: 'system', fontSize: 'normal' };
+}
+
+export function updateSettings(partial) {
+  S.settings = { ...(S.settings || {}), ...partial };
+  save();
+  return S.settings;
+}
