@@ -11,7 +11,7 @@
    ========================================================================== */
 
 import { state, TARGET_SEC, PASS_CORRECT, daysLeft, answersToday, lastExam } from './store.js';
-import { SUBJECTS, questionsOf, questionById, topicsOf, topicById, questionsOfTopic } from './data.js';
+import { SUBJECTS, questionsOf, questionById, topicsOf, topicById, questionsOfTopic, shuffle } from './data.js';
 
 /* ==========================================================================
    1. SRS — ARALIKLI GERİ GETİRME
@@ -237,101 +237,286 @@ function daysSince(iso) {
  * @returns {{kind:string, title:string, why:string, cta:string, action:object, alts:Array}}
  */
 export function nextAction() {
-  const S = state();
-  const due = dueQuestions();
   const d = daysLeft();
-  const alts = [];
+  const due = dueQuestions();
+  const gaps = karmaGaps();
 
-  // --- 1. Vadesi gelen tekrarlar ---
-  if (due.length >= 5) {
-    return {
-      kind: 'review',
-      title: `${due.length} soru tekrar vadesinde`,
-      why: 'Aralıklı geri getirme, öğrenmenin prosedürel hafızaya geçtiği yer. Vade kaçarsa unutma eğrisi baştan başlar — bunlar her şeyden önce gelir.',
-      cta: `Tekrarı başlat (${Math.min(due.length, 20)} soru)`,
-      action: { view: 'practice', mode: 'review', count: Math.min(due.length, 20) },
-      alts: buildAlts(['exam', 'weak', 'new'])
-    };
-  }
-
-  // --- 2. Baz ölçüm: hiç deneme yok veya çok eskidi ---
+  // --- 1. Baz ölçüm: deneme yoksa her şeyden önce gelir ---
   const last = lastExam();
   const examAge = daysSince(last?.at);
   const enoughPool = [...questionById.values()].length >= 100;
-  if (enoughPool && (!last || (examAge > 10 && d > 5))) {
+  if (enoughPool && (!last || (examAge > 7 && d > 3))) {
     return {
       kind: 'exam',
-      title: last ? 'Yeni bir deneme zamanı' : 'İlk deneme sınavını çöz',
+      title: last ? 'Yeni bir deneme zamanı' : 'Önce bir deneme çöz',
       why: last
-        ? `Son denemenden ${Math.round(examAge)} gün geçti. Net, tek gerçek pusuladır — bu kadar aralıkta gelişimin ölçülemez.`
-        : 'Nerede olduğunu bilmeden neyi çalışacağına karar veremezsin. 120 soru, süre baskısı altında, tek oturum — baz netini alalım.',
+        ? `Son denemenden ${Math.round(examAge)} gün geçti. Netin ölçülmediği sürece bütün tahminler ölçülmemiş bir sabite dayanıyor.`
+        : 'Henüz hiç denemen yok. Net tahminlerinin tamamı varsayım; bir deneme girdiğin an hepsi yeniden hesaplanır. 120 soru, tek oturum, boş bırakmadan.',
       cta: '120 soruluk denemeyi başlat',
       action: { view: 'exam', mode: 'start' },
-      alts: buildAlts(['weak', 'new', 'review'])
+      alts: buildAlts(['karma', 'review'])
     };
   }
 
-  // --- 3. En zayıf ağırlıklı ders ---
-  const ranked = allSubjectMastery()
-    .filter(s => s.pool >= 5)
-    .map(s => {
-      const m = s.mastery;
-      const gap = m.state === 'none' ? 1 : (1 - m.score);
-      // Sınav ağırlığı × açık = puana etkisi
-      return { ...s, priority: (s.examQ / 120) * gap };
-    })
-    .sort((a, b) => b.priority - a.priority);
+  // --- 2. Karma set: varsayılan çalışma biçimi ---
+  // Ders bazlı mod artık öneri sırasında yok. Sınav karışık soruyor; ayırt etme
+  // işi yalnız harmanlanmış sette çalışılıyor. Vadesi gelen tekrarlar da bu
+  // setin içine giriyor, ayrı mod açmaya gerek kalmıyor.
+  const count = d <= 7 ? 30 : 20;
+  const w = karmaWeights().filter(r => r.weight > 0).sort((a, b) => b.weight - a.weight);
+  const lead = w[0];
+  const fresh = w.filter(r => r.fresh).length;
 
-  const worst = ranked[0];
-  if (worst && worst.priority > 0.008) {
-    const m = worst.mastery;
-    const why = m.state === 'none'
-      ? `${worst.name} sınavda ${worst.examQ} soru ediyor ve henüz hiç çözmedin. En büyük ölçülmemiş riskin burada.`
-      : m.state === 'effort'
-        ? `${worst.name}'nda başarın %${Math.round(m.acc * 100)}, medyan sürenin ${Math.round(m.medianSec)} sn. Hem yavaş hem hatalı — bu konu hâlâ eforlu, prosedürel değil.`
-        : `${worst.name}'nda doğruluğun iyi (%${Math.round(m.acc * 100)}) ama medyan süren ${Math.round(m.medianSec)} sn. Hedef ${TARGET_SEC} sn — hız çalışması gerek.`;
-    return {
-      kind: 'weak',
-      title: `${worst.name}'na odaklan`,
-      why,
-      cta: `${Math.min(15, worst.pool)} soru çöz`,
-      action: { view: 'practice', mode: 'subject', subjectId: worst.id, count: Math.min(15, worst.pool) },
-      alts: buildAlts(['review', 'exam', 'new'])
-    };
+  let why;
+  if (due.length >= 5 && fresh > 0) {
+    why = `Set ${Math.min(due.length, Math.floor(count * KARMA_DUE_SHARE))} tekrar sorusuyla açılıyor, kalanı yeni malzeme. Hiç açmadığın ${fresh} ders var; bunlar ilk temasta blok hâlinde geliyor, tanıdıktan sonra harmana karışıyor.`;
+  } else if (fresh > 0) {
+    why = `Hiç açmadığın ${fresh} ders var ve sınavın yarısından fazlası oralarda. Set ağırlığı ölçülmüş sınav dağılımından geliyor; en çok pay ${lead ? lead.name : '—'} tarafında.`;
+  } else {
+    why = `Karışık set. Ders adı cevabı verene kadar gizli; sınavda da yazmıyor, hangi kuralın uygulanacağını kendin seçeceksin.`;
   }
 
-  // --- 4. Hiç dokunulmamış içerik ---
-  const unseen = unseenQuestions();
-  if (unseen.length > 0) {
-    return {
-      kind: 'new',
-      title: `${unseen.length} soruya hiç dokunmadın`,
-      why: 'Havuzun tamamını en az bir kez görmeden zayıf alan haritası tamamlanmaz.',
-      cta: `Yeni ${Math.min(15, unseen.length)} soru çöz`,
-      action: { view: 'practice', mode: 'unseen', count: Math.min(15, unseen.length) },
-      alts: buildAlts(['review', 'exam', 'weak'])
-    };
-  }
-
-  // --- 5. Bakım dozu ---
   return {
-    kind: 'maintain',
-    title: 'Bakım dozu',
-    why: 'Vadesi gelen tekrar yok, zayıf alan kalmadı. Şimdi işi hızı korumak — karma set çöz, otomatikliği paslanmaya bırakma.',
-    cta: '15 soruluk karma set',
-    action: { view: 'practice', mode: 'mixed', count: 15 },
-    alts: buildAlts(['exam', 'review'])
+    kind: 'karma',
+    title: `${count} soruluk karma set`,
+    why,
+    cta: `Karma seti başlat (${count} soru)`,
+    action: { view: 'practice', mode: 'karma', count },
+    alts: buildAlts(['exam', 'review']).concat(
+      gaps.length ? [{ label: `Kâğıtta kalan ${gaps.length} ders`, action: { view: 'progress' } }] : []
+    )
   };
 }
 
 function buildAlts(kinds) {
   const map = {
+    karma:  { label: 'Karma set',      action: { view: 'practice', mode: 'karma', count: 20 } },
     review: { label: 'Tekrarları çöz', action: { view: 'practice', mode: 'review', count: 20 } },
     exam:   { label: 'Deneme sınavı',  action: { view: 'exam', mode: 'start' } },
-    new:    { label: 'Yeni sorular',   action: { view: 'practice', mode: 'unseen', count: 15 } },
-    weak:   { label: 'Karma set',      action: { view: 'practice', mode: 'mixed', count: 15 } }
+    new:    { label: 'Yeni sorular',   action: { view: 'practice', mode: 'unseen', count: 15 } }
   };
   return kinds.map(k => map[k]).filter(Boolean);
+}
+
+/* ==========================================================================
+   4. KARMA SET — sınavın kendi biçimi
+   ----------------------------------------------------------------------
+   Neden ders bazlı değil: sınav 120 soruyu karışık soruyor. Ders ders
+   çalışıldığında hangi kuralın uygulanacağı sorunun ÜSTÜNDE yazılı olur;
+   sınavda yazmaz. Ayırt etme işi ancak harmanlanmış sette çalışılır
+   (Brunmair & Richter 2019 meta-analizi, 59 çalışma: kural uygulamada
+   g = 0,34 — mütevazı ama gerçek; düz metin ezberinde yok).
+   AMA harmanlama edinimin YERİNE geçmez: hiç görülmemiş bir derste tek tek
+   dağıtılmış sorular tahmine döner. Bu yüzden ilk temas blok hâlinde verilir
+   (KARMA_ACQ_BLOCK), ders tanındıktan sonra harmana karışır.
+
+   Bir set üç parçadan kurulur:
+     1. Vadesi gelen tekrarlar (en çok %30) — ayrı "tekrar seansı" yok,
+        yanlışlar setin içinde geri gelir. Mod değiştirmek gerekmez.
+     2. Ölçülmüş sınav ağırlığına göre dağıtılmış yeni sorular.
+     3. Sırası: aynı ders yan yana gelmez (edinim bloğu hariç).
+
+   Ders payı = examQ × (0,6 × kapsam açığı + 0,4 × isabet açığı)
+     kapsam açığı : o dersten kaç soru görüldü / görülmesi gereken
+     isabet açığı : ölçülen isabet düştükçe pay büyür, hiç veri yoksa tam pay
+   Bilinmeyen ders en yüksek önceliği alır; bu bir karar değil, dünkü
+   aritmetiğin sonucu: hiç açılmamış dersler sınavın 64 sorusu.
+   ========================================================================== */
+
+/** Setin en fazla bu kadarı vadesi gelen tekrar olur. */
+export const KARMA_DUE_SHARE = 0.30;
+/** Hiç açılmamış derste ilk temas kaç soruluk blok hâlinde verilir. */
+export const KARMA_ACQ_BLOCK = 4;
+/** Bu sayıdan az soru çözülmüş ders "henüz edinilmemiş" sayılır. */
+export const KARMA_ACQ_THRESHOLD = 5;
+/** Sınavdaki her soru için hedeflenen kapsam (kaç soru görülmeli). */
+export const KARMA_COVER_PER_EXAMQ = 4;
+/** Ders payında kapsam açığının payı; kalanı isabet açığının. KARAR, ölçüm değil. */
+export const KARMA_COVER_W = 0.6;
+/** Havuz, sınav payının bu katını taşıyamıyorsa ders karma sette kısılır. */
+export const KARMA_SERVE_PER_EXAMQ = 8;
+/** Bir sette en fazla kaç derse edinim bloğu verilir. */
+export const KARMA_MAX_BLOCKS = 2;
+
+/** Ders bazında ham cevap sayacı: { seen, correct }. */
+function subjectCounts() {
+  const S = state();
+  const m = new Map();
+  for (const a of S.answers) {
+    const r = m.get(a.subjectId) || { seen: 0, correct: 0 };
+    r.seen++; if (a.ok) r.correct++;
+    m.set(a.subjectId, r);
+  }
+  return m;
+}
+
+/**
+ * Her ders için karma payı ağırlığı. Havuzu olmayan ders ağırlık almaz
+ * (ona kâğıttan çalışılacak — bkz. karmaGaps).
+ */
+export function karmaWeights() {
+  const counts = subjectCounts();
+  return SUBJECTS.map(s => {
+    const pool = questionsOf(s.id).length;
+    const c = counts.get(s.id) || { seen: 0, correct: 0 };
+    const coverTarget = Math.max(1, s.examQ * KARMA_COVER_PER_EXAMQ);
+    const coverGap = 1 - Math.min(1, c.seen / coverTarget);
+    const acc = c.seen >= 5 ? c.correct / c.seen : null;
+    // Hiç veri yoksa açık tam sayılır: bilmediğin ders en riskli derstir.
+    const accGap = acc === null ? 1 : Math.max(0.12, 1 - acc);
+    // İki açık ÇARPILMAZ, toplanır. Çarpım, kapsamı dolmuş ama isabeti düşük
+    // dersi sıfıra yaklaştırıyordu: HMK (61 soru görülmüş, isabet %72, sınavda
+    // 12 soru) 40 soruluk sette hiç çıkmıyordu. Oysa iki açıktan HERHANGİ BİRİ
+    // tek başına çalışma sebebidir. Kapsam ağır basıyor çünkü bu aşamada
+    // sınavın yarısından fazlası hiç açılmamış derslerde; kapsam kapandıkça
+    // ağırlık kendiliğinden isabete kayıyor.
+    const need = KARMA_COVER_W * coverGap + (1 - KARMA_COVER_W) * accGap;
+    // Havuz ne kadarını gerçekten taşıyabiliyor? Sınavda 11 soru eden Ticaret'in
+    // bankada 14 sorusu var; ağırlığı tek başına examQ'dan gelirse uygulama o 14
+    // soruyu ilk setlerde harcayıp dersi "çalışıldı" sanıyor. Taşıyamadığı dersi
+    // kısar, kâğıda bırakır (karmaGaps bunu ekranda söylüyor).
+    const serve = Math.min(1, pool / Math.max(1, s.examQ * KARMA_SERVE_PER_EXAMQ));
+    const thin = pool < s.examQ * 2;
+    const weight = pool === 0 ? 0 : s.examQ * need * serve;
+    return { ...s, pool, seen: c.seen, acc, coverGap, accGap, serve, thin, weight, fresh: c.seen < KARMA_ACQ_THRESHOLD };
+  });
+}
+
+/**
+ * Sınav payını taşıyacak havuzu OLMAYAN dersler.
+ * Bunlar sessizce düşmez; uygulamada "bu ders kâğıtta" diye yazılır.
+ * Eşik: havuz, sınav payının iki katından azsa o dersi karma set taşıyamaz.
+ */
+export function karmaGaps() {
+  return karmaWeights()
+    .filter(s => s.pool < s.examQ * 2)
+    .map(s => ({ id: s.id, name: s.name, examQ: s.examQ, pool: s.pool }))
+    .sort((a, b) => b.examQ - a.examQ);
+}
+
+/** Bir dersten seçilebilir sorular: önce hiç görülmemiş, sonra takılınanlar. */
+function candidatesOf(subjectId, excludeIds, scope = 'core') {
+  const S = state();
+  const seenIds = new Set(S.answers.map(a => a.qId));
+  let pool = questionsOf(subjectId, scope).filter(q => !excludeIds.has(q.id));
+  if (!pool.length && scope === 'core') {
+    pool = questionsOf(subjectId, 'all').filter(q => !excludeIds.has(q.id));
+  }
+  const unseen = [];
+  const shaky = [];
+  for (const q of pool) {
+    if (!seenIds.has(q.id)) { unseen.push(q); continue; }
+    const r = S.srs[q.id];
+    // Mezun olmuş ya da kutusu ilerlemiş ve vadesi gelmemiş soruyu tekrar sormayız.
+    if (r && r.box >= 2) continue;
+    shaky.push(q);
+  }
+  return shuffle(unseen).concat(shuffle(shaky));
+}
+
+/** Ağırlıkları tam sayı kotaya çevir (en büyük kalan yöntemi). */
+function allocate(rows, total) {
+  const sum = rows.reduce((a, r) => a + r.weight, 0);
+  if (sum <= 0 || total <= 0) return new Map();
+  const exact = rows.map(r => ({ id: r.id, v: (r.weight / sum) * total }));
+  const out = new Map(exact.map(e => [e.id, Math.floor(e.v)]));
+  let left = total - [...out.values()].reduce((a, b) => a + b, 0);
+  exact.sort((a, b) => (b.v - Math.floor(b.v)) - (a.v - Math.floor(a.v)));
+  for (let i = 0; left > 0 && i < exact.length; i++, left--) {
+    out.set(exact[i].id, out.get(exact[i].id) + 1);
+  }
+  return out;
+}
+
+/**
+ * Aynı ders yan yana gelmesin diye dağıt. Edinim blokları bölünmez:
+ * blok tek bir öğe gibi yerleştirilir, içi bitişik kalır.
+ */
+function interleave(groups) {
+  // groups: [{ subjectId, items:[q], block:bool }]
+  const units = [];
+  for (const g of groups) {
+    if (g.block) units.push({ subjectId: g.subjectId, items: g.items });
+    else g.items.forEach(q => units.push({ subjectId: g.subjectId, items: [q] }));
+  }
+  const bySubj = new Map();
+  units.forEach(u => {
+    if (!bySubj.has(u.subjectId)) bySubj.set(u.subjectId, []);
+    bySubj.get(u.subjectId).push(u);
+  });
+  const out = [];
+  let lastSubj = null;
+  while (bySubj.size) {
+    // En çok kalanı olan ve son konulandan farklı dersi seç.
+    let pick = null;
+    let best = -1;
+    for (const [sid, arr] of bySubj) {
+      if (sid === lastSubj && bySubj.size > 1) continue;
+      if (arr.length > best) { best = arr.length; pick = sid; }
+    }
+    if (pick === null) pick = [...bySubj.keys()][0];
+    const arr = bySubj.get(pick);
+    const unit = arr.shift();
+    out.push(...unit.items);
+    lastSubj = pick;
+    if (!arr.length) bySubj.delete(pick);
+  }
+  return out;
+}
+
+/**
+ * Karma set kur.
+ * @returns {{questions:Array, plan:Array, due:number, gaps:Array}}
+ */
+export function buildKarmaSet(count = 20, scope = 'core') {
+  const used = new Set();
+  const picked = [];
+
+  // --- 1. Vadesi gelen tekrarlar ---
+  const dueCap = Math.floor(count * KARMA_DUE_SHARE);
+  const due = dueQuestions().slice(0, dueCap);
+  due.forEach(d => { used.add(d.q.id); });
+  const dueGroups = due.map(d => ({ subjectId: d.q.subjectId, items: [d.q], block: false }));
+
+  // --- 2. Kalan pay: ölçülmüş sınav ağırlığına göre yeni malzeme ---
+  const remaining = count - due.length;
+  const rows = karmaWeights().filter(r => r.weight > 0);
+  const quota = allocate(rows, remaining);
+
+  const newGroups = [];
+  let deficit = 0;
+  let blocksLeft = KARMA_MAX_BLOCKS;
+  // Ağırlığı yüksek ders önce seçilsin ki edinim bloğu en çok gereken derse gitsin.
+  rows.sort((a, b) => b.weight - a.weight);
+  for (const r of rows) {
+    let want = quota.get(r.id) || 0;
+    if (!want) continue;
+    // Havuzu zaten yetmeyen dersin kıt sorularını sete dağıtmayız: seti bir
+    // örnekle işaretler, gerisi kâğıtta kalır.
+    if (r.thin) want = Math.min(want, 1);
+    // Hiç açılmamış derste ilk temas blok hâlinde verilir; tek soru tahmine
+    // döner. Ama set blok yığınına dönmesin diye set başına en fazla
+    // KARMA_MAX_BLOCKS ders blok alır — yoksa "karma" adı altında yine
+    // ders ders çalışmış oluyoruz.
+    const block = r.fresh && !r.thin && blocksLeft > 0;
+    if (block) { want = Math.max(want, Math.min(KARMA_ACQ_BLOCK, r.pool)); blocksLeft--; }
+    const cands = candidatesOf(r.id, used, scope).slice(0, want);
+    cands.forEach(q => used.add(q.id));
+    if (cands.length < want) deficit += want - cands.length;
+    if (cands.length) newGroups.push({ subjectId: r.id, items: cands, block: block && cands.length > 1 });
+  }
+
+  const all = interleave(dueGroups.concat(newGroups));
+  picked.push(...all.slice(0, Math.max(1, count)));
+
+  // Plan: kullanıcıya değil, ekrandaki özet ve teste.
+  const planMap = new Map();
+  picked.forEach(q => planMap.set(q.subjectId, (planMap.get(q.subjectId) || 0) + 1));
+  const plan = [...planMap.entries()]
+    .map(([id, n]) => ({ id, name: (SUBJECTS.find(s => s.id === id) || {}).name || id, n }))
+    .sort((a, b) => b.n - a.n);
+
+  return { questions: picked, plan, due: due.length, gaps: karmaGaps(), deficit };
 }
 
 /* ==========================================================================
