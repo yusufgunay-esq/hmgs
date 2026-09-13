@@ -29,16 +29,16 @@ function addDays(d, n) {
 }
 
 /** Cevaptan sonra SRS durumunu güncelle. Dönen not kullanıcıya gösterilir. */
-export function scheduleAfterAnswer(qId, ok) {
+export function scheduleAfterAnswer(qId, ok, logicGuess = false) {
   const S = state();
   const cur = S.srs[qId] || { box: 0, lapses: 0, dueAt: null, lastAt: null };
   const now = new Date();
 
-  if (ok) {
+  if (ok && !logicGuess) {
     cur.box = Math.min(cur.box + 1, BOXES.length);
   } else {
     cur.box = 0;
-    cur.lapses += 1;
+    if (!ok) cur.lapses += 1;
   }
   cur.lastAt = now.toISOString();
 
@@ -49,10 +49,17 @@ export function scheduleAfterAnswer(qId, ok) {
   }
   S.srs[qId] = cur;
 
-  if (cur.box >= BOXES.length) return { box: cur.box, note: 'Bu soru mezun oldu — tekrar sırasından çıktı.' };
+  if (cur.box >= BOXES.length) return { box: cur.box, note: 'Bu soru mezun oldu (tekrar sırasından çıktı).' };
   if (!ok) return { box: 0, note: `Yarın tekrar sorulacak. (${cur.lapses}. kez takıldın)` };
+  if (logicGuess) return { box: 0, note: 'Yarın tekrar sorulacak. (Mantıkla çözüldü, konu açıklarında)' };
   return { box: cur.box, note: `${BOXES[cur.box]} gün sonra tekrar sorulacak.` };
 }
+
+/** Mantıkla çözülen soruyu SRS'te kutu 0'a çekerek tekrar havuzuna alır. */
+export function reScheduleAsLogic(qId, flag = true) {
+  return scheduleAfterAnswer(qId, true, flag);
+}
+
 
 /** Bugün vadesi gelmiş (veya geçmiş) sorular. */
 export function dueQuestions(now = new Date()) {
