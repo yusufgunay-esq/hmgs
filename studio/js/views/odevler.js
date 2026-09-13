@@ -56,9 +56,9 @@ const SUBJECT_NEEDLES = {
 };
 
 const TYPE_META = {
-  quiz:     { etiket: '🎯 Soru Bankası',                        cls: 'chip accent', renk: 'var(--accent)' },
-  practice: { etiket: '🧩 Pratik / Simülatör',                  cls: 'chip green',  renk: 'var(--ok)' },
-  review:   { etiket: '📖 Fiziki Kitap — Hata & Kavram Hasadı', cls: 'chip amber',  renk: 'var(--warn)' }
+  quiz:     { etiket: 'Soru Bankası',                         cls: 'chip accent', renk: 'var(--accent)' },
+  practice: { etiket: 'Pratik / Simülatör',                   cls: 'chip green',  renk: 'var(--ok)' },
+  review:   { etiket: 'Fiziki Kitap: Hata ve Kavram Hasadı', cls: 'chip amber',  renk: 'var(--warn)' }
 };
 
 function resolveSubjectId(t) {
@@ -210,7 +210,7 @@ export function render() {
   const tasks = tasksCache || [];
   if (!tasks.length) {
     host.innerHTML = `<div class="wrap"><div class="card">
-      <h3>Atanmış ödev bulunmuyor 🎉</h3>
+      <h3>Atanmış ödev bulunmuyor</h3>
       <p style="font-size:0.9rem;color:var(--ink-2);margin-top:0.4rem">Koç henüz yeni ödev atamadı veya tüm ödevler tamamlandı.</p>
       <button class="btn btn-2" style="margin-top:0.8rem" data-act="odev-yenile">Yenile</button>
     </div></div>`;
@@ -220,7 +220,7 @@ export function render() {
   host.innerHTML = `<div class="wrap">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap">
       <div>
-        <h2 style="font-size:1.2rem;font-weight:800;color:var(--ink)">📋 Koç Görevleri &amp; Ödevlerin</h2>
+        <h2 style="font-size:1.2rem;font-weight:800;color:var(--ink)">Koç Görevleri ve Ödevlerin</h2>
         <p style="font-size:0.85rem;color:var(--ink-2)">Fiziksel kitapta çalıştığın konuyu Stüdyo'da tam olarak o üniteden pekiştir.</p>
       </div>
       <button class="btn btn-2" data-act="odev-yenile" style="font-size:0.8rem">Yenile</button>
@@ -247,7 +247,7 @@ function kartHTML(t) {
     <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.35rem">
       <span class="${meta.cls}">${meta.etiket}</span>
       ${dersAdi ? `<span class="chip">${esc(dersAdi)}</span>` : ''}
-      ${topInfo.topicName ? `<span class="chip" style="background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;font-weight:600">🎯 ${esc(topInfo.topicName)}</span>` : ''}
+      ${topInfo.topicName ? `<span class="chip" style="background:var(--accent-soft);color:var(--accent-ink);border:1px solid var(--line);font-weight:600">${esc(topInfo.topicName)}</span>` : ''}
       ${due ? `<span style="font-size:0.75rem;color:var(--ink-2)">Vade: <b>${due}</b></span>` : ''}
     </div>
 
@@ -284,28 +284,28 @@ function butonlarHTML(type, subjectId, genId, topInfo) {
 
   if (type === 'practice') {
     const gen = genId && genId !== 'notes' ? GENERATORS.find(g => g.id === genId) : null;
-    const etiket = gen ? `🧩 ${esc(gen.title)}`
-      : (genId === 'notes' ? '🧩 Notlarından Tekrar' : '🧩 Pratik Alanını Aç');
+    const etiket = gen ? esc(gen.title)
+      : (genId === 'notes' ? 'Notlarından Tekrar' : 'Pratik Alanını Aç');
     return `
       <button class="btn" data-act="odev-pratik" data-gen="${esc(genId || '')}" style="font-size:0.8rem;padding:0.4rem 0.8rem">${etiket}</button>
-      ${(topicId || topicIds.length) ? topicTestBtn('btn-2', `🎯 Bu Konudan Test Çöz (${poolCount ? `${poolCount} soru` : 'Test'})`) : generalTestBtn('btn-2', subjectId ? '🎯 Bu dersten test çöz' : '🎯 Karma test çöz')}`;
+      ${(topicId || topicIds.length) ? topicTestBtn('btn-2', `Bu Konudan Test Çöz (${poolCount ? `${poolCount} soru` : 'Test'})`) : generalTestBtn('btn-2', subjectId ? 'Bu dersten test çöz' : 'Karma test çöz')}`;
   }
 
   if (type === 'review') {
     return `
-      <span style="font-size:0.8rem;color:var(--ink-2);align-self:center">Bu görev fiziki kitapta yapılır — hataları ve yeni kavramları Takip'e işle.</span>
-      ${(topicId || topicIds.length) ? topicTestBtn('btn-2', `🎯 Pekiştirme Testi (${esc(topInfo.topicName || 'Bu Konu')})`) : generalTestBtn('btn-2', subjectId ? '🎯 Yine de bu dersten test çöz' : '🎯 Karma test çöz')}`;
+      <span style="font-size:0.8rem;color:var(--ink-2);align-self:center">Bu görev fiziki kitapta yapılır (hataları ve yeni kavramları Takip'e işle).</span>
+      ${(topicId || topicIds.length) ? topicTestBtn('btn-2', `Pekiştirme Testi (${esc(topInfo.topicName || 'Bu Konu')})`) : generalTestBtn('btn-2', subjectId ? 'Yine de bu dersten test çöz' : 'Karma test çöz')}`;
   }
 
   // quiz (varsayılan)
   if (topicId || topicIds.length) {
     return `
-      ${topicTestBtn('', `🎯 Bu Konudan Test Çöz (${poolCount ? `${poolCount} soru` : '15 soru'})`)}
-      ${generalTestBtn('btn-2', '🎯 Tüm Dersten Çöz (Genel Tekrar)')}
-      <button class="btn btn-2" data-act="odev-pratik" data-gen="" style="font-size:0.8rem;padding:0.4rem 0.8rem">🧩 Pratik Alanı</button>`;
+      ${topicTestBtn('', `Bu Konudan Test Çöz (${poolCount ? `${poolCount} soru` : '15 soru'})`)}
+      ${generalTestBtn('btn-2', 'Tüm Dersten Çöz (Genel Tekrar)')}
+      <button class="btn btn-2" data-act="odev-pratik" data-gen="" style="font-size:0.8rem;padding:0.4rem 0.8rem">Pratik Alanı</button>`;
   }
 
   return `
-    ${generalTestBtn('', subjectId ? '🎯 Stüdyo\'da Test Çöz (15 soru)' : '🎯 Karma Test Çöz (15 soru)')}
-    <button class="btn btn-2" data-act="odev-pratik" data-gen="" style="font-size:0.8rem;padding:0.4rem 0.8rem">🧩 Pratik Alanı</button>`;
+    ${generalTestBtn('', subjectId ? 'Stüdyo\'da Test Çöz (15 soru)' : 'Karma Test Çöz (15 soru)')}
+    <button class="btn btn-2" data-act="odev-pratik" data-gen="" style="font-size:0.8rem;padding:0.4rem 0.8rem">Pratik Alanı</button>`;
 }
