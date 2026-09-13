@@ -6,44 +6,66 @@
 import { esc, rich, richBlock, splitStem, fmtSec, emptyState, $, toast } from '../ui.js';
 import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions } from '../data.js';
 import { recordAnswer, save, saveSession, state, TARGET_SEC } from '../store.js';
-import { scheduleAfterAnswer, dueQuestions, unseenQuestions } from '../engine.js';
+import { scheduleAfterAnswer, dueQuestions, unseenQuestions, buildKarmaSet } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
 
 let S = null;   // aktif seans
 let tick = null;
 
-/** Seans kur. opts: { mode, subjectId, topicId, topicIds, count, customLabel } */
+/** Seans kur. opts: { mode, subjectId, topicId, topicIds, count, customLabel, targetScope } */
 export function startSession(opts = {}) {
-  const { mode = 'mixed', subjectId = null, topicId = null, topicIds = null, count = 15, customLabel = null } = opts;
+  const { mode = 'mixed', subjectId = null, topicId = null, topicIds = null, count = 15, customLabel = null, targetScope = 'core' } = opts;
   let pool = [];
   let label = '';
 
-  if (mode === 'review') {
-    // Vadesi gelen yanlışlar. subjectId verilirse yalnız o ders.
-    // (27 Ağu 2026: ders süzgeci eklendi — "Yanlışlarım" ekranı ders ders
-    //  çözdürebilsin diye. Süzgeçsiz çağrı eskisi gibi çalışır.)
+  let karmaMeta = null;
+
+  if (mode === 'karma') {
+    // Sınav biçimli harmanlanmış set: ders payı ölçülmüş sınav dağılımından
+    const built = buildKarmaSet(count, targetScope);
+    pool = built.questions;
+    karmaMeta = { plan: built.plan, due: built.due, gaps: built.gaps };
+    label = customLabel || 'Karma set';
+  } else if (mode === 'review') {
     let due = dueQuestions();
     if (subjectId) due = due.filter(d => d.q.subjectId === subjectId);
     pool = due.map(d => d.q);
+    if (targetScope === 'core') {
+      const coreOnly = pool.filter(q => q.examTarget === 'hmgs_core');
+      if (coreOnly.length) pool = coreOnly;
+    }
     label = subjectId ? `Tekrar · ${subjectName(subjectId)}` : 'Tekrar seansı';
   } else if (mode === 'topics' && Array.isArray(topicIds) && topicIds.length) {
-    pool = shuffle(questionsOfTopics(topicIds));
+    pool = shuffle(questionsOfTopics(topicIds, targetScope));
+    if (!pool.length && targetScope === 'core') pool = shuffle(questionsOfTopics(topicIds, 'all'));
     const titles = topicIds.map(id => topicById.get(id)?.title).filter(Boolean);
     label = customLabel || (titles.length === 1 ? titles[0] : (titles.length ? `${titles[0]} (+${titles.length - 1} konu)` : 'Seçili Konular'));
   } else if (mode === 'topic' || (topicId && mode !== 'subject' && mode !== 'pastExam' && mode !== 'review')) {
-    pool = shuffle(questionsOfTopic(topicId));
+    pool = shuffle(questionsOfTopic(topicId, targetScope));
+    if (!pool.length && targetScope === 'core') pool = shuffle(questionsOfTopic(topicId, 'all'));
     label = customLabel || topicById.get(topicId)?.title || 'Konu soruları';
   } else if (mode === 'subject') {
-    pool = shuffle(questionsOf(subjectId));
+    pool = shuffle(questionsOf(subjectId, targetScope));
+    if (!pool.length && targetScope === 'core') pool = shuffle(questionsOf(subjectId, 'all'));
     label = customLabel || subjectName(subjectId);
   } else if (mode === 'unseen') {
-    pool = shuffle(unseenQuestions(subjectId));
+    let unseen = unseenQuestions(subjectId);
+    if (targetScope === 'core') {
+      const coreOnly = unseen.filter(q => q.examTarget === 'hmgs_core');
+      if (coreOnly.length) unseen = coreOnly;
+    }
+    pool = shuffle(unseen);
     label = 'Yeni sorular';
   } else if (mode === 'pastExam') {
     pool = shuffle(pastExamQuestions());
     label = 'Çıkmış sorular · karışık pratik';
   } else {
-    pool = shuffle(subjectId ? questionsOf(subjectId) : allQuestions());
+    let raw = subjectId ? questionsOf(subjectId, targetScope) : allQuestions();
+    if (targetScope === 'core') {
+      const coreOnly = raw.filter(q => q.examTarget === 'hmgs_core');
+      if (coreOnly.length) raw = coreOnly;
+    }
+    pool = shuffle(raw);
     label = customLabel || (subjectId ? subjectName(subjectId) : 'Karma set');
   }
 
@@ -54,8 +76,13 @@ export function startSession(opts = {}) {
     return false;
   }
 
+  // Ders adı cevaptan önce gizlenir: sınavda da yazmıyor. Soruya bakıp hangi
+  // dersin kuralı olduğunu seçmek işin yarısı; etiket gösterilirse o yarı
+  // bedava veriliyor ve karma setin tek kazancı kayboluyor.
+  const hideSubject = (mode === 'karma' || mode === 'pastExam');
+
   S = {
-    mode, label, count, subjectId, topicId,
+    mode, label, count, subjectId, topicId, karmaMeta, hideSubject, targetScope,
     questions: pool.slice(0, Math.max(1, count)),
     i: 0,
     answered: false,
@@ -89,13 +116,15 @@ export function render() {
       cta: { act: 'go-today', label: 'Bugün ekranına dön' }
     })}
     <div class="card" style="margin-top:1rem">
-      <h3 style="font-size:1rem;font-weight:700;margin-bottom:0.4rem">Sadece çıkmış sorular</h3>
+      <h3 style="font-size:1rem;font-weight:700;margin-bottom:0.4rem">Soru Havuzu ve Hızlı Pratik</h3>
       <p style="font-size:0.9rem;color:var(--ink-2);margin-bottom:0.9rem">
-        Süresiz, karışık pratik — yalnız resmi HMGS sınavlarından (Nisan 2026 + Eylül 2025) gerçek çıkmış sorular.
-        Bunları orijinal sınav koşulunda, tek oturumda çözmek istersen <strong>Deneme</strong> sekmesindeki
-        "Gerçek çıkmış sınavlar" bölümünü kullan.
+        Sınava kalan kritik günlerde doğrudan HMGS sınav ayarındaki sorularla çalışabilir veya ileri düzey (Hakimlik) sorularıyla derinleşebilirsin.
       </p>
-      <button class="btn btn-2" data-act="practice-pastexam">Çıkmış soruları çöz</button>
+      <div class="btn-row" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <button class="btn btn-2" data-act="practice-core-karma">HMGS Çekirdek Karma (20 Soru)</button>
+        <button class="btn btn-2" data-act="practice-all-karma">Tüm Havuz Karma (İleri Dahil)</button>
+        <button class="btn btn-2" data-act="practice-pastexam">Çıkmış Soruları Çöz</button>
+      </div>
     </div></div>`;
     return;
   }
@@ -113,7 +142,8 @@ export function render() {
       <div class="q-head">
         <span class="chip accent">${esc(S.label)}</span>
         <span>${S.i + 1} / ${S.questions.length}</span>
-        <span>${esc(subjectName(q.subjectId))}</span>
+        <span id="q-subj">${S.hideSubject ? '<span class="hint">ders gizli</span>' : esc(subjectName(q.subjectId))}</span>
+        ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
         ${q.difficulty && q.difficulty !== 'etiketsiz' ? `<span class="chip">${esc(q.difficulty)}</span>` : ''}
         <span class="q-timer" id="q-timer">0 sn</span>
       </div>
@@ -233,6 +263,13 @@ function paintResult(q, chosen, row, sched, ms) {
   next.innerHTML = `<button class="btn" data-act="next">${S.i + 1 >= S.questions.length ? 'Seansı bitir' : 'Sonraki soru'}</button>`;
   fb?.appendChild(next);
 
+  // Gizlenen ders adı cevaptan sonra açılır — hangi dersi ıskaladığını görmeden
+  // karma setin geri bildirimi eksik kalır.
+  if (S.hideSubject) {
+    const el = $('#q-subj');
+    if (el) el.textContent = subjectName(q.subjectId);
+  }
+
   $('#q-shell')?.classList.add('answered');
 
   // Telefonda çözüm şıkların ALTINA açılır; kullanıcı kendi kaydırmasın diye
@@ -308,6 +345,18 @@ function renderSummary(host) {
     <div class="wrap-read">
       <h1 class="page">Seans bitti</h1>
       <p class="page-sub">${esc(S.label)} · ${done.length} soru</p>
+      ${S.karmaMeta && S.karmaMeta.gaps && S.karmaMeta.gaps.length ? `
+        <div class="card" style="margin-bottom:1.25rem">
+          <div class="metric-k">Bu dersleri karma set taşıyamıyor</div>
+          <p class="hint" style="margin:.4rem 0 .6rem">
+            Havuzda yeterli soru yok, sınavda ise
+            ${S.karmaMeta.gaps.reduce((a, g) => a + g.examQ, 0)} soru ediyorlar.
+            Bunlar kâğıttan çalışılacak; uygulama sessizce atlamıyor.
+          </p>
+          <div class="chip-row">
+            ${S.karmaMeta.gaps.map(g => `<span class="chip amber">${esc(g.name)} · sınavda ${g.examQ}, havuzda ${g.pool}</span>`).join('')}
+          </div>
+        </div>` : ''}
 
       <div class="grid grid-3" style="margin-bottom:1.5rem">
         <div class="metric">
@@ -366,20 +415,20 @@ function syncPanelHTML() {
   const sent = S.pushState === 'ok';
   return `
     <div class="trap" style="margin-top:2rem" id="sync-panel">
-      <div class="lbl">HMGS Takip'e gönder</div>
-      <p style="margin-bottom:0.75rem">Bu seansın ders kırılımı çalışma kaydına yazılacak. İstersen bir not düş — nasıl geçtiğini sonra hatırlarsın.</p>
+      <div class="lbl">HMGS Takip'e Gönder</div>
+      <p style="margin-bottom:0.75rem">Bu seansın ders kırılımı çalışma kaydına yazılacak. İstersen bir not düş (nasıl geçtiğini sonra hatırlarsın).</p>
       <label style="display:block;font-size:0.82rem;font-weight:600;color:var(--ink-2);margin-bottom:0.3rem">
-        📝 Hissiyat Notu <span style="font-weight:400;opacity:.7">(nasıl geçti, zorluk, dikkat hataları…)</span>
+        Hissiyat Notu <span style="font-weight:400;opacity:.7">(nasıl geçti, zorluk, dikkat hataları…)</span>
       </label>
       <textarea id="sess-note" rows="3"
-        placeholder="Örn: Saat çok geçti, dikkat hatası yaptım — bilgi eksiği değil."
+        placeholder="Örn: Saat çok geçti, dikkat hatası yaptım (bilgi eksiği değil)."
         style="width:100%;padding:0.6rem 0.75rem;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:0.95rem;resize:vertical;background:var(--bg);color:inherit;margin-bottom:0.75rem"
         ${sent ? 'disabled' : ''}>${esc(S.note || '')}</textarea>
       <label style="display:block;font-size:0.82rem;font-weight:600;color:var(--ink-2);margin-bottom:0.3rem">
-        ✏️ Highlight / Çözüm Nüansı <span style="font-weight:400;opacity:.7">(öğrendiğin incelik, sık hata, çakılan konu…)</span>
+        Vurgu ve Çözüm Nüansı <span style="font-weight:400;opacity:.7">(öğrendiğin incelik, sık hata, takılınan konu…)</span>
       </label>
       <textarea id="sess-highlight" rows="3"
-        placeholder="Örn: Muris muvazaasında ispat yükü davalıda — Yargıtay HGK 2020."
+        placeholder="Örn: Muris muvazaasında ispat yükü davalıda; Yargıtay HGK 2020."
         style="width:100%;padding:0.6rem 0.75rem;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:0.95rem;resize:vertical;background:var(--bg);color:inherit"
         ${sent ? 'disabled' : ''}>${esc(S.highlights || '')}</textarea>
       <div class="btn-row" style="margin-top:0.75rem">
