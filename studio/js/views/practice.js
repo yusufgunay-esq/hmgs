@@ -100,7 +100,13 @@ function allQuestions() {
 }
 
 export function hasSession() { return !!S && S.i < S.questions.length; }
-export function endSession() { S = null; stopTick(); }
+export function endSession() {
+  S = null;
+  stopTick();
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.classList.remove('in-session');
+  }
+}
 
 /* ---------- render ---------- */
 
@@ -109,6 +115,9 @@ export function render() {
   if (!host) return;
 
   if (!S) {
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.remove('in-session');
+    }
     host.innerHTML = `<div class="wrap">${emptyState({
       icon: '◦',
       title: 'Açık bir seans yok',
@@ -129,7 +138,17 @@ export function render() {
     return;
   }
 
-  if (S.i >= S.questions.length) { renderSummary(host); return; }
+  if (S.i >= S.questions.length) {
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.remove('in-session');
+    }
+    renderSummary(host);
+    return;
+  }
+
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.classList.add('in-session');
+  }
 
   const q = S.questions[S.i];
   const { premise, ask } = splitStem(q.stem);
@@ -137,38 +156,59 @@ export function render() {
   const topic = q.topicId ? topicById.get(q.topicId) : null;
 
   host.innerHTML = `
-    <div class="wrap-read">
-      <div class="q-progress"><i style="width:${prog}%"></i></div>
-      <div class="q-head">
-        <span class="chip accent">${esc(S.label)}</span>
-        <span>${S.i + 1} / ${S.questions.length}</span>
-        <span id="q-subj">${S.hideSubject ? '<span class="hint">ders gizli</span>' : esc(subjectName(q.subjectId))}</span>
-        ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
-        ${q.difficulty && q.difficulty !== 'etiketsiz' ? `<span class="chip">${esc(q.difficulty)}</span>` : ''}
-        <span class="q-timer" id="q-timer">0 sn</span>
-      </div>
-    </div>
-
-    <div class="q-shell" id="q-shell">
-      <div class="q-main">
-        <div class="card">
-          ${premiseHTML(premise)}
-          <div class="q-ask">${rich(ask)}</div>
-          <div class="opts" id="opts">
-            ${q.options.map(o => optionRowHTML(o, { pickAct: 'pick' })).join('')}
+    <div class="q-screen">
+      <div class="q-strip">
+        <div class="q-strip-left">
+          <button class="btn btn-2 btn-s" data-act="quit" title="Seansı bitir">
+            <span class="q-quit-x">✕</span>
+            <span>Bitir</span>
+          </button>
+          <span class="q-strip-subj" id="q-subj">${S.hideSubject ? '<span class="hint">ders gizli</span>' : esc(subjectName(q.subjectId))}</span>
+          ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
+        </div>
+        <div class="q-strip-center">
+          <div class="q-progress-box">
+            <div class="q-progress-track"><div class="q-progress-bar" style="width:${prog}%"></div></div>
+            <span class="q-progress-count">${S.i + 1} / ${S.questions.length}</span>
           </div>
         </div>
-
-        <div class="btn-row" style="margin-top:1.25rem">
-          <button class="btn btn-2 btn-s" data-act="dontknow">Bilmiyorum · çözümü göster</button>
-          <button class="btn btn-2 btn-s" data-act="quit">Seansı bitir</button>
-          <span class="hint" style="margin-left:auto">
-            <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">Enter</span> devam
-          </span>
+        <div class="q-strip-right">
+          <span class="chip accent">${esc(S.label)}</span>
+          ${q.difficulty && q.difficulty !== 'etiketsiz' ? `<span class="chip">${esc(q.difficulty)}</span>` : ''}
+          <span class="q-timer" id="q-timer">0 sn</span>
+          <button class="icon-btn" data-act="toggle-font-size" title="Metin Boyutunu Değiştir" aria-label="Metin boyutu">
+            <span style="font-family:var(--sans);font-size:0.72rem;font-weight:700">A±</span>
+          </button>
+          <button class="icon-btn" data-act="toggle-theme" title="Karanlık / Aydınlık Tema" aria-label="Tema değiştir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
         </div>
-        ${topic ? `<p class="hint" style="margin-top:0.8rem">Bağlı konu: ${esc(topic.title)}</p>` : ''}
       </div>
-      <aside class="q-side"><div id="fb"></div></aside>
+
+      <div class="q-shell" id="q-shell">
+        <div class="q-main">
+          <div class="card q-card">
+            ${premiseHTML(premise)}
+            <div class="q-ask">${rich(ask)}</div>
+            <div class="opts" id="opts">
+              ${q.options.map(o => optionRowHTML(o, { pickAct: 'pick' })).join('')}
+            </div>
+          </div>
+
+          <div class="q-main-foot" id="q-actions">
+            <button class="btn btn-2 btn-s" data-act="dontknow">Bilmiyorum · çözümü göster</button>
+            <button class="btn btn-2 btn-s" data-act="ask-gemini" title="Kavramı ve soruyu Gemini için kopyala (G)">Gemini'ye Sor <span class="kbd">G</span></button>
+            <button class="btn btn-2 btn-s" data-act="quit">Seansı bitir</button>
+            <span class="hint">
+              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">G</span> Gemini · <span class="kbd">Enter</span> devam
+            </span>
+          </div>
+          ${topic ? `<p class="hint q-topic-hint">Bağlı konu: ${esc(topic.title)}</p>` : ''}
+        </div>
+        <aside class="q-side"><div id="fb"></div></aside>
+      </div>
     </div>`;
 
   S.answered = false;
@@ -246,6 +286,14 @@ function paintResult(q, chosen, row, sched, ms) {
 
   const fb = $('#fb');
   if (fb) {
+    const isLast = S.i + 1 >= S.questions.length;
+    const logicBtnHTML = row.ok ? `
+      <button class="btn btn-logic" data-act="next-logic" title="Mantıkla çözüldü olarak işaretle ve geç (M)">
+        <span>Mantıkla Geç</span>
+        <span class="kbd-hint">M</span>
+      </button>
+    ` : '';
+
     fb.innerHTML = `
       <div class="feedback ${row.ok ? 'ok' : 'no'}">
         <div class="fb-head">
@@ -259,27 +307,31 @@ function paintResult(q, chosen, row, sched, ms) {
         </div>
         <div class="fb-body">
           ${explanationHTML(q, chosen)}
+          ${q.legalBasis ? `<div class="fb-basis-wrap"><span class="basis">${esc(q.legalBasis)}</span></div>` : ''}
         </div>
-        <div class="fb-footer">
-          ${q.legalBasis ? `<span class="basis">${esc(q.legalBasis)}</span>` : ''}
-          <span class="srs-note">${esc(sched.note)}</span>
+        <div class="fb-actions">
+          <div class="btn-row">
+            <button class="btn" data-act="next">${isLast ? 'Seansı bitir' : 'Sonraki soru'}</button>
+            <button class="btn btn-2 btn-s" data-act="ask-gemini" title="Kavramı ve soruyu Gemini için kopyala (G)">Gemini'ye Sor <span class="kbd">G</span></button>
+            ${logicBtnHTML}
+          </div>
+          <div class="fb-actions-meta">
+            <span class="srs-note">${esc(sched.note)}</span>
+            <span class="hint"><span class="kbd">Enter</span> devam${row.ok ? ' · <span class="kbd">M</span> mantık' : ''} · <span class="kbd">G</span> Gemini</span>
+          </div>
         </div>
       </div>`;
   }
-  const next = document.createElement('div');
-  next.className = 'btn-row';
-  next.style.marginTop = '1.1rem';
-  const logicBtnHTML = row.ok ? `
-    <button class="btn btn-logic" data-act="next-logic" title="Mantıkla çözüldü olarak işaretle ve geç (M)">
-      <span>Mantıkla Geç</span>
-      <span class="kbd-hint">M</span>
-    </button>
-  ` : '';
-  next.innerHTML = `<button class="btn" data-act="next">${S.i + 1 >= S.questions.length ? 'Seansı bitir' : 'Sonraki soru'}</button>${logicBtnHTML}`;
-  fb?.appendChild(next);
 
-  // Gizlenen ders adı cevaptan sonra açılır — hangi dersi ıskaladığını görmeden
-  // karma setin geri bildirimi eksik kalır.
+  // Sol kontrol alanını cevaplanmış duruma göre senkronize et
+  const btnDontKnow = document.querySelector('#q-actions [data-act="dontknow"]');
+  if (btnDontKnow) btnDontKnow.style.display = 'none';
+  const qHint = document.querySelector('#q-actions .hint');
+  if (qHint) {
+    qHint.innerHTML = `<span class="kbd">Enter</span> sonraki soru${row.ok ? ' · <span class="kbd">M</span> mantıkla geç' : ''} · <span class="kbd">G</span> Gemini`;
+  }
+
+  // Gizlenen ders adı cevaptan sonra açılır
   if (S.hideSubject) {
     const el = $('#q-subj');
     if (el) el.textContent = subjectName(q.subjectId);
@@ -287,16 +339,20 @@ function paintResult(q, chosen, row, sched, ms) {
 
   $('#q-shell')?.classList.add('answered');
 
-  // Telefonda çözüm şıkların ALTINA açılır; kullanıcı kendi kaydırmasın diye
-  // oraya götürüyoruz. Masaüstünde çözüm zaten sağda beliriyor — orada
-  // kaydırmak yerine "Sonraki" düğmesine odaklanmak (Enter ile devam) doğru.
-  // matchMedia yoksa (smoke testin jsdom ortamı) masaüstü dalına düşer.
-  const darEkran = typeof window.matchMedia === 'function'
-    && window.matchMedia('(max-width: 760px)').matches;
+  // Çözüm alanlarının daima en baştan okunmasını sağla
+  const fbBody = fb?.querySelector('.fb-body');
+  if (fbBody) fbBody.scrollTop = 0;
+  const qSide = document.querySelector('.q-side');
+  if (qSide) qSide.scrollTop = 0;
+
+  // Geniş ekranda sessiz odakla, yarım ekran ve mobilde çözümü yumuşakça odakla
+  const darEkran = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(max-width: 1150px)').matches;
   if (darEkran) {
     requestAnimationFrame(() => fb?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   } else {
-    $('[data-act="next"]')?.focus();
+    if (typeof window !== 'undefined') window.scrollTo(0, 0);
+    $('[data-act="next"]')?.focus({ preventScroll: true });
   }
 }
 
@@ -836,3 +892,63 @@ function notifyLocalServerIfAny() {
     }).catch(() => {});
   } catch (_) {}
 }
+
+/**
+ * Mevcut soruyu, konuyu ve ilgili kanun maddesini Gemini masaüstü uygulamasına
+ * kolayca yapıştırmak üzere panoya aktarır ve yerel köprüyü tetikler.
+ */
+export function askGemini() {
+  if (!S || S.i >= S.questions.length) return;
+  const q = S.questions[S.i];
+  const topic = q.topicId ? topicById.get(q.topicId) : null;
+  const subj = subjectName(q.subjectId);
+  const topicTitle = topic ? topic.title : '';
+  const basis = q.legalBasis ? ` (${q.legalBasis})` : '';
+
+  const prompt = `HMGS Hukuk Sorusu Analizi:
+Ders: ${subj}
+Konu: ${topicTitle}${basis}
+Soru: ${q.stem.replace(/\\n+/g, ' ').trim()}
+
+Lütfen bu kavramı açıkla:
+1. Kurumun hukuki niteliği ve ilgili kanun maddesi
+2. Sistemin temel aktörleri ve aralarındaki hukuki ilişki
+3. Akılda kalıcı somut bir pratik olay (örnek vaka)
+4. Sınavda tuzak olarak kullanılan çeldirici ayrım`;
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(prompt).then(() => {
+      toast('Gemini istemi panoya kopyalandı! Sağ pencerede Ctrl+V yapın.');
+    }).catch(() => {
+      fallbackCopy(prompt);
+    });
+  } else {
+    fallbackCopy(prompt);
+  }
+
+  try {
+    fetch('/api/gemini-bridge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, activate: true })
+    }).catch(() => {});
+  } catch (_) {}
+}
+
+function fallbackCopy(text) {
+  if (typeof document === 'undefined') return;
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    toast('Gemini istemi panoya kopyalandı! Sağ pencerede Ctrl+V yapın.');
+  } catch (_) {
+    toast('İstem hazırlandı.');
+  }
+  document.body.removeChild(ta);
+}
+
