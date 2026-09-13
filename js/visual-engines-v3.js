@@ -22,6 +22,17 @@ window.HMGSV3 = (function () {
   --hv3-red:#E5484D;--hv3-red-soft:rgba(229,72,77,.09);--hv3-red-ink:#b02a2e;
   --hv3-amber:#D98A0B;--hv3-amber-soft:rgba(217,138,11,.10);--hv3-amber-ink:#8a5800;
   font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;color:var(--hv3-ink);animation:hv3fade .35s cubic-bezier(.22,.61,.36,1)}
+[data-theme="dark"] .hv3{--hv3-ink:#F4F4F5;--hv3-muted:#A1A1AA;--hv3-faint:#71717A;--hv3-line:rgba(255,255,255,.08);--hv3-line2:rgba(255,255,255,.16);
+  --hv3-surface:#121722;--hv3-raise:#181F2E;--hv3-accent:#6F7CE6;--hv3-accent-ink:#A7B1FB;--hv3-accent-soft:rgba(111,124,230,.14);
+  --hv3-green:#34D399;--hv3-green-soft:rgba(52,211,153,.14);--hv3-green-ink:#6ee7b7;
+  --hv3-red:#F87171;--hv3-red-soft:rgba(248,113,113,.14);--hv3-red-ink:#fca5a5;
+  --hv3-amber:#FBBF24;--hv3-amber-soft:rgba(251,191,36,.14);--hv3-amber-ink:#fde68a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hv3{
+  --hv3-ink:#F4F4F5;--hv3-muted:#A1A1AA;--hv3-faint:#71717A;--hv3-line:rgba(255,255,255,.08);--hv3-line2:rgba(255,255,255,.16);
+  --hv3-surface:#121722;--hv3-raise:#181F2E;--hv3-accent:#6F7CE6;--hv3-accent-ink:#A7B1FB;--hv3-accent-soft:rgba(111,124,230,.14);
+  --hv3-green:#34D399;--hv3-green-soft:rgba(52,211,153,.14);--hv3-green-ink:#6ee7b7;
+  --hv3-red:#F87171;--hv3-red-soft:rgba(248,113,113,.14);--hv3-red-ink:#fca5a5;
+  --hv3-amber:#FBBF24;--hv3-amber-soft:rgba(251,191,36,.14);--hv3-amber-ink:#fde68a}}
 @keyframes hv3fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 .hv3 .hv3-h{font-size:15px;color:var(--hv3-muted);margin-bottom:16px}
 .hv3 .hv3-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 2px;border-bottom:1px solid var(--hv3-line)}
