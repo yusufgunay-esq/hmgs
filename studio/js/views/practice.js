@@ -5,8 +5,8 @@
 
 import { esc, rich, richBlock, splitStem, fmtSec, emptyState, $, toast } from '../ui.js';
 import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions } from '../data.js';
-import { recordAnswer, save, saveSession, state, TARGET_SEC } from '../store.js';
-import { scheduleAfterAnswer, dueQuestions, unseenQuestions, buildKarmaSet } from '../engine.js';
+import { recordAnswer, markLastAnswerLogic, save, saveSession, state, TARGET_SEC } from '../store.js';
+import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
 
 let S = null;   // aktif seans
@@ -236,6 +236,14 @@ function paintResult(q, chosen, row, sched, ms) {
   const verdict = row.ok ? 'Doğru' : (chosen === null ? 'Boş bıraktın' : 'Yanlış');
   const icon = row.ok ? '✓' : (chosen === null ? '–' : '✕');
 
+  const logicBadgeHTML = row.ok ? `
+    <button class="badge-logic" data-act="toggle-logic" id="badge-logic" title="Mantıkla çözdüm / Konu eksik (M)">
+      <span class="badge-logic-dot"></span>
+      <span>Mantık</span>
+      <span class="kbd-hint">M</span>
+    </button>
+  ` : '';
+
   const fb = $('#fb');
   if (fb) {
     fb.innerHTML = `
@@ -246,6 +254,7 @@ function paintResult(q, chosen, row, sched, ms) {
             <div class="fb-verdict">${verdict}</div>
             <div class="fb-correct">Doğru şık: <b>${esc(q.correct)}</b></div>
           </div>
+          ${logicBadgeHTML}
           <span class="fb-time chip ${slow ? 'amber' : 'green'}">${fmtSec(sec)}${slow ? ` · hedef ${TARGET_SEC} sn` : ''}</span>
         </div>
         <div class="fb-body">
@@ -260,7 +269,13 @@ function paintResult(q, chosen, row, sched, ms) {
   const next = document.createElement('div');
   next.className = 'btn-row';
   next.style.marginTop = '1.1rem';
-  next.innerHTML = `<button class="btn" data-act="next">${S.i + 1 >= S.questions.length ? 'Seansı bitir' : 'Sonraki soru'}</button>`;
+  const logicBtnHTML = row.ok ? `
+    <button class="btn btn-logic" data-act="next-logic" title="Mantıkla çözüldü olarak işaretle ve geç (M)">
+      <span>Mantıkla Geç</span>
+      <span class="kbd-hint">M</span>
+    </button>
+  ` : '';
+  next.innerHTML = `<button class="btn" data-act="next">${S.i + 1 >= S.questions.length ? 'Seansı bitir' : 'Sonraki soru'}</button>${logicBtnHTML}`;
   fb?.appendChild(next);
 
   // Gizlenen ders adı cevaptan sonra açılır — hangi dersi ıskaladığını görmeden
@@ -319,6 +334,42 @@ export function next() {
   render();
 }
 
+export function isAnswered() {
+  return !!S && S.answered;
+}
+
+export function nextLogic() {
+  if (!S || !S.answered) return;
+  const q = S.questions[S.i];
+  const lastLog = S.log[S.log.length - 1];
+  if (lastLog && lastLog.ok) {
+    markLastAnswerLogic(true);
+    reScheduleAsLogic(q.id, true);
+    lastLog.logicGuess = true;
+    save();
+  }
+  next();
+}
+
+export function toggleLogic() {
+  if (!S || !S.answered) return;
+  const q = S.questions[S.i];
+  const lastLog = S.log[S.log.length - 1];
+  if (!lastLog || !lastLog.ok) return;
+
+  const newFlag = !lastLog.logicGuess;
+  markLastAnswerLogic(newFlag);
+  lastLog.logicGuess = newFlag;
+
+  const sched = newFlag ? reScheduleAsLogic(q.id, true) : scheduleAfterAnswer(q.id, true, false);
+  save();
+
+  const badge = $('#badge-logic');
+  if (badge) badge.classList.toggle('active', newFlag);
+  const srsNote = $('#fb .srs-note');
+  if (srsNote) srsNote.textContent = sched.note;
+}
+
 export function quit() {
   if (!S) return;
   S.i = S.questions.length;
@@ -340,6 +391,7 @@ function renderSummary(host) {
   const avg = secs.length ? secs.reduce((a, b) => a + b, 0) / secs.length : 0;
   const slowest = done.slice().sort((a, b) => b.ms - a.ms)[0];
   const wrongs = done.filter(r => !r.ok);
+  const logics = done.filter(r => r.logicGuess);
 
   host.innerHTML = `
     <div class="wrap-read">
@@ -371,12 +423,12 @@ function renderSummary(host) {
         </div>
         <div class="metric">
           <div class="metric-k">Tekrar sırasına giren</div>
-          <div class="metric-v">${wrongs.length}</div>
-          <div class="metric-n">yarın yeniden sorulacak</div>
+          <div class="metric-v">${wrongs.length + logics.length}</div>
+          <div class="metric-n">${wrongs.length} yanlış${logics.length ? `, ${logics.length} mantık` : ''}</div>
         </div>
       </div>
 
-      ${avg > TARGET_SEC ? `<div class="trap"><div class="lbl">Hız notu</div><p>Ortalaman hedefin üstünde. Sınavda 120 soru için soru başına ortalama 75 saniyen var — doğruluk yerleştiyse bundan sonraki iş hızı düşürmek.</p></div>` : ''}
+      ${avg > TARGET_SEC ? `<div class="trap"><div class="lbl">Hız notu</div><p>Ortalaman hedefin üstünde. Sınavda 120 soru için soru başına ortalama 75 saniyen var; doğruluk yerleştiyse bundan sonraki iş hızı düşürmek.</p></div>` : ''}
       ${slowest && slowest.ms / 1000 > TARGET_SEC * 2 ? `<p class="hint">En uzun süren soru: ${esc(slowest.qId)} · ${fmtSec(slowest.ms / 1000)}</p>` : ''}
 
       ${wrongs.length ? `
@@ -394,6 +446,23 @@ function renderSummary(host) {
             </div>
           </div>`;
         }).join('')}` : ''}
+
+      ${logics.length ? `
+        <div class="section-label">Mantıkla çözülenler (Teorik Açıklar)</div>
+        ${logics.map(r => {
+          const q = S.questions.find(x => x.id === r.qId);
+          const t = q?.topicId ? topicById.get(q.topicId) : null;
+          return `<div class="subj" style="border-left: 3px solid var(--warn)">
+            <div>
+              <div class="subj-name">${esc((q?.stem || '').slice(0, 95))}${(q?.stem || '').length > 95 ? '…' : ''}</div>
+              <div class="subj-meta">${esc(subjectName(q?.subjectId))}${t ? ' · ' + esc(t.title) : ' · konuya bağlı değil'} · <span style="color:var(--warn);font-weight:600">Mantıkla Geçildi</span></div>
+            </div>
+            <div class="subj-right">
+              ${t ? `<button class="btn btn-2 btn-s" data-act="go-flow-topic" data-topic="${esc(t.id)}">Konuyu oku</button>` : ''}
+            </div>
+          </div>`;
+        }).join('')}` : ''}
+
 
       ${syncPanelHTML()}
 
@@ -756,10 +825,14 @@ function notifyLocalServerIfAny() {
   if (!isLocal) return;
 
   try {
+    const s = state();
     fetch('/api/save-sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessions: state().sessions })
+      body: JSON.stringify({
+        sessions: s.sessions || [],
+        answers: (s.answers || []).slice(-2000)
+      })
     }).catch(() => {});
   } catch (_) {}
 }
