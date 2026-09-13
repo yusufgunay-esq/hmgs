@@ -241,10 +241,10 @@ function katalogHTML() {
         ${hepsi.n ? `Şu ana kadar ${hepsi.n} hücre, %${Math.round(hepsi.ok / hepsi.n * 100)} doğru.` : ''}
       </div>
 
-      <h3 style="margin-top:1.5rem;font-size:1.1rem;font-weight:700;color:var(--ink);">🔁 Notlarından Tekrar (canlı, Takip uygulamasından)</h3>
+      <h3 style="margin-top:1.5rem;font-size:1.1rem;font-weight:700;color:var(--ink);">Notlarından Tekrar (canlı, Takip uygulamasından)</h3>
       ${notesReviewSectionHTML()}
 
-      <h3 style="margin-top:2rem;font-size:1.1rem;font-weight:700;color:var(--ink);">🚀 Dinamik Mevzuat Üreteçleri</h3>
+      <h3 style="margin-top:2rem;font-size:1.1rem;font-weight:700;color:var(--ink);">Dinamik Mevzuat Üreteçleri</h3>
       <div class="grid grid-2" style="margin-top:0.75rem">
         ${GENERATORS.map(g => {
           const st = drillStats(g.id);
@@ -298,14 +298,14 @@ function renderGeneratorView(host) {
         <button class="btn btn-2 btn-s" id="btn-pratik-geri">‹ Pratik alanı</button>
         <span class="chip">${esc(cur.gen.basis)}</span>
         ${st.n ? `<span class="chip">${st.ok}/${st.n} · %${Math.round(st.ok / st.n * 100)}</span>` : ''}
-        ${cur.sonsuz ? `<span class="chip ${cur.seri >= 3 ? 'green' : ''}">🔥 seri ${cur.seri}${cur.enIyiSeri > cur.seri ? ` · en iyi ${cur.enIyiSeri}` : ''}</span>` : ''}
+        ${cur.sonsuz ? `<span class="chip ${cur.seri >= 3 ? 'green' : ''}">Seri: ${cur.seri}${cur.enIyiSeri > cur.seri ? ` · en iyi ${cur.enIyiSeri}` : ''}</span>` : ''}
         <span style="margin-left:auto"></span>
         <button class="btn" id="btn-pratik-yeni">Yeni vaka →</button>
       </div>
 
       <h2>${esc(cur.sonsuz ? 'Sonsuz mod' : cur.gen.title)}</h2>
       <div class="basisline">
-        Vaka #${cur.seed} · ${esc(cur.pkg.baslik || '')} · ${esc(cur.gen.title)} — bu oturumda ${cur.sayac} vaka
+        Vaka #${cur.seed} · ${esc(cur.pkg.baslik || '')} · ${esc(cur.gen.title)} (bu oturumda ${cur.sayac} vaka)
       </div>
 
       <div id="pratik-panels"></div>
@@ -341,21 +341,21 @@ function renderNotesSubjectView(host) {
         <span class="chip">${data.items.length} kavram/not</span>
       </div>
 
-      <h2>${esc(subj)} — Notlarından Tekrar</h2>
+      <h2>${esc(subj)}: Notlarından Tekrar</h2>
       <div class="basisline">
         Bu liste Takip uygulamandaki gerçek kayıtlardan geliyor. "N. kez" rozeti aynı kavramın
-        farklı günlerde yine yanlış/takıldığın listesine girdiğini gösterir — projenin kendi kuralına göre
-        bu, ham yanlış sayısından daha güçlü bir zayıflık sinyalidir. Kartın içeriği bilerek boş: doğru
+        farklı günlerde yine yanlış/takıldığın listesine girdiğini gösterir (projenin kendi kuralına göre
+        bu, ham yanlış sayısından daha güçlü bir zayıflık sinyalidir). Kartın içeriği bilerek boş: doğru
         cevabı kendi hafızandan veya kitaptan hatırlamaya çalış.
       </div>
 
       <div class="grid grid-2" style="margin-top:1rem">
         ${data.items.map(it => `
           <div class="card" style="text-align:left;">
-            <div class="pk-t" style="font-weight:700;">${esc(it.term)}${it.open ? ' <span class="chip amber">❓ açık soru</span>' : ''}</div>
+            <div class="pk-t" style="font-weight:700;">${esc(it.term)}${it.open ? ' <span class="chip amber">Açık soru</span>' : ''}</div>
             <div class="pk-m" style="margin-top:0.35rem;">
               ${it.count >= 2 ? `<span class="chip red">${it.count}. kez</span> ` : ''}
-              ${it.pages.length ? `<span class="chip">📖 ${it.pages.map(esc).join(', ')}</span> ` : ''}
+              ${it.pages.length ? `<span class="chip">Sayfa: ${it.pages.map(esc).join(', ')}</span> ` : ''}
               ${it.topics.length ? esc(it.topics.join(', ')) : ''}
             </div>
           </div>
