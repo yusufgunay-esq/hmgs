@@ -9,7 +9,7 @@
 
 import { $, $$, toast } from './ui.js';
 import { initData, initDataAsync, populateData, topicById, questionById } from './data.js';
-import { load, save, daysLeft, state } from './store.js';
+import { load, save, daysLeft, state, getSettings, updateSettings } from './store.js';
 import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress } from './vault-client.js';
 
 
@@ -25,6 +25,40 @@ import * as pratik from './views/pratik.js';
 const VIEWS = ['today', 'odevler', 'flow', 'practice', 'pratik', 'exam', 'progress'];
 let currentView = 'today';
 let lastAction = null;
+
+/* ---------- tema ve yazı boyutu yönetimi ---------- */
+
+export function applyTheme(theme) {
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+
+  const meta = $('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', isDark ? '#0B0E14' : '#FAF9F6');
+
+  const icon = $('#themeIcon');
+  if (icon) {
+    if (isDark) {
+      icon.innerHTML = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+    } else {
+      icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+    }
+  }
+}
+
+export function applyFontSize(fontSize) {
+  if (fontSize === 'large') {
+    document.documentElement.setAttribute('data-font-size', 'large');
+  } else {
+    document.documentElement.removeAttribute('data-font-size');
+  }
+}
+
+try {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const s = getSettings();
+    if (s.theme === 'system') applyTheme('system');
+  });
+} catch (e) {}
 
 /* ---------- yönlendirme ---------- */
 
@@ -94,6 +128,22 @@ document.addEventListener('click', async e => {
   e.preventDefault();
 
   switch (act) {
+    /* --- tema ve görünüm --- */
+    case 'toggle-theme': {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const next = isDark ? 'light' : 'dark';
+      updateSettings({ theme: next });
+      applyTheme(next);
+      break;
+    }
+    case 'toggle-font-size': {
+      const isLarge = document.documentElement.getAttribute('data-font-size') === 'large';
+      const next = isLarge ? 'normal' : 'large';
+      updateSettings({ fontSize: next });
+      applyFontSize(next);
+      break;
+    }
+
     /* --- gezinme --- */
     case 'go-today':   show('today'); break;
     case 'go-exam':    show('exam'); break;
@@ -168,6 +218,12 @@ document.addEventListener('click', async e => {
     }
     case 'practice-pastexam':
       if (practice.startSession({ mode: 'pastExam', count: 999 })) show('practice');
+      break;
+    case 'practice-core-karma':
+      if (practice.startSession({ mode: 'karma', count: 20, targetScope: 'core', customLabel: 'HMGS Çekirdek Karma' })) show('practice');
+      break;
+    case 'practice-all-karma':
+      if (practice.startSession({ mode: 'karma', count: 20, targetScope: 'all', customLabel: 'Tüm Havuz Karma (İleri Dahil)' })) show('practice');
       break;
 
     /* --- akış --- */
@@ -319,7 +375,13 @@ function renderDriveConnectScreen() {
   host.innerHTML = `
     <div class="wrap" style="padding:4rem 1rem;max-width:380px;margin:0 auto">
       <div class="card" style="text-align:center;padding:2.5rem 1.5rem">
-        <div style="font-size:2.2rem;margin-bottom:0.75rem">⚖️</div>
+        <div style="display:flex;justify-content:center;margin-bottom:1rem">
+          <div style="width:48px;height:48px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center">
+            <svg style="width:24px;height:24px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+            </svg>
+          </div>
+        </div>
         <h2 style="font-size:1.25rem;font-weight:700;color:var(--ink);margin-bottom:0.5rem">
           HMGS Stüdyo
         </h2>
@@ -342,6 +404,10 @@ async function boot() {
   window.__STUDIO_LOADED__ = true;
   try {
     load();
+    const curSettings = getSettings();
+    applyTheme(curSettings.theme || 'system');
+    applyFontSize(curSettings.fontSize || 'normal');
+
     const rep = await initDataAsync();
 
     const d = daysLeft();
