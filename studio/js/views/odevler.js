@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    views/odevler.js — KOÇ GÖREVLERİ & ÖDEVLER SEKMESİ
    Yapay Zeka Koç'un atadığı ödevleri canlı çeker (/api/claude-tasks) ve
    ödev kartından doğrudan Stüdyo Soru Testi (practice) veya Mevzuat/Not
@@ -22,11 +22,14 @@
 
 import { esc, $ } from '../ui.js';
 import { SUBJECTS, SUBJECT_BY_ID, subjectName, topicById, topicsOf, questionsOfTopic, questionsOfTopics, questionsOf } from '../data.js';
+import { getDailyPlan, setDailyPlan } from '../store.js';
 import { GENERATORS } from './pratik.js';
+import * as todayView from './today.js';
 
 let tasksCache = null;
 let tasksLoading = false;
 let tasksErr = null;
+let planSource = '';
 
 /* --------------------------------------------------------------------------
    ŞEMA ÇÖZÜMLEME
@@ -136,6 +139,49 @@ function resolveGeneratorId(t) {
 }
 
 /* --------------------------------------------------------------------------
+   GÜNLÜK HEDEF — KOÇ PLANINDAN
+   -------------------------------------------------------------------------- */
+
+/**
+ * Görev başlığı koç tarafından "... (s.7-10 · 5 soru)" biçiminde yazılır.
+ * Stüdyo'da çözülecek toplam soru bu sayıların toplamıdır; okuma görevlerinde
+ * ("· okuma") soru yoktur, yalnız fiziki kitapta okunur.
+ * Başlıkta sayı yoksa görev Stüdyo soru yükü sayılmaz — tahmin edilmez.
+ */
+function plannedQuestions(tasks) {
+  let questions = 0, quizTasks = 0, readingTasks = 0, counted = 0;
+
+  for (const t of tasks) {
+    const type = resolveType(t);
+    const m = String(t.title || '').match(/·\s*(\d+)\s*soru\b/);
+
+    if (type === 'review') { readingTasks++; continue; }
+    if (!m) { readingTasks++; continue; }
+    const n = Number(m[1]);
+    if (!Number.isFinite(n) || n <= 0) { readingTasks++; continue; }
+    questions += n;
+    quizTasks++;
+    counted++;
+  }
+
+  return { questions, quizTasks, readingTasks, totalTasks: tasks.length, counted };
+}
+
+/** Çekilen görevlerden bugünün planını yazar; hedef böylece tek kaynağa bağlanır. */
+function publishPlan(tasks, source) {
+  const p = plannedQuestions(tasks);
+  if (!p.questions) return;   // okuma günü: Stüdyo soru hedefi yok, taban geçerli
+  const before = getDailyPlan();
+  setDailyPlan({ ...p, source });
+  // Hedef değiştiyse Bugün ekranı eski sayıyla kalmasın.
+  if (!before || before.questions !== p.questions) renderToday();
+}
+
+function renderToday() {
+  try { todayView.render(); } catch (e) { console.warn('[odevler] today.render hatası:', e.message); }
+}
+
+/* --------------------------------------------------------------------------
    VERİ
    -------------------------------------------------------------------------- */
 
@@ -167,6 +213,7 @@ export async function fetchTasks(force) {
         if (data && Array.isArray(data.tasks)) {
           tasksCache = data.tasks;
           loaded = true;
+          planSource = url;
           break;
         }
       }
@@ -178,6 +225,8 @@ export async function fetchTasks(force) {
   if (!loaded) {
     tasksErr = lastErr || 'Ödev dosyasına ulaşılamadı';
     console.warn('[odevler] claude-tasks yüklenemedi:', tasksErr);
+  } else {
+    publishPlan(tasksCache, planSource);
   }
 
   tasksLoading = false;
