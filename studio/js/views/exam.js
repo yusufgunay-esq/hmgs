@@ -1,10 +1,10 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    views/exam.js — 120 SORULUK SINAV SİMÜLASYONU
    Gerçek ders dağılımı · geri sayım · boş bırakma · soru haritası
    Kural: HMGS'de yanlış cezası yoktur → net = doğru. Asla boş bırakma.
    ========================================================================== */
 
-import { esc, rich, splitStem, fmtClock, emptyState, $, toast } from '../ui.js';
+import { esc, rich, richBlock, splitStem, fmtClock, emptyState, $, toast } from '../ui.js';
 import { buildExamSet, subjectName, SUBJECTS, topicById, pastExamList, pastExamQuestions } from '../data.js';
 import { recordAnswer, save, saveExam, state, EXAM_TOTAL, PASS_CORRECT } from '../store.js';
 import { scheduleAfterAnswer, scoreOf } from '../engine.js';
@@ -271,6 +271,28 @@ export function finish(auto = false) {
 
   const total = E.questions.length;
   const sc = scoreOf(correct, total);
+
+  // Yanlış ve boş soruların dökümü sonuç ekranına gömülür. Önceden yalnız
+  // sayaç ve ders kırılımı basılıyordu: 120 soruluk denemeden sonra tek bir
+  // yanlışı okumak için ayrı seans başlatmak gerekiyordu. Soru nesnesinin
+  // tamamı değil, ekranda gösterilecek alanlar saklanır.
+  const misses = [];
+  E.questions.forEach((q, i) => {
+    const chosen = E.answers[i];
+    if (chosen === q.correct) return;
+    misses.push({
+      qId: q.id,
+      subjectId: q.subjectId,
+      topicId: q.topicId || null,
+      stem: q.stem,
+      options: Array.isArray(q.options) ? q.options : [],
+      correct: q.correct,
+      chosen: chosen === null ? null : chosen,
+      explanation: q.explanation || '',
+      legalBasis: q.legalBasis || ''
+    });
+  });
+
   const result = {
     at: new Date().toISOString(),
     label: E.label,
@@ -285,6 +307,7 @@ export function finish(auto = false) {
     bySubject,
     byTopic,
     shortfall: E.shortfall,
+    misses,
     wrongIds: E.questions.filter((q, i) => E.answers[i] !== q.correct).map(q => q.id)
   };
 
@@ -351,12 +374,73 @@ function resultBlock(r, compact) {
 
       ${topicBreakdownHTML(r)}
 
+      ${missesHTML(r)}
+
       <div class="btn-row" style="margin-top:1.5rem">
         <button class="btn" data-act="go-today">Bugün ekranına dön</button>
-        <button class="btn btn-2" data-act="exam-review-wrong">Yanlışları hemen çöz (${r.wrongIds.length})</button>
+        <button class="btn btn-2" data-act="exam-review-wrong">Yanlış ve boşları hemen çöz (${r.wrongIds.length})</button>
         <button class="btn btn-2" data-act="exam-export-stats" style="background:var(--accent);color:#fff;font-weight:700">Takip Uygulamasına Aktar (Kopyala)</button>
       </div>
     </div>`;
+}
+
+/**
+ * Denemedeki yanlış ve boş soruların dökümü — kök, şıklar, senin işaretlediğin,
+ * doğru şık ve uygulamanın açıklaması. Amaç: 120 soruluk denemeden çıkıp
+ * "neyi neden kaçırdım" sorusunu tek ekranda cevaplayabilmek.
+ *
+ * Uzun dökümlerde (120 soruluk denemede 40+ yanlış olabilir) liste <details>
+ * içinde katlanır; ekran ilk açılışta yine özet kalır.
+ */
+function missesHTML(r) {
+  const rows = r.misses || [];
+  if (!rows.length) {
+    return `<div class="section-label">Yanlışların · tek tek</div>
+      <p style="font-size:0.9rem;color:var(--ink-2)">Bu denemede yanlışın veya boşun yok.</p>`;
+  }
+
+  const cards = rows.map((m, idx) => {
+    const topic = m.topicId ? topicById.get(m.topicId) : null;
+    const secim = m.chosen
+      ? `<b style="color:var(--no)">${esc(m.chosen)}</b>) ${esc(textOfOpt(m, m.chosen))}`
+      : '<b style="color:var(--warn)">boş bıraktın</b>';
+    return `<div class="card" style="margin-top:0.75rem;border-left:4px solid ${m.chosen ? 'var(--no)' : 'var(--warn)'}">
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.4rem">
+        <span class="chip">${idx + 1}. ${esc(subjectName(m.subjectId))}</span>
+        ${topic ? `<span class="chip" style="background:var(--accent-soft);color:var(--accent-ink);border:1px solid var(--line)">${esc(topic.title)}</span>` : ''}
+        <span class="chip ${m.chosen ? 'red' : 'amber'}">${m.chosen ? 'yanlış' : 'boş'}</span>
+      </div>
+      <div class="q-ask" style="font-size:0.92rem;font-weight:600">${rich(m.stem)}</div>
+      <div class="opts" style="margin-top:0.6rem">
+        ${m.options.map(o => {
+          const cls = o.key === m.correct ? 'done reveal' : (o.key === m.chosen ? 'done pick-no' : 'done dim');
+          return `<div class="opt-row"><div class="opt ${cls}">
+            <span class="opt-k">${esc(o.key)}</span>
+            <span class="opt-txt">${rich(o.text)}</span>
+          </div></div>`;
+        }).join('')}
+      </div>
+      <div style="font-size:0.85rem;color:var(--ink-2);margin-top:0.6rem">Senin işaretlediğin: ${secim}</div>
+      <div style="font-size:0.85rem;color:var(--ink);margin-top:0.35rem">Doğru şık: <b>${esc(m.correct)}</b>) ${esc(textOfOpt(m, m.correct))}</div>
+      ${m.explanation ? `<div class="fb-body" style="margin-top:0.7rem">${richBlock(m.explanation)}</div>` : ''}
+      ${m.legalBasis ? `<div class="fb-basis-wrap"><span class="basis">${esc(m.legalBasis)}</span></div>` : ''}
+    </div>`;
+  }).join('');
+
+  const katlanmis = rows.length > 8
+    ? `<details style="margin-top:0.75rem"><summary style="cursor:pointer;font-size:0.9rem;color:var(--ink-2)">${rows.length} sorunun tamamını aç</summary>${cards}</details>`
+    : `<div style="margin-top:0.5rem">${cards}</div>`;
+
+  return `<div class="section-label">Yanlışların · tek tek açıklamasıyla</div>
+    <p style="font-size:0.85rem;color:var(--ink-2)">Aynı soruyu Stüdyo'da bir daha çözmeden de buradan okuyabilirsin${
+      rows.length > 8 ? `; ${rows.length} kaydın tamamı aşağıda katlı duruyor` : ''}.</p>
+    ${katlanmis}`;
+}
+
+/** Dökümü saklanan soru kaydından şık metnini çözer. */
+function textOfOpt(m, key) {
+  const o = (m.options || []).find(x => x.key === key);
+  return o ? String(o.text || '').trim() : '';
 }
 
 /**
