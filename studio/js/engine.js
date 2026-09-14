@@ -1,4 +1,4 @@
-/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+﻿/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
    رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
    ==========================================================================
@@ -10,7 +10,7 @@
    Hepsi store.js'teki ham cevap günlüğünden beslenir.
    ========================================================================== */
 
-import { state, TARGET_SEC, PASS_CORRECT, daysLeft, answersToday, lastExam } from './store.js';
+import { state, TARGET_SEC, PASS_CORRECT, daysLeft, answersToday, lastExam, todayKey } from './store.js';
 import { SUBJECTS, questionsOf, questionById, topicsOf, topicById, questionsOfTopic, shuffle } from './data.js';
 
 /* ==========================================================================
@@ -215,22 +215,43 @@ export function bleedingTags(limit = 8) {
      5. Bakım dozu              (her şey yeşilse hızı koru)
    ========================================================================== */
 
-export function dailyTarget() {
+/**
+ * Bugün Stüdyo'da çözülmesi gereken soru sayısı.
+ *
+ * TEK KAYNAK İLKESİ: koç bugün için ödev atadıysa (odevler.js → setDailyPlan)
+ * hedef o planın Stüdyo'da çözülecek soru toplamıdır. Koçun taahhüdü
+ * (günde 200 soru) ekranda bir hedef gibi gösterilemez: o taahhüdün bir kısmı
+ * fiziki kitapta kağıda çözülüyor ve Stüdyo o kısmı göremiyor. Plan yoksa
+ * Stüdyo kendi ölçekli tabanına düşer — uydurma bir sayı gösterilmez.
+ *
+ * @returns {{value:number, source:'plan'|'base', plan:object|null}}
+ */
+export function dailyTargetInfo() {
   const S = state();
+  const plan = S.plan && S.plan.date === todayKey() && S.plan.questions > 0 ? S.plan : null;
+  if (plan) return { value: plan.questions, source: 'plan', plan };
+
   const d = daysLeft();
   const base = S.settings.dailyTarget || 40;
-  if (d <= 7) return Math.round(base * 1.5);   // son hafta: yoğunlaş
-  if (d <= 21) return Math.round(base * 1.25);
-  return base;
+  if (d <= 7) return { value: Math.round(base * 1.5), source: 'base', plan: null };
+  if (d <= 21) return { value: Math.round(base * 1.25), source: 'base', plan: null };
+  return { value: base, source: 'base', plan: null };
+}
+
+export function dailyTarget() {
+  return dailyTargetInfo().value;
 }
 
 export function todayProgress() {
   const rows = answersToday();
-  const target = dailyTarget();
+  const info = dailyTargetInfo();
+  const target = info.value;
   return {
     solved: rows.length,
     correct: rows.filter(r => r.ok).length,
     target,
+    targetSource: info.source,
+    plan: info.plan,
     pct: Math.min(100, Math.round((rows.length / target) * 100))
   };
 }
