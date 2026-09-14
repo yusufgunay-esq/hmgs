@@ -1,4 +1,4 @@
-/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+﻿/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
    رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
    ==========================================================================
@@ -123,7 +123,13 @@ function runAction(a) {
 /* ---------- tek olay dinleyici ---------- */
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-act], [data-view]');
+  // `:not(body)` ŞART: show() görünüm adını <body data-view="…"> üzerine de yazar
+  // (CSS kancası). Bu nitelik seçiciye takılırsa, soru/çözüm ekranında etkileşimsiz
+  // bir alana (açıklama metni, boşluk) yapılan HER tıklama closest() ile body'yi
+  // bulur, show(aynı görünüm) → render() çalışır. practice.js render() içinde
+  // S.answered=false ve S.qStart=performance.now() yaptığı için sonuç: cevap
+  // silinir, soru geri gelir ve süre ölçümü sıfırlanır (exam.js'te E.qStart aynı).
+  const el = e.target.closest('[data-act], [data-view]:not(body)');
 
   if (!el) return;
 
@@ -288,8 +294,9 @@ document.addEventListener('click', async e => {
     case 'exam-review-wrong': {
       const ids = exam.wrongIdsOfLast();
       const qs = ids.map(id => questionById.get(id)).filter(Boolean);
-      if (!qs.length) { toast('Yanlış soru yok.'); break; }
-      if (practice.startSession({ mode: 'review', count: qs.length })) { show('practice'); break; }
+      if (!qs.length) { toast('Son denemede yanlış veya boş soru yok.'); break; }
+      const ok = practice.startSession({ questions: qs, customLabel: `Deneme yanlışları · ${qs.length} soru` });
+      if (ok) { show('practice'); break; }
       toast('Tekrar seansı kurulamadı.');
       break;
     }
