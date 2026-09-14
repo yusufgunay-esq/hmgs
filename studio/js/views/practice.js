@@ -1,9 +1,9 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    views/practice.js — SÜRE ÖLÇEN SORU MOTORU
    Her cevap telemetriye yazılır, SRS'e işlenir. Süre ölçümü pazarlıksızdır.
    ========================================================================== */
 
-import { esc, rich, richBlock, splitStem, fmtSec, emptyState, $, toast } from '../ui.js';
+import { esc, rich, richBlock, splitStem, fmtSec, emptyState, groupLegalRefs, $, toast } from '../ui.js';
 import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions } from '../data.js';
 import { recordAnswer, markLastAnswerLogic, save, saveSession, state, TARGET_SEC } from '../store.js';
 import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet } from '../engine.js';
@@ -14,13 +14,23 @@ let tick = null;
 
 /** Seans kur. opts: { mode, subjectId, topicId, topicIds, count, customLabel, targetScope } */
 export function startSession(opts = {}) {
-  const { mode = 'mixed', subjectId = null, topicId = null, topicIds = null, count = 15, customLabel = null, targetScope = 'core' } = opts;
+  const { mode = 'mixed', subjectId = null, topicId = null, topicIds = null, count = 15, customLabel = null, targetScope = 'core', questions = null } = opts;
   let pool = [];
   let label = '';
 
   let karmaMeta = null;
 
-  if (mode === 'karma') {
+  // Hazır havuz: çağıran taraf soruları zaten seçmişse (örn. deneme sonucundaki
+  // yanlışlar) havuz kurallarına hiç girilmez. Aksi halde "yanlışları çöz"
+  // butonu, vadesi gelmiş tekrarları çözerdi — etiket ile davranış ayrışırdı.
+  // Boş dizi "verilmemiş" sayılmaz: çağıran açıkça "bu sorular" dediyse ve liste
+  // boşsa sessizce tüm havuza düşmek yerine seans kurulmaz.
+  const explicit = Array.isArray(questions) ? questions.slice() : null;
+
+  if (explicit) {
+    pool = explicit;
+    label = customLabel || 'Seçili sorular';
+  } else if (mode === 'karma') {
     // Sınav biçimli harmanlanmış set: ders payı ölçülmüş sınav dağılımından
     const built = buildKarmaSet(count, targetScope);
     pool = built.questions;
@@ -83,7 +93,9 @@ export function startSession(opts = {}) {
 
   S = {
     mode, label, count, subjectId, topicId, karmaMeta, hideSubject, targetScope,
-    questions: pool.slice(0, Math.max(1, count)),
+    // Explicit havuz verildiğinde count kesme uygulanmaz: çağıran kaç soruyu
+    // kastettiğini havuzun kendisiyle söylemiştir.
+    questions: explicit ? pool : pool.slice(0, Math.max(1, count)),
     i: 0,
     answered: false,
     startedAt: performance.now(),
@@ -199,7 +211,7 @@ export function render() {
 
           <div class="q-main-foot" id="q-actions">
             <button class="btn btn-2 btn-s" data-act="dontknow">Bilmiyorum · çözümü göster</button>
-            <button class="btn btn-2 btn-s" data-act="ask-gemini" title="Kavramı ve soruyu Gemini için kopyala (G)">Gemini'ye Sor <span class="kbd">G</span></button>
+            <button class="btn btn-2 btn-s" data-act="ask-gemini" title="Soruyu ve beş şıkkı ipucu istemi olarak kopyalar — doğru şık gönderilmez (G)">İpucu İste <span class="kbd">G</span></button>
             <button class="btn btn-2 btn-s" data-act="quit">Seansı bitir</button>
             <span class="hint">
               <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">G</span> Gemini · <span class="kbd">Enter</span> devam
@@ -294,6 +306,15 @@ function paintResult(q, chosen, row, sched, ms) {
       </button>
     ` : '';
 
+    // Buton metni gönderilecek istemi söyler: cevap öncesi ipucu, sonrası analiz.
+    // Üç ayrı sonuç durumu için üç ayrı metin — hepsi doğru şıkkı ve uygulama
+    // açıklamasını isteme koyar, yalnız istenen soru değişir.
+    const geminiBtnHTML = chosen === null
+      ? `<button class="btn btn-2 btn-s" data-act="ask-gemini" title="Boş bıraktığın soruyu, doğru şıkkı ve uygulama açıklamasını analiz istemi olarak kopyalar (G)">Boşu Analiz Et <span class="kbd">G</span></button>`
+      : row.ok
+        ? `<button class="btn btn-2 btn-s" data-act="ask-gemini" title="Doğru şıkkı, diğer şıkların tuzağını ve uygulama açıklamasını sağlama istemi olarak kopyalar (G)">Sağlamasını Yap <span class="kbd">G</span></button>`
+        : `<button class="btn btn-2 btn-s" data-act="ask-gemini" title="Seçtiğin şık, doğru şık ve uygulama açıklaması analiz istemi olarak kopyalanır (G)">Yanlışı Analiz Et <span class="kbd">G</span></button>`;
+
     fb.innerHTML = `
       <div class="feedback ${row.ok ? 'ok' : 'no'}">
         <div class="fb-head">
@@ -312,7 +333,7 @@ function paintResult(q, chosen, row, sched, ms) {
         <div class="fb-actions">
           <div class="btn-row">
             <button class="btn" data-act="next">${isLast ? 'Seansı bitir' : 'Sonraki soru'}</button>
-            <button class="btn btn-2 btn-s" data-act="ask-gemini" title="Kavramı ve soruyu Gemini için kopyala (G)">Gemini'ye Sor <span class="kbd">G</span></button>
+            ${geminiBtnHTML}
             ${logicBtnHTML}
           </div>
           <div class="fb-actions-meta">
@@ -602,11 +623,12 @@ export async function pushSession() {
     total: S.questions ? S.questions.length : 0
   };
 
-  // 1. Tarayıcı içi Takip kuyruğuna yaz (aynı origin / GitHub Pages anında görür)
+  // 1. Tarayıcı içi Takip kuyruğuna yaz (aynı origin'de Takip anında görür)
   queueSessionForTakip(targetSess);
 
-  // 2. Varsa yerel sunucuya arka planda sessizce haber ver
-  notifyLocalServerIfAny();
+  // 2. PC'de yerel Stüdyo sunucusu varsa seansı diske yazıp Drive kuyruğuna taşıt.
+  //    Bu çağrı GERÇEK sonucu döndürür (sunucu sessions-push'u bizim için koşturur).
+  const localPush = await pushToLocalServer();
 
   // 3. Tarayıcıda aktif Google Drive oturumu varsa doğrudan Drive'a yaz
   let driveSynced = false;
@@ -614,14 +636,21 @@ export async function pushSession() {
     driveSynced = await pushSessionToDriveDirectly(targetSess);
   } catch (_) {}
 
-  S.pushState = 'ok';
-  if (driveSynced) {
-    S.pushMsg = 'Takip uygulamasına ve Google Drive bulutuna aktarıldı.';
+  // Dürüst durum: "Gönderildi ✓" YALNIZCA Drive'a gerçekten ulaşıldığında yazılır.
+  // Aksi halde kullanıcıya nerede beklediği ve ne yapması gerektiği açıkça söylenir.
+  if (driveSynced || localPush.ok) {
+    S.pushState = 'ok';
+    S.pushMsg = 'Google Drive\'a gönderildi — Takip uygulamasını açtığında çalışma kaydında görünecek.';
+    render();
+    toast('Seans Takip kaydına gönderildi ✓');
   } else {
-    S.pushMsg = 'Takip kuyruğuna kaydedildi (uygulama açıldığında eşitlenecek).';
+    S.pushState = 'queued';
+    S.pushMsg = localPush.attempted
+      ? (localPush.message || 'Gönderim tamamlanmadı — Google Drive yetkisi geçersiz olabilir.')
+      : 'Seans bu cihazda sıraya alındı. PC\'de Takip uygulamasını açtığında eşitlenir.';
+    render();
+    toast('Seans sıraya alındı — gönderim tamamlanmadı');
   }
-  render();
-  toast('Seans Takip kaydına eklendi ✓');
 }
 
 function setSyncUI(busy, msg) {
@@ -735,7 +764,7 @@ function finalizeSession() {
   // Seansı otomatik olarak yerel Takip kuyruğuna ekle ve varsa doğrudan Drive'a ilet.
   queueSessionForTakip(result);
   pushSessionToDriveDirectly(result).catch(() => {});
-  notifyLocalServerIfAny();
+  pushToLocalServer().catch(() => {});
 }
 
 /**
@@ -872,70 +901,204 @@ async function pushSessionToDriveDirectly(sess) {
 }
 
 /**
- * Geliştirme ortamında (yalnızca localhost üzerinde) yerel studio_server varsa
- * arka planda sessizce haberdar eder. Hata verirse asla kullanıcıya yansıtmaz.
+ * Yerel Stüdyo sunucusu (PC'de localhost:8766) varsa iki adımı SIRAYLA çalıştırır:
+ *   1) POST /api/save-sessions → güncel seansları studio_sessions_export.json'a yazar
+ *   2) POST /api/push-sessions → sunucu `hmgs-sync.mjs sessions-push` çalıştırır ve
+ *      seansı Drive'daki pendingStudioSessions kuyruğuna ekler
+ * Sıra zorunludur: push, export dosyasını okur; save bitmeden push edilirse bayat içerik gider.
+ *
+ * GitHub Pages / telefonda bu uçlar yoktur; her hata sessizce yutulur ve kullanıcıya
+ * ağ hatası gösterilmez (13 Eyl 2026 sözleşmesi, kriter 1).
+ *
+ * @returns {Promise<{attempted: boolean, ok: boolean, message: string}>}
+ *   attempted: yerel sunucu ortamı mıydı — false ise buton "sıraya alındı" der.
+ *   ok: Drive'a yazıldı mı — butonun "Gönderildi ✓" demesinin TEK koşulu budur.
  */
-function notifyLocalServerIfAny() {
-  if (typeof window === 'undefined') return;
+async function pushToLocalServer() {
+  if (typeof window === 'undefined') return { attempted: false, ok: false, message: '' };
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (!isLocal) return;
+  if (!isLocal) return { attempted: false, ok: false, message: '' };
 
   try {
     const s = state();
-    fetch('/api/save-sessions', {
+    await fetch('/api/save-sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessions: s.sessions || [],
         answers: (s.answers || []).slice(-2000)
       })
-    }).catch(() => {});
+    });
+  } catch (_) {
+    return { attempted: true, ok: false, message: '' };
+  }
+
+  try {
+    const res = await fetch('/api/push-sessions', { method: 'POST' });
+    if (!res.ok) return { attempted: true, ok: false, message: '' };
+    const data = await res.json();
+    return { attempted: true, ok: data?.status === 'ok', message: data?.message || '' };
+  } catch (_) {
+    return { attempted: true, ok: false, message: '' };
+  }
+}
+
+/* ---------- Gemini istemi ---------- */
+
+/**
+ * İstem, sorunun KENDİSİNİ taşımak zorundadır: havuzdaki soruların ~%37'si
+ * olumsuz köklü ("hangisi değildir / yanlıştır / olamaz"). Şıklar olmadan bu
+ * sorular cevaplanamaz — eski istem yalnız `stem` gönderiyordu, o yüzden
+ * Gemini'ye soru değil başlık gidiyordu.
+ *
+ * İki ayrı ihtiyaç, iki ayrı istem:
+ *   - Cevaplanmadan  → yol gösterici ipucu. Doğru şık isteme YAZILMAZ.
+ *   - Cevaplandıktan → analiz. Seçilen şık + doğru şık + uygulamanın kendi
+ *     açıklaması birlikte gider; istenen şey "neden benim şıkkım yanlış".
+ *
+ * @param {object} q soru nesnesi (stem, options, correct, explanation, …)
+ * @param {{answered?:boolean, chosen?:string|null}} [stateArg]
+ * @returns {{mode:'hint'|'wrong'|'blank'|'correct', text:string}}
+ */
+export function buildGeminiPrompt(q, stateArg = {}) {
+  const answered = !!stateArg.answered;
+  const chosen = stateArg.chosen || null;
+
+  // Dayanaklar künye olarak gider: ham chunk başlıkları
+  // ("1136 sk m. 5/a — Avukatlığa Kabulü Engelleyen Mutlak ve Süresiz Suçlar…")
+  // istemi 4 satır şişirip bilgi eklemiyordu. groupLegalRefs kanunu bir kez
+  // yazar, maddeleri toplar: "1136 sk m. 3, 5/a · 1136 sk m. 3 & m. 4".
+  const topic = q.topicId ? topicById.get(q.topicId) : null;
+  const refs = [];
+  if (q.legalBasis) refs.push(String(q.legalBasis).trim());
+  if (topic && Array.isArray(topic.chunks)) {
+    for (const c of topic.chunks) {
+      if (refs.length >= 4) break;
+      if (c && c.legalRef) refs.push(String(c.legalRef).trim());
+    }
+  }
+  const basis = groupLegalRefs(refs, 150);
+
+  const opts = Array.isArray(q.options) ? q.options : [];
+  const textOf = k => {
+    const o = opts.find(x => x.key === k);
+    return o ? String(o.text || '').trim() : '';
+  };
+
+  const L = [];
+  L.push('HMGS 2026/2 (27 Eylül 2026) hukuk sınavına çalışıyorum. Aşağıdaki soruda takıldım.');
+  L.push('');
+  L.push(`Ders: ${subjectName(q.subjectId)}`);
+  if (topic) L.push(`Konu: ${String(topic.title || '').replace(/^\s*\d+\.\s*/, '')}`);
+  if (basis) L.push(`Konu dayanakları: ${basis}`);
+  if (q.category === 'Çıkmış Sorular') {
+    L.push(`Kaynak: ${q.sourceBadgeLabel || 'çıkmış sınav sorusu'}`);
+  }
+  L.push('');
+  L.push('SORU');
+  L.push(String(q.stem || '').replace(/\s*\n\s*/g, ' ').trim());
+  L.push('');
+  L.push('ŞIKLAR');
+  for (const o of opts) L.push(`${o.key}) ${String(o.text || '').trim()}`);
+  L.push('');
+
+  let mode;
+  if (!answered) {
+    mode = 'hint';
+    L.push('Henüz şık işaretlemedim. Doğru şıkkı söyleme, hiçbir şıkka "doğru" veya "yanlış" etiketi koyma.');
+    L.push('Şunları yaz:');
+    L.push('1. Soru hangi hükmü yokluyor — tek cümle.');
+    L.push('2. Karar hangi iki şık arasında veriliyor, ayrım hangi kanun maddesine ve hangi şarta dayanıyor.');
+    L.push('3. Bu ayrımı kendim sınayabilmem için tek cümlelik bir kontrol sorusu yaz.');
+    L.push('Kısa yaz. Akademik paragraf, örnek vaka anlatımı ve genel sınav tavsiyesi istemiyorum.');
+  } else if (chosen && chosen !== q.correct) {
+    mode = 'wrong';
+    L.push(`Bu soruyu yanlış işaretledim: ${chosen}) ${textOf(chosen)}`);
+    L.push(`Doğru şık: ${q.correct}) ${textOf(q.correct)}`);
+    L.push(`Uygulamanın kendi açıklaması: ${String(q.explanation || '').trim()}`);
+    L.push('Açıklamanın tamamını tekrar yazma; üstüne ekle.');
+    L.push('Şunları yaz:');
+    L.push(`1. Benim seçtiğim ${chosen} şıkkı neden yanlış — hangi kavramı ya da şartı karıştırmışım.`);
+    L.push(`2. ${q.correct} ile ${chosen} arasındaki ayrım hangi kanun maddesine ve hangi şarta dayanıyor.`);
+    L.push('3. Uygulamanın açıklamasında eksik veya yanlış bir bilgi varsa söyle; yoksa "açıklama doğru" de.');
+    L.push('4. Aynı konudan, şıkları birbirine benzeyen bir HMGS sorusu yaz; doğru cevabı gerekçesiyle ver.');
+  } else if (!chosen) {
+    mode = 'blank';
+    L.push('Bu soruyu bilmiyordum, boş bıraktım.');
+    L.push(`Doğru şık: ${q.correct}) ${textOf(q.correct)}`);
+    L.push(`Uygulamanın kendi açıklaması: ${String(q.explanation || '').trim()}`);
+    L.push('Açıklamanın tamamını tekrar yazma; üstüne ekle.');
+    L.push('Şunları yaz:');
+    L.push('1. Doğru şıkkı doğru yapan şart ne — kanun maddesiyle.');
+    L.push('2. Diğer dört şık neden yanlış — her biri tek satır, hangi kavramla karıştırılmak isteniyor.');
+    L.push('3. Bu konudan, şıkları birbirine benzeyen bir HMGS sorusu yaz; doğru cevabı gerekçesiyle ver.');
+  } else {
+    mode = 'correct';
+    L.push(`Doğru işaretledim (${q.correct}) ama sağlamasını yapmak istiyorum.`);
+    L.push(`Uygulamanın kendi açıklaması: ${String(q.explanation || '').trim()}`);
+    L.push('Açıklamanın tamamını tekrar yazma; üstüne ekle.');
+    L.push('Şunları yaz:');
+    L.push('1. Bu şıkkı doğru yapan şart ne, hangi maddeden geliyor.');
+    L.push('2. Diğer şıklar nerede tuzak — her biri tek satır, hangi kavramla karıştırılmak isteniyor.');
+    L.push('3. Aynı kuralın istisnası varsa yaz; yoksa "istisna yok" de.');
+  }
+
+  return { mode, text: L.join('\n') };
+}
+
+/** Cihaza göre yapıştırma yönergesi — telefonda "sağ pencere" diye bir şey yok. */
+function pasteHint() {
+  try {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(pointer: coarse)').matches) {
+      return 'Gemini uygulamasına yapıştır (metne dokunup Yapıştır).';
+    }
   } catch (_) {}
+  return "Gemini'ye yapıştır (Ctrl+V).";
 }
 
 /**
- * Mevcut soruyu, konuyu ve ilgili kanun maddesini Gemini masaüstü uygulamasına
- * kolayca yapıştırmak üzere panoya aktarır ve yerel köprüyü tetikler.
+ * Mevcut soruyu şıklarıyla, konusuyla ve seçilen cevapla birlikte Gemini'ye
+ * yapıştırılmak üzere panoya kopyalar. Uygulama içinde çözüm üretmez —
+ * Gemini ayrı bir pencerede/cihazda açık olmalıdır.
  */
 export function askGemini() {
   if (!S || S.i >= S.questions.length) return;
   const q = S.questions[S.i];
-  const topic = q.topicId ? topicById.get(q.topicId) : null;
-  const subj = subjectName(q.subjectId);
-  const topicTitle = topic ? topic.title : '';
-  const basis = q.legalBasis ? ` (${q.legalBasis})` : '';
+  const last = S.log[S.log.length - 1];
+  const chosen = S.answered && last && last.qId === q.id ? last.chosen : null;
 
-  const prompt = `HMGS Hukuk Sorusu Analizi:
-Ders: ${subj}
-Konu: ${topicTitle}${basis}
-Soru: ${q.stem.replace(/\\n+/g, ' ').trim()}
-
-Lütfen bu kavramı açıkla:
-1. Kurumun hukuki niteliği ve ilgili kanun maddesi
-2. Sistemin temel aktörleri ve aralarındaki hukuki ilişki
-3. Akılda kalıcı somut bir pratik olay (örnek vaka)
-4. Sınavda tuzak olarak kullanılan çeldirici ayrım`;
+  const built = buildGeminiPrompt(q, { answered: !!S.answered, chosen });
+  const prompt = built.text;
+  const cls = built.mode === 'hint' ? 'Soru + 5 şık (doğru şık yok)'
+    : built.mode === 'wrong' ? 'Seçtiğin şık + doğru şık + açıklama'
+      : built.mode === 'blank' ? 'Boş soru + doğru şık + açıklama'
+        : 'Doğru şık + açıklama';
+  const msg = `${built.mode === 'hint' ? 'İpucu' : 'Analiz'} istemi kopyalandı — ${cls}. ${pasteHint()}`;
 
   if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(prompt).then(() => {
-      toast('Gemini istemi panoya kopyalandı! Sağ pencerede Ctrl+V yapın.');
+      toast(msg);
     }).catch(() => {
-      fallbackCopy(prompt);
+      fallbackCopy(prompt, msg);
     });
   } else {
-    fallbackCopy(prompt);
+    fallbackCopy(prompt, msg);
   }
 
+  // Yerel Stüdyo sunucusu açıksa panoya ikinci yoldan da yazar. Sunucu yoksa
+  // (telefon, GitHub Pages) sessizce düşer — kullanıcıya yanlış bilgi verilmez,
+  // kopyalama işini input içindeki tarayıcı API'si zaten yapmıştır.
   try {
     fetch('/api/gemini-bridge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, activate: true })
+      body: JSON.stringify({ prompt })
     }).catch(() => {});
   } catch (_) {}
 }
 
-function fallbackCopy(text) {
+function fallbackCopy(text, msg) {
   if (typeof document === 'undefined') return;
   const ta = document.createElement('textarea');
   ta.value = text;
@@ -943,12 +1106,13 @@ function fallbackCopy(text) {
   ta.style.opacity = '0';
   document.body.appendChild(ta);
   ta.select();
+  let ok = false;
   try {
-    document.execCommand('copy');
-    toast('Gemini istemi panoya kopyalandı! Sağ pencerede Ctrl+V yapın.');
+    ok = document.execCommand('copy');
   } catch (_) {
-    toast('İstem hazırlandı.');
+    ok = false;
   }
   document.body.removeChild(ta);
+  toast(ok ? msg : 'İstem hazırlandı ama panoya kopyalanamadı.');
 }
 
