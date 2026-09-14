@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    data.js — VERİ ERİŞİM KATMANI VE İNDEKSLER
    topics.js / questions.js global sabitleri okur, tek seferde indeksler.
    O(n) tam tarama yerine hazır Map'ler.
@@ -81,6 +81,121 @@ function push(map, key, val) {
   map.get(key).push(val);
 }
 
+/* ==========================================================================
+   SORU DÜZEYİ MEVZUAT DAYANAĞI TÜRETİMİ (konu → soru)
+
+   Ölçüm (14 Eylül 2026, data/hmgs_vault.json): 3065 sorunun 2455'inde
+   legalBasis alanı YOK. Konu kartlarında ise 124/124 dolu ve dizi hâlinde
+   (["TMK m. 8", "TMK m. 9", …]). Eksik soruların gerekçe metninden madde
+   çıkarmak işe yaramıyor: yalnızca 35/2455 (%1,4) gerekçesinde madde
+   referansı geçiyor. Doğru kaynak sorunun kendi topicId'si — join 2301
+   soruyu kapsıyor, 0 boşta kalıyor. Kalan 154 kayıtta topicId null
+   (hepsi muessir_2026_cikmis); onlara dayanak UYDURULMAZ.
+
+   Birleştirme bilinçli olarak burada, tüm veri yollarının geçtiği
+   populateData'da yapılır: loadMasterVault() önce globals'a (questions.js),
+   sonra IndexedDB'ye, sonra Drive kopyasına bakar — üçü de buradan geçer.
+   Yalnızca vault JSON'unu düzeltmek dağıtım kopyasını düzeltir ama
+   questions.js yolunu boşta bırakırdı.
+
+   ui.js'teki groupLegalRefs ile AYNI sıkıştırma uygulanır: konu dizisini ham
+   kopyalamak ortalama 133, en kötü 511 karakterlik künye üretiyordu, hedef
+   ise satır sınırı olmayan bir çip (`.feedback .basis` → inline-block). Kanun
+   adı bir kez yazılır, maddelerin yalnızca numarası toplanır. Kopyanın
+   sebebi: ui.js'i veri katmanına bağlamak, render katmanındaki bir imza
+   değişikliğini tüm uygulamanın import hatasına çevirirdi.
+   ========================================================================== */
+
+const DERIVED_BASIS_MAX = 72;   // çip tek satırda kalsın
+
+/** legalBasis'i (metin veya dizi) temiz künye kalemlerine çevirir. */
+function asRefList(raw) {
+  if (!raw) return [];
+  const out = [];
+  for (const chunk of (Array.isArray(raw) ? raw : [raw])) {
+    for (const part of String(chunk).split(/[,;]/)) {
+      const s = part.trim();
+      if (s) out.push(s);
+    }
+  }
+  return out;
+}
+
+/** Künyeyi gruplayıp kırpar — ui.groupLegalRefs ile aynı algoritma. */
+function groupBasis(refs, max = DERIVED_BASIS_MAX) {
+  const order = [];
+  const byLaw = new Map();
+  const prose = [];
+
+  for (const item of refs) {
+    // "TMK m. 8" · "4857 sk m. 2/4" · "1982 AY m. 13-15"
+    const m = /^([^—–]{0,40}?)\s*\bm\.\s*(\d[\w\/.\-]*)$/i.exec(item);
+    if (m) {
+      const law = m[1].trim() || '—';
+      const art = m[2].trim();
+      if (!byLaw.has(law)) { byLaw.set(law, []); order.push(law); }
+      const list = byLaw.get(law);
+      if (!list.includes(art)) list.push(art);
+    } else {
+      prose.push(item);
+    }
+  }
+
+  const groups = order.map(law => `${law} m. ${byLaw.get(law).join(', ')}`);
+  const statute = /(sayılı|Kanun|Anayasa|\bAY\b|Sözleşme|\bsk\b|Tüzük|Yönetmelik|KHK)/i;
+  const cites = prose.filter(p => p.length <= 45 && statute.test(p));
+  const joined = [...groups, ...cites].join(' · ');
+
+  // Boş dönüş BİLİNÇLİ: konunun legalBasis'ı yalnızca doktrin/künye içeriyorsa
+  // soruya dayanak YAZILMAZ. Ölçülen etki: 116 soru — tpc_felsefe_001/002/003
+  // (112) ve tpc_genel_kamu_001 (4). O konuların legalBasis'ı "Thomas Aquinas —
+  // Lex Aeterna", "Hugo Grotius — De Jure Belli ac Pacis (1625)" gibi eser
+  // adlarıdır; bunları mevzuat künyesi gibi basmak öğrenciye olmayan bir kanun
+  // dayanağı gösterir (AGENTS.md §0.2/4). Doktrin şeritte okunur, rozette değil.
+  //
+  // tpc_genel_kamu_001 neden listeye dahil: tek madde biçimli kalemi
+  // "1982 Anayasası m. 6 (…) & m. 80 (…)" doktrin metniyle AYNI kalemde durur ve
+  // bu rozet ETİKETSİZ basılır (.feedback .basis, studio.css:831) — Rousseau/Locke
+  // sorusunun altında o kalem sanki o sorunun dayanağıymış gibi okunur. Kalemin
+  // kazandırdığı 4 soru, riske ettiği yanlış atfı karşılamıyor.
+  // ui.groupLegalRefs de aynı konuda bu kalemi yüzeye çıkarmaz (doktrin
+  // betimlemesine düşer) — yani '' dönüşü, uygulamanın başka yerinde GÖSTERİLEN
+  // bir kanunu gizlemiyor. ui.js KONU kartıdır, burası SORU künyesidir.
+  if (!joined) return '';
+
+  if (joined.length <= max) return joined;
+
+  // Bütçe aşıldı: maddeler ORTADAN kesilmez (yanlış atıf riski), kuyruk
+  // düşer ve görünür bir "…" bırakılır. Uzun betimleyici kalemler (Hukuk
+  // Felsefesi, Genel Kamu) zaten şerit değil içerik malzemesidir.
+  const cut = joined.slice(0, max);
+  const sp = cut.lastIndexOf(' ');
+  const head = (sp > max * 0.6 ? cut.slice(0, sp) : cut)
+    .replace(/\s*[,;·]\s*$/, '').trim();
+  return head ? head + '…' : joined.slice(0, max);
+}
+
+/**
+ * Konu düzeyindeki legalBasis'ı soruya taşır.
+ * Soru kendi künyesini taşıyorsa DOKUNMAZ; topicId yoksa uydurmaz.
+ */
+function deriveBasis(q) {
+  const own = q.legalBasis;
+  if (typeof own === 'string' ? own.trim() : own) return;
+
+  const t = q.topicId ? topicById.get(q.topicId) : null;
+  if (!t) return;
+
+  const refs = asRefList(t.legalBasis);
+  if (!refs.length) return;
+
+  const s = groupBasis(refs);
+  if (!s) return;
+
+  q.legalBasis = s;                 // string — consumer'lar esc(q.legalBasis) bekliyor
+  q.legalBasisSource = 'topic';     // türetilmiş: denetlenebilir kalsın
+}
+
 /**
  * Klasik script'teki `const X = [...]` global lexical scope'a gider ama
  * window'a otomatik BAĞLANMAZ. Bu yüzden iki yoldan da deniyoruz:
@@ -118,6 +233,7 @@ export function populateData(vaultData) {
     push(topicsBySubject, t.subjectId, t);
   });
   QUESTIONS.forEach(q => {
+    deriveBasis(q);   // konu künyesini soruya taşı (soru doluysa dokunmaz)
     questionById.set(q.id, q);
     push(questionsBySubject, q.subjectId, q);
     if (q.topicId && topicById.has(q.topicId)) push(questionsByTopic, q.topicId, q);
@@ -160,6 +276,8 @@ export function integrity() {
   const emptySubjects = SUBJECTS.filter(s => !(questionsBySubject.get(s.id) || []).length);
   const untagged = QUESTIONS.filter(q => !q.difficulty || q.difficulty === 'etiketsiz');
   const legacyTopics = TOPICS.filter(t => !V3_TYPES.has(t.visualType));
+  const derivedBasis = QUESTIONS.filter(q => q.legalBasisSource === 'topic').length;
+  const missingBasis = QUESTIONS.filter(q => !q.legalBasis).length;
   const rep = {
     topics: TOPICS.length,
     questions: QUESTIONS.length,
@@ -168,7 +286,11 @@ export function integrity() {
     emptySubjects: emptySubjects.map(s => s.name),
     untaggedDifficulty: untagged.length,
     v3Topics: TOPICS.length - legacyTopics.length,
-    legacyTopics: legacyTopics.length
+    legacyTopics: legacyTopics.length,
+    // Mevzuat dayanağı: derivedBasis konudan türetildi (2185); missingBasis hâlâ
+    // boş (270 = 154 topicId'siz + 116 doktrin konusu). Uydurma yok, sessiz kayıp yok.
+    derivedBasis,
+    missingBasis
   };
   console.info('[veri bütünlüğü]', rep);
   return rep;
