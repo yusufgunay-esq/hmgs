@@ -1,4 +1,4 @@
-/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+﻿/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
    رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
    ==========================================================================
@@ -40,6 +40,11 @@ function blank() {
     drills: [],
     /** Devam eden deneme (yarıda kalırsa geri dönülebilir) */
     examInProgress: null,
+    /** Koçun bugün için atadığı Stüdyo işi — odevler.js yazar, engine okur.
+        { date:'YYYY-MM-DD', questions:sayı, quizTasks:sayı, readingTasks:sayı,
+          totalTasks:sayı, source:'/api/claude-tasks', at:ISO }
+        Yoksa null: hedef o zaman Stüdyo'nun kendi tabanından türetilir. */
+    plan: null,
     settings: { dailyTarget: 40, theme: 'system', fontSize: 'normal' }
   };
 }
@@ -255,6 +260,39 @@ export function streak() {
 }
 
 export function lastExam() { return S.exams.length ? S.exams[S.exams.length - 1] : null; }
+
+/**
+ * Bugünün koç planı — yalnızca BUGÜNE ait kayıt geçerli sayılır. Dünün planı
+ * ekranda hedef olarak görünmeye devam ederse kullanıcı bitmiş bir işin
+ * peşinden koşar.
+ */
+export function getDailyPlan() {
+  const p = S.plan;
+  if (!p || typeof p !== 'object') return null;
+  if (p.date !== todayKey()) return null;
+  if (!Number.isFinite(p.questions) || p.questions <= 0) return null;
+  return p;
+}
+
+/** odevler.js koç görevlerini çektikten sonra çağırır. */
+export function setDailyPlan({ questions, quizTasks = 0, readingTasks = 0, totalTasks = 0, source = '' }) {
+  S.plan = {
+    date: todayKey(),
+    questions: Math.round(questions),
+    quizTasks, readingTasks, totalTasks, source,
+    at: new Date().toISOString()
+  };
+  return S.plan;
+}
+
+/**
+ * Cevap kaydından bağımsız, doğrudan hedef sayısı verilir. Test ve dış
+ * çağrılar için; günlük kullanımda plan akışı geçerlidir.
+ */
+export function setDailyTarget(n) {
+  S.settings.dailyTarget = Math.max(1, Math.round(n));
+  save();
+}
 
 export function getSettings() {
   return S.settings || { dailyTarget: 40, theme: 'system', fontSize: 'normal' };
