@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    views/today.js — BUGÜN: TEK KARAR EKRANI
    Kullanıcı bu ekranda ne çalışacağına karar vermez; koç karar verir ve
    gerekçesini söyler. Seçenekler ikincil kalır.
@@ -6,15 +6,25 @@
 
 import { esc, $, pct } from '../ui.js';
 import { subjectName, topicById } from '../data.js';
-import { daysLeft, streak, lastExam, PASS_CORRECT, state } from '../store.js';
-import {
-  nextAction, todayProgress, srsSummary, allSubjectMastery,
-  MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions
-} from '../engine.js';
+import { daysLeft, streak, lastExam, PASS_CORRECT, state, getDailyPlan } from '../store.js';
+import { nextAction, todayProgress, srsSummary, allSubjectMastery,
+  MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions } from '../engine.js';
+
+/** Koç planı bugün için bir kez tazelenir — her render'da ağ isteği yok. */
+let planRefreshed = false;
 
 export function render() {
   const host = $('#view-today');
   if (!host) return;
+
+  // Bugünün planı elde varsa ağa çıkma; yoksa arkada bir kez çek. Çekim
+  // bitince odevler.js Bugün'ü yeniden çizer, sayı yerine oturur.
+  if (!planRefreshed && !getDailyPlan()) {
+    planRefreshed = true;
+    import('./odevler.js')
+      .then(m => m.fetchTasks())
+      .catch(() => {});
+  }
 
   const act = nextAction();
   const prog = todayProgress();
@@ -56,6 +66,7 @@ export function render() {
           <div class="metric-v">${prog.solved}<span style="font-size:0.85rem;font-weight:600;color:var(--ink-3)"> / ${prog.target}</span></div>
           <div class="track"><i style="width:${prog.pct}%"></i></div>
           <div class="metric-n">${prog.solved ? `${prog.correct} doğru · ${pct(prog.solved ? (prog.correct / prog.solved) * 100 : 0)}` : 'henüz başlamadın'}</div>
+          <div class="metric-n">${hedefNotu(prog)}</div>
         </div>
         <div class="metric">
           <div class="metric-k">Son deneme neti</div>
@@ -138,6 +149,22 @@ export function render() {
       <div class="section-label">Dersler · otomatikleşme durumu</div>
       ${renderSubjects(mastery)}
     </div>`;
+}
+
+/**
+ * Hedefin nereden geldiğini yazar. Sessiz kalmak yanlış olurdu: ekranda
+ * "0 / 50" görüp koçun 200 soru taahhüdünü hatırlayan kullanıcı hangisinin
+ * doğru olduğunu bilemez. Sayıyı gösterdiğimiz gibi kaynağını da söylüyoruz.
+ */
+function hedefNotu(prog) {
+  if (prog.targetSource === 'plan' && prog.plan) {
+    const okuma = prog.plan.readingTasks;
+    return `Koç planı: ${prog.plan.quizTasks} test görevi`
+      + (okuma ? ` · ${okuma} okuma görevi (Stüdyo dışı)` : '')
+      + ' · kağıtta çözülenler bu sayıya girmez';
+  }
+  return `Koç planı bugün yüklenmedi · Stüdyo tabanı ${prog.target}`
+    + ' · kağıtta çözülenler bu sayıya girmez';
 }
 
 /** Vadesi gelen tekrarları ders bazında topla — en çok bekleyen üstte. */
