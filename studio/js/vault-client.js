@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    vault-client.js — HMGS STÜDYO SIFIR-VERİ İSTEMCİ & GİZLİ KASA MOTORU
    - GitHub'da 0 telifli soru ve 0 konu barındırır.
    - Soru ve konu kütüphanesi kullanıcının şahsi Google Drive'ından (hmgs_vault.json)
@@ -12,7 +12,157 @@ const STORE_NAME = 'vault_store';
 const VAULT_KEY = 'hmgs_vault_master';
 
 const CLIENT_ID = '235274565512-c8oalrvo4idikpbkh2j3g8sgdjsq3v83.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file';
+
+// ORTAK YETKİ SETİ (17 Eylül 2026) — Takip uygulamasıyla (HMGS_Takip_App/index.html)
+// BİREBİR AYNI olmak ZORUNDA. Tarayıcı farklı istek listelerini farklı onay ekranı
+// sayar; iki uygulama ayrı set istediği sürece kullanıcı iki kez bağlanmak zorunda
+// kalıyordu. Tek set = tek onay ekranı, tek giriş, paylaşılan jeton.
+//
+//   • drive.appdata  : ESKİ veri yeri. Yalnızca Takip'in tek seferlik taşıması
+//                      için duruyor; Stüdyo kullanmaz. (Jeton ortak olduğu için
+//                      bu kapsam burada da istenmek zorunda.)
+//   • drive.readonly : hmgs_vault.json (7,4 MB soru+konu kasası) okuması.
+//   • drive.file     : Stüdyo'nun KENDİ oluşturduğu dosyaları yazması
+//                      (HMGS/hmgs_studio_progress.json, HMGS/hmgs_studio_queue.json).
+const SCOPES = 'https://www.googleapis.com/auth/drive.appdata '
+             + 'https://www.googleapis.com/auth/drive.readonly '
+             + 'https://www.googleapis.com/auth/drive.file';
+
+// Drive'da verinin durduğu tek görünür klasör — Takip uygulamasıyla aynı sabit.
+const HMGS_FOLDER_NAME = 'HMGS';
+
+const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
+const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
+
+// ------------------------------------------------------------- Jeton paylaşımı
+
+// Takip uygulaması jetonu `hmgs_gtoken` altında saklar ({t, exp}). Stüdyo da AYNI
+// anahtarı okur/yazar; aynı origin'de (GitHub Pages) iki uygulama tek oturum
+// paylaşır, kullanıcı Stüdyo'ya geçince yeniden giriş yapmaz.
+//
+// NOT: yerel geliştirmede Stüdyo 8766, Takip 8000 portunda çalışır — farklı
+// origin sayıldıkları için localStorage PAYLAŞILMAZ. O durumda her biri kendi
+// girişini ister; prod'da (tek origin) paylaşım geçerlidir.
+const SHARED_TOKEN_KEY = 'hmgs_gtoken';
+const SHARED_FOLDER_KEY = 'hmgs_drive_folder_id';
+
+let activeAccessToken = null;
+
+function readSharedToken() {
+  try {
+    const raw = localStorage.getItem(SHARED_TOKEN_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || !o.t) return null;
+    // Süresi dolmuşsa temizle — Takip ile aynı 2 dakikalık emniyet payı.
+    if (o.exp && o.exp - Date.now() < 120000) {
+      localStorage.removeItem(SHARED_TOKEN_KEY);
+      return null;
+    }
+    return o.t;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Takip'in beklediği biçimde yazar: {t, exp}. İki uygulama aynı jetonu kullanır. */
+function saveSharedToken(token, expiresIn) {
+  try {
+    const ttl = parseInt(expiresIn || 3600, 10);
+    localStorage.setItem(SHARED_TOKEN_KEY, JSON.stringify({
+      t: token,
+      exp: Date.now() + (ttl * 1000)
+    }));
+  } catch (e) { /* private mode vb. — oturum yine de çalışır */ }
+}
+
+/** Sadece sessionStorage (sayfa oturumu) — kalıcı saklama `hmgs_gtoken` üzerinden. */
+export function getActiveToken() {
+  if (!activeAccessToken) {
+    activeAccessToken = readSharedToken()
+      || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hmgs_access_token') : null);
+  }
+  return activeAccessToken;
+}
+
+export function setActiveToken(token) {
+  activeAccessToken = token;
+  if (typeof sessionStorage !== 'undefined') {
+    if (token) sessionStorage.setItem('hmgs_access_token', token);
+    else sessionStorage.removeItem('hmgs_access_token');
+  }
+}
+
+/** Drive kökündeki HMGS klasörünü bulur, yoksa oluşturur. */
+let hmgsFolderId = null;
+try { hmgsFolderId = localStorage.getItem(SHARED_FOLDER_KEY) || null; } catch (e) {}
+
+async function driveFetch(url, token, opts = {}) {
+  return fetch(url, {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, ...(opts.headers || {}) }
+  });
+}
+
+async function ensureHmgsFolder(token) {
+  if (hmgsFolderId) return hmgsFolderId;
+
+  const q = encodeURIComponent(`name='${HMGS_FOLDER_NAME}' and trashed=false`);
+  const listRes = await driveFetch(`${DRIVE_API}?q=${q}&fields=files(id,mimeType)&orderBy=modifiedTime desc`, token);
+  if (listRes.ok) {
+    const { files } = await listRes.json();
+    const folder = (files || []).find(f => f.mimeType === 'application/vnd.google-apps.folder');
+    if (folder) {
+      hmgsFolderId = folder.id;
+      try { localStorage.setItem(SHARED_FOLDER_KEY, hmgsFolderId); } catch (e) {}
+      return hmgsFolderId;
+    }
+  }
+
+  const createRes = await driveFetch(DRIVE_API, token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({
+      name: HMGS_FOLDER_NAME,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: ['root']
+    })
+  });
+  if (!createRes.ok) {
+    console.warn('[vault] HMGS klasörü oluşturulamadı:', createRes.status, await createRes.text());
+    return null;
+  }
+  const created = await createRes.json();
+  hmgsFolderId = created.id || null;
+  try { if (hmgsFolderId) localStorage.setItem(SHARED_FOLDER_KEY, hmgsFolderId); } catch (e) {}
+  return hmgsFolderId;
+}
+
+/**
+ * Dosyayı ÖNCE HMGS/ klasöründe, bulamazsa Drive kökünde arar.
+ * @returns {Promise<object|null>} {id, inFolder}
+ */
+async function findSharedFile(name, token) {
+  const q = encodeURIComponent(`name='${name}' and trashed=false`);
+  const folder = await ensureHmgsFolder(token);
+  if (folder) {
+    const res = await driveFetch(
+      `${DRIVE_API}?q=${q}+and+'${folder}'+in+parents&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
+      token
+    );
+    if (res.ok) {
+      const { files } = await res.json();
+      if (files && files.length) return { id: files[0].id, inFolder: true };
+    }
+  }
+  // Geriye dönük: eski sürümler dosyaları doğrudan köke yazıyordu.
+  const legacy = await driveFetch(`${DRIVE_API}?q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`, token);
+  if (legacy.ok) {
+    const { files } = await legacy.json();
+    if (files && files.length) return { id: files[0].id, inFolder: false };
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------- IndexedDB
 
@@ -75,48 +225,18 @@ export async function clearVaultIndexedDB() {
   }
 }
 
-// ---------------------------------------------------------------- Google Drive Sync
-
-let activeAccessToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hmgs_access_token') : null;
-
-export function getActiveToken() {
-  if (!activeAccessToken && typeof sessionStorage !== 'undefined') {
-    activeAccessToken = sessionStorage.getItem('hmgs_access_token');
-  }
-  return activeAccessToken;
-}
-
-export function setActiveToken(token) {
-  activeAccessToken = token;
-  if (typeof sessionStorage !== 'undefined') {
-    if (token) sessionStorage.setItem('hmgs_access_token', token);
-    else sessionStorage.removeItem('hmgs_access_token');
-  }
-}
+// ---------------------------------------------- Google Drive Sync (HMGS/ klasörü)
 
 export async function fetchVaultFromDrive(token) {
   setActiveToken(token);
-  const q = encodeURIComponent("name='hmgs_vault.json' and trashed=false");
-  const listRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime,size)&orderBy=modifiedTime desc`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
 
-  if (!listRes.ok) {
-    const err = await listRes.text();
-    throw new Error(`Drive dosya arama hatası (${listRes.status}): ${err}`);
+  const found = await findSharedFile('hmgs_vault.json', token);
+  if (!found) {
+    throw new Error('Google Drive\'da "hmgs_vault.json" bulunamadı (HMGS klasörü ve kök tarandı). '
+      + 'Lütfen önce bilgisayarda kasayı Drive\'a gönderin.');
   }
 
-  const listData = await listRes.json();
-  if (!listData.files || listData.files.length === 0) {
-    throw new Error('Google Drive hesabınızda "hmgs_vault.json" bulunamadı. Lütfen önce bilgisayarda senkronizasyonu çalıştırın.');
-  }
-
-  const fileId = listData.files[0].id;
-  const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
+  const dlRes = await driveFetch(`${DRIVE_API}/${found.id}?alt=media`, token);
   if (!dlRes.ok) {
     const err = await dlRes.text();
     throw new Error(`Drive dosya indirme hatası (${dlRes.status}): ${err}`);
@@ -143,19 +263,9 @@ const PROGRESS_FILE_NAME = 'hmgs_studio_progress.json';
 
 export async function fetchProgressFromDrive(token) {
   try {
-    const q = encodeURIComponent(`name='${PROGRESS_FILE_NAME}' and trashed=false`);
-    const listRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!listRes.ok) return null;
-    const listData = await listRes.json();
-    if (!listData.files || listData.files.length === 0) return null;
-
-    const fileId = listData.files[0].id;
-    const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const found = await findSharedFile(PROGRESS_FILE_NAME, token);
+    if (!found) return null;
+    const dlRes = await driveFetch(`${DRIVE_API}/${found.id}?alt=media`, token);
     if (!dlRes.ok) return null;
     return await dlRes.json();
   } catch (err) {
@@ -166,59 +276,124 @@ export async function fetchProgressFromDrive(token) {
 
 export async function uploadProgressToDrive(token, stateData) {
   try {
-    const q = encodeURIComponent(`name='${PROGRESS_FILE_NAME}' and trashed=false`);
-    const listRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!listRes.ok) return false;
-    const listData = await listRes.json();
-    const fileId = listData.files && listData.files.length > 0 ? listData.files[0].id : null;
+    const found = await findSharedFile(PROGRESS_FILE_NAME, token);
     const jsonContent = JSON.stringify(stateData, null, 2);
 
-    if (fileId) {
+    if (found) {
       // Mevcut dosyayı güncelle (PATCH)
-      const patchRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      const patchRes = await driveFetch(`${DRIVE_UPLOAD}/${found.id}?uploadType=media`, token, {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json; charset=UTF-8'
-        },
+        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
         body: jsonContent
       });
       return patchRes.ok;
-    } else {
-      // Yeni dosya oluştur (Multipart POST)
-      const boundary = '-------HMGS_STUDIO_SYNC_BOUNDARY';
-      const delimiter = `\r\n--${boundary}\r\n`;
-      const closeDelim = `\r\n--${boundary}--`;
-
-      const metadata = {
-        name: PROGRESS_FILE_NAME,
-        mimeType: 'application/json'
-      };
-
-      const multipartBody =
-        delimiter +
-        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-        JSON.stringify(metadata) +
-        delimiter +
-        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-        jsonContent +
-        closeDelim;
-
-      const postRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`
-        },
-        body: multipartBody
-      });
-      return postRes.ok;
     }
+
+    // Yeni dosya: HMGS/ klasörünün İÇİNDE oluştur.
+    // (Kök yerine klasör: kullanıcı verisi Drive arayüzünde görünür ve yedeklenebilir
+    // olsun. drive.file kapsamı yalnızca uygulamanın yarattığı dosyayı yazabildiği
+    // için yaratıcı burada tarayıcı olur — sonraki PATCH'ler bu yüzden çalışır.)
+    const folderId = await ensureHmgsFolder(token);
+    const boundary = '-------HMGS_STUDIO_SYNC_BOUNDARY';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+
+    const metadata = {
+      name: PROGRESS_FILE_NAME,
+      mimeType: 'application/json',
+      parents: folderId ? [folderId] : ['root']
+    };
+
+    const multipartBody =
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) +
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      jsonContent +
+      closeDelim;
+
+    const postRes = await fetch(`${DRIVE_UPLOAD}?uploadType=multipart`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`
+      },
+      body: multipartBody
+    });
+    return postRes.ok;
   } catch (err) {
     console.warn('[progress sync] Drive yazma hatası:', err);
+    return false;
+  }
+}
+
+// ------------------------------------------------- Stüdyo → Takip aktarım kuyruğu
+
+const QUEUE_FILE_NAME = 'hmgs_studio_queue.json';
+
+/**
+ * Stüdyo'nun pratik seanslarını + ham cevaplarını Drive'daki
+ * `HMGS/hmgs_studio_queue.json` dosyasına yazar.
+ *
+ * NEDEN: eskiden seanslar ancak masaüstü `hmgs-sync.mjs sessions-push`
+ * çalıştığında Takip'e ulaşabiliyordu. O script ayrı bir OAuth istemcisi
+ * kullandığı için Takip'in appDataFolder'ını göremiyor, refresh token'ı da
+ * sürekli düşüyordu → zincir hiçbir zaman kapanmıyordu. Artık Stüdyo kuyruğu
+ * doğrudan ortak HMGS/ klasörüne yazıyor, Takip açılışta okuyor.
+ *
+ * TEK YAZAR: bu dosyanın tek yazarı Stüdyo'dur. Takip sadece okur.
+ * Takip tarafı `studioSessionId` üzerinden idempotent çevirdiği için aynı
+ * seans iki kez çalışma kaydına dönmez.
+ */
+export async function pushStudioQueueToDrive(token, sessions, answers = []) {
+  setActiveToken(token);
+  try {
+    const payload = JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      sessions: Array.isArray(sessions) ? sessions : [],
+      answers: Array.isArray(answers) ? answers : []
+    }, null, 2);
+
+    const found = await findSharedFile(QUEUE_FILE_NAME, token);
+    if (found) {
+      const res = await driveFetch(`${DRIVE_UPLOAD}/${found.id}?uploadType=media`, token, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+        body: payload
+      });
+      return res.ok;
+    }
+
+    const folderId = await ensureHmgsFolder(token);
+    const boundary = '-------HMGS_STUDIO_QUEUE_BOUNDARY';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+    const metadata = {
+      name: QUEUE_FILE_NAME,
+      mimeType: 'application/json',
+      parents: folderId ? [folderId] : ['root']
+    };
+    const multipartBody =
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) +
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      payload +
+      closeDelim;
+
+    const postRes = await fetch(`${DRIVE_UPLOAD}?uploadType=multipart`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`
+      },
+      body: multipartBody
+    });
+    return postRes.ok;
+  } catch (err) {
+    console.warn('[studio queue] Drive yazma hatası:', err);
     return false;
   }
 }
@@ -353,6 +528,15 @@ if (typeof window !== 'undefined') {
 }
 
 export function requestDriveLoginAndDownload() {
+  // Elde geçerli PAYLAŞILAN jeton varsa onay ekranı hiç açılmaz. Kullanıcı
+  // Takip'te bir kez bağlanmışsa Stüdyo'ya geçerken yeniden giriş yapmaz
+  // (aynı origin — prod).
+  const paylasilan = readSharedToken();
+  if (paylasilan) {
+    setActiveToken(paylasilan);
+    return fetchVaultFromDrive(paylasilan);
+  }
+
   return new Promise((resolve, reject) => {
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
       return reject(new Error('Google kimlik kütüphanesi yüklenemedi. Lütfen internet bağlantınızı kontrol edin.'));
@@ -367,6 +551,7 @@ export function requestDriveLoginAndDownload() {
         }
         try {
           setActiveToken(resp.access_token);
+          saveSharedToken(resp.access_token, resp.expires_in);
           const vault = await fetchVaultFromDrive(resp.access_token);
           resolve(vault);
         } catch (fetchErr) {
