@@ -5,9 +5,10 @@
 
 import { esc, rich, richBlock, splitStem, fmtSec, emptyState, groupLegalRefs, $, toast } from '../ui.js';
 import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions } from '../data.js';
-import { recordAnswer, markLastAnswerLogic, save, saveSession, state, TARGET_SEC } from '../store.js';
+import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
 import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
+import { pushStudioQueueToDrive, getActiveToken, setActiveToken } from '../vault-client.js';
 
 let S = null;   // aktif seans
 let tick = null;
@@ -101,7 +102,12 @@ export function startSession(opts = {}) {
     startedAt: performance.now(),
     qStart: performance.now(),
     log: [],
-    summarySaved: false
+    summarySaved: false,
+    // Soru bazlı davranış sinyalleri — her soru geçişinde sıfırlanır
+    elimUsed: false,
+    geminiAsked: false,
+    // Cevap VERİLMEDEN Gemini'ye sorulduysa ipucu alındı → SRS logicGuess gibi davranır
+    geminiAskedPreAnswer: false
   };
   render();
   return true;
@@ -250,8 +256,13 @@ export function pick(key) {
   S.answered = true;
   stopTick();
 
-  const row = recordAnswer(q, key, ms, S.mode === 'review' ? 'review' : 'practice');
-  const sched = scheduleAfterAnswer(q.id, row.ok);
+  const row = recordAnswer(q, key, ms, S.mode === 'review' ? 'review' : 'practice', {
+    usedElim: S.elimUsed,
+    askedGemini: S.geminiAsked
+  });
+  // Cevap öncesi Gemini'ye sorulmuşsa (ipucu) → logicGuess gibi SRS ilerletme
+  const treatAsLogic = S.geminiAskedPreAnswer;
+  const sched = scheduleAfterAnswer(q.id, row.ok, treatAsLogic);
   save();
   S.log.push({ ...row, sched });
 
@@ -266,7 +277,10 @@ export function dontKnow() {
   S.answered = true;
   stopTick();
 
-  const row = recordAnswer(q, null, ms, S.mode === 'review' ? 'review' : 'practice');
+  const row = recordAnswer(q, null, ms, S.mode === 'review' ? 'review' : 'practice', {
+    usedElim: S.elimUsed,
+    askedGemini: S.geminiAsked
+  });
   const sched = scheduleAfterAnswer(q.id, false);
   save();
   S.log.push({ ...row, sched });
@@ -293,6 +307,14 @@ function paintResult(q, chosen, row, sched, ms) {
       <span class="badge-logic-dot"></span>
       <span>Mantık</span>
       <span class="kbd-hint">M</span>
+    </button>
+  ` : '';
+
+  // Yanlış/boş durumda dikkat hatası toggle'ı
+  const attentionBadgeHTML = !row.ok ? `
+    <button class="badge-logic" data-act="toggle-attention" id="badge-attention" title="Bildim ama dikkatsizlik yaptım — konu değil, dikkat eksikliği">
+      <span class="badge-logic-dot"></span>
+      <span>Dikkat</span>
     </button>
   ` : '';
 
@@ -323,7 +345,7 @@ function paintResult(q, chosen, row, sched, ms) {
             <div class="fb-verdict">${verdict}</div>
             <div class="fb-correct">Doğru şık: <b>${esc(q.correct)}</b></div>
           </div>
-          ${logicBadgeHTML}
+          ${logicBadgeHTML}${attentionBadgeHTML}
           <span class="fb-time chip ${slow ? 'amber' : 'green'}">${fmtSec(sec)}${slow ? ` · hedef ${TARGET_SEC} sn` : ''}</span>
         </div>
         <div class="fb-body">
@@ -396,11 +418,13 @@ function $$opts() { return [...document.querySelectorAll('#opts .opt')]; }
 
 export function eliminateOption(key) {
   if (!S || S.answered) return;
+  S.elimUsed = true;
   toggleOption('#view-practice', key);
 }
 
 export function eliminatePremise(numeral) {
   if (!S || S.answered) return;
+  S.elimUsed = true;
   togglePremise('#view-practice', numeral);
 }
 
@@ -408,6 +432,10 @@ export function next() {
   if (!S) return;
   if (!S.answered) return;
   S.i += 1;
+  // Yeni soru için soru bazlı sinyalleri sıfırla
+  S.elimUsed = false;
+  S.geminiAsked = false;
+  S.geminiAskedPreAnswer = false;
   render();
 }
 
@@ -445,6 +473,20 @@ export function toggleLogic() {
   if (badge) badge.classList.toggle('active', newFlag);
   const srsNote = $('#fb .srs-note');
   if (srsNote) srsNote.textContent = sched.note;
+}
+
+/** Yanlış yapılan cevabı dikkat hatası olarak işaretle / kaldır. */
+export function toggleAttention() {
+  if (!S || !S.answered) return;
+  const lastLog = S.log[S.log.length - 1];
+  if (!lastLog || lastLog.ok) return;
+
+  const newFlag = !lastLog.attentionError;
+  markLastAnswerAttention(newFlag);
+  lastLog.attentionError = newFlag;
+
+  const badge = $('#badge-attention');
+  if (badge) badge.classList.toggle('active', newFlag);
 }
 
 export function quit() {
@@ -822,80 +864,34 @@ function getAnyGoogleToken() {
 }
 
 /**
- * Tarayıcıda aktif Google token varsa, seansı doğrudan Google Drive'daki
- * hmgs_2026_data.json dosyasının pendingStudioSessions[] kuyruğuna ekler/günceller.
- * Böylece farklı cihazlar arasında (ör. masaüstünden telefona) anında eşitlenir.
+ * Tarayıcıda aktif Google jetonu varsa seansı Drive'daki
+ * `HMGS/hmgs_studio_queue.json` kuyruğuna yazar. Takip uygulaması bir sonraki
+ * açılışında bu kuyruğu okuyup `entries[]`e çevirir.
+ *
+ * NEDEN AYRI DOSYA — eski sürüm doğrudan `hmgs_2026_data.json`'u PATCH'liyordu.
+ * Bu iki kuralı birden bozuyordu:
+ *   1. TEK YAZAR KURALI — o dosyanın tek yazarı Takip uygulamasıdır. Stüdyo
+ *      "oku-değiştir-yaz" yaptığı için Takip tam o sırada kaydederse Stüdyo'nun
+ *      bayat kopyası Takip'in yeni kaydını siliyordu.
+ *   2. Drive'da dosyanın sahibi Takip'tir; `drive.file` kapsamı başka bir
+ *      istemcinin yarattığı dosyayı yazamaz — istek 403 dönüyordu.
+ * Kuyruk dosyasının sahibi ve tek yazarı artık Stüdyo'dur; Takip sadece okur.
  */
 async function pushSessionToDriveDirectly(sess) {
   if (!sess || !sess.id) return false;
-  const token = getAnyGoogleToken();
+  let token = getAnyGoogleToken();
   if (!token) return false;
+  setActiveToken(token);
 
   try {
-    let fileId = null;
-    const q = encodeURIComponent("name='hmgs_2026_data.json' and trashed=false");
-
-    // 1. Önce appDataFolder içinde hmgs_2026_data.json ara
-    let res = await fetch(
-      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      if (data.files && data.files.length > 0) {
-        fileId = data.files[0].id;
-      }
-    }
-
-    // appDataFolder'da yoksa kök Drive'da ara (eski sürüm uyumu)
-    if (!fileId) {
-      res = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.files && data.files.length > 0) {
-          fileId = data.files[0].id;
-        }
-      }
-    }
-
-    if (!fileId) return false;
-
-    // 2. Dosyanın mevcut içeriğini oku
-    const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!dlRes.ok) return false;
-
-    const remoteData = await dlRes.json();
-    if (!remoteData || typeof remoteData !== 'object') return false;
-
-    if (!Array.isArray(remoteData.pendingStudioSessions)) {
-      remoteData.pendingStudioSessions = [];
-    }
-
-    const idx = remoteData.pendingStudioSessions.findIndex(s => s.id === sess.id);
-    if (idx >= 0) {
-      remoteData.pendingStudioSessions[idx] = sess;
-    } else {
-      remoteData.pendingStudioSessions.push(sess);
-    }
-
-    // 3. Dosyayı PATCH ile Drive'a geri yaz
-    const patchRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json; charset=UTF-8'
-      },
-      body: JSON.stringify(remoteData, null, 2)
-    });
-
-    return patchRes.ok;
+    // Kuyruk dosyası TAM bir anlık görüntüdür (append değil): Stüdyo zaten
+    // localStorage'daki sessions[] dizisinin tamamını gönderiyor. Takip tarafı
+    // studioSessionId üzerinden idempotent çevirdiği için mükerrer kayıt olmaz.
+    const s = state();
+    const ok = await pushStudioQueueToDrive(token, s.sessions || [], (s.answers || []).slice(-2000));
+    return ok;
   } catch (err) {
-    console.warn('[sync] Google Drive doğrudan kuyruk güncelleme uyarısı:', err);
+    console.warn('[sync] Drive kuyruk güncelleme uyarısı:', err);
     return false;
   }
 }
@@ -1067,6 +1063,19 @@ export function askGemini() {
   const q = S.questions[S.i];
   const last = S.log[S.log.length - 1];
   const chosen = S.answered && last && last.qId === q.id ? last.chosen : null;
+
+  // Davranış sinyali: bu soru için Gemini'ye soruldu
+  S.geminiAsked = true;
+  // Cevap VERİLMEDEN sorulduysa → ipucu modu. SRS'te logicGuess gibi davranacak.
+  if (!S.answered) S.geminiAskedPreAnswer = true;
+  if (S.answered && last && last.qId === q.id) {
+    last.askedGemini = true;
+    // store'daki son kayıt ile S.log senkron — doğrudan güncelle ve kaydet
+    const storeAnswers = state().answers;
+    const storeRow = storeAnswers.findLast?.(a => a.qId === q.id) ||
+      [...storeAnswers].reverse().find(a => a.qId === q.id);
+    if (storeRow) { storeRow.askedGemini = true; save(); }
+  }
 
   const built = buildGeminiPrompt(q, { answered: !!S.answered, chosen });
   const prompt = built.text;
