@@ -313,9 +313,30 @@ export function finish(auto = false) {
 
   saveExam(result);
   save();
+  pushExamToLocalServer().catch(() => {});
   lastResult = result;
   E.finished = true;
   render();
+}
+
+/**
+ * Deneme sonucunu yerel Stüdyo sunucusuna (localhost:8766) yazar.
+ * localStorage'da hapis kalmaması için: sonuç `studio_sessions_export.json`'a
+ * `exams[]` olarak düşer, böylece diskte kalıcı bir kayıt olur ve
+ * HMGS_Takip_App ile paylaşılabilir. GitHub Pages/telefonda bu uç yoktur —
+ * hata sessizce yutulur, kullanıcıya ağ hatası gösterilmez.
+ */
+async function pushExamToLocalServer() {
+  if (typeof window === 'undefined') return;
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (!isLocal) return;
+  try {
+    await fetch('/api/save-sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exams: state().exams || [] })
+    });
+  } catch (_) { /* yerel sunucu kapalıysa sessizce geç */ }
 }
 
 /* ---------- sonuç ---------- */
