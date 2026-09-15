@@ -815,7 +815,7 @@ function finalizeSession() {
  * Takip uygulaması (aynı origin / GitHub Pages) açıldığında bu kuyruğu okuyup
  * anında çalışma kaydına (entries[]) çevirir.
  */
-function queueSessionForTakip(sess) {
+export function queueSessionForTakip(sess) {
   if (!sess || !sess.id) return;
   try {
     const KEY = 'hmgs_pending_studio_sessions';
@@ -877,7 +877,7 @@ function getAnyGoogleToken() {
  *      istemcinin yarattığı dosyayı yazamaz — istek 403 dönüyordu.
  * Kuyruk dosyasının sahibi ve tek yazarı artık Stüdyo'dur; Takip sadece okur.
  */
-async function pushSessionToDriveDirectly(sess) {
+export async function pushSessionToDriveDirectly(sess) {
   if (!sess || !sess.id) return false;
   let token = getAnyGoogleToken();
   if (!token) return false;
@@ -910,7 +910,7 @@ async function pushSessionToDriveDirectly(sess) {
  *   attempted: yerel sunucu ortamı mıydı — false ise buton "sıraya alındı" der.
  *   ok: Drive'a yazıldı mı — butonun "Gönderildi ✓" demesinin TEK koşulu budur.
  */
-async function pushToLocalServer() {
+export async function pushToLocalServer() {
   if (typeof window === 'undefined') return { attempted: false, ok: false, message: '' };
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   if (!isLocal) return { attempted: false, ok: false, message: '' };
