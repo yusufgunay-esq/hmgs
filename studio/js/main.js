@@ -1,4 +1,4 @@
-/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+﻿/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
    رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
    ==========================================================================
@@ -20,9 +20,10 @@ import * as exam from './views/exam.js';
 import * as flow from './views/flow.js';
 import * as progress from './views/progress.js';
 import * as pratik from './views/pratik.js';
+import * as akim from './views/akim.js';
 
 
-const VIEWS = ['today', 'odevler', 'flow', 'practice', 'pratik', 'exam', 'progress'];
+const VIEWS = ['today', 'odevler', 'flow', 'akim', 'practice', 'pratik', 'exam', 'progress'];
 let currentView = 'today';
 let lastAction = null;
 
@@ -75,7 +76,8 @@ function show(view, push = true) {
   if (typeof document !== 'undefined' && document.body) {
     document.body.setAttribute('data-view', view);
     document.body.classList.toggle('view-practice', view === 'practice');
-    document.body.classList.toggle('in-session', view === 'practice' && practice.hasSession());
+    document.body.classList.toggle('in-session',
+      (view === 'practice' && practice.hasSession()) || (view === 'akim' && akim.hasSession()));
   }
   VIEWS.forEach(v => $('#view-' + v)?.classList.toggle('on', v === view));
   $$('.nav button').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === view)));
@@ -84,6 +86,7 @@ function show(view, push = true) {
     if (view === 'today') today.render();
     if (view === 'odevler') odevler.fetchTasks();
     if (view === 'flow') flow.render();
+    if (view === 'akim') akim.render();
     if (view === 'practice') practice.render();
     if (view === 'pratik') pratik.render();
     if (view === 'exam') exam.render();
@@ -269,14 +272,27 @@ document.addEventListener('click', async e => {
     case 'again':        if (!practice.repeatSession()) show('today'); break;
     case 'push-session': practice.pushSession(); break;
 
+    /* --- akış modu --- */
+    case 'akim-start':         akim.start(); break;
+    case 'akim-quit':          akim.quit(); break;
+    case 'akim-pick':          akim.pick(el.dataset.key); break;
+    case 'akim-dontknow':      akim.dontKnow(); break;
+    case 'akim-next':          akim.next(); break;
+    case 'akim-next-logic':    akim.nextLogic(); break;
+    case 'akim-toggle-logic':  akim.toggleLogic(); break;
+    case 'akim-toggle-attention': akim.toggleAttention(); break;
+    case 'akim-ask-gemini':    akim.askGemini(); break;
+
     /* --- şık / öncül eleme (pratik + sınav ortak) --- */
     case 'eliminate': {
       if (currentView === 'exam') exam.eliminateOption(el.dataset.key);
+      else if (currentView === 'akim') akim.eliminateOption(el.dataset.key);
       else practice.eliminateOption(el.dataset.key);
       break;
     }
     case 'eliminate-premise': {
       if (currentView === 'exam') exam.eliminatePremise(el.dataset.numeral);
+      else if (currentView === 'akim') akim.eliminatePremise(el.dataset.numeral);
       else practice.eliminatePremise(el.dataset.numeral);
       break;
     }
@@ -369,6 +385,16 @@ document.addEventListener('keydown', e => {
     } else {
       if (letter) { practice.pick(letter); e.preventDefault(); }
       else if (k === 'B') { practice.dontKnow(); e.preventDefault(); }
+    }
+  } else if (currentView === 'akim' && akim.hasSession()) {
+    if (e.key === 'Escape') { akim.quit(); e.preventDefault(); return; }
+    if (k === 'G') { akim.askGemini(); e.preventDefault(); return; }
+    if (akim.isAnswered()) {
+      if (e.key === 'Enter' || e.key === ' ') { akim.next(); e.preventDefault(); }
+      else if (k === 'M') { akim.nextLogic(); e.preventDefault(); }
+    } else {
+      if (letter) { akim.pick(letter); e.preventDefault(); }
+      else if (k === 'B') { akim.dontKnow(); e.preventDefault(); }
     }
   } else if (currentView === 'exam' && exam.active()) {
     if (letter) { exam.pick(letter); e.preventDefault(); }
