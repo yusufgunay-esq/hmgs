@@ -8,6 +8,7 @@ import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle,
 import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
 import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
+import { kuralButtonHTML } from '../kural.js';
 import { pushStudioQueueToDrive, getActiveToken, setActiveToken } from '../vault-client.js';
 
 let S = null;   // aktif seans
@@ -351,16 +352,18 @@ function paintResult(q, chosen, row, sched, ms) {
         <div class="fb-body">
           ${explanationHTML(q, chosen)}
           ${q.legalBasis ? `<div class="fb-basis-wrap"><span class="basis">${esc(q.legalBasis)}</span></div>` : ''}
+          <div class="kural-slot" id="kural-slot" hidden></div>
         </div>
         <div class="fb-actions">
           <div class="btn-row">
             <button class="btn" data-act="next">${isLast ? 'Seansı bitir' : 'Sonraki soru'}</button>
             ${geminiBtnHTML}
             ${logicBtnHTML}
+            ${kuralButtonHTML(q)}
           </div>
           <div class="fb-actions-meta">
             <span class="srs-note">${esc(sched.note)}</span>
-            <span class="hint"><span class="kbd">Enter</span> devam${row.ok ? ' · <span class="kbd">M</span> mantık' : ''} · <span class="kbd">G</span> Gemini</span>
+            <span class="hint"><span class="kbd">Enter</span> devam${row.ok ? ' · <span class="kbd">M</span> mantık' : ''}${kuralButtonHTML(q) ? ' · <span class="kbd">K</span> kural' : ''} · <span class="kbd">G</span> Gemini</span>
           </div>
         </div>
       </div>`;
