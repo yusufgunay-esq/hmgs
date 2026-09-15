@@ -8,7 +8,8 @@ import { esc, $, pct } from '../ui.js';
 import { subjectName, topicById } from '../data.js';
 import { daysLeft, streak, lastExam, PASS_CORRECT, state, getDailyPlan } from '../store.js';
 import { nextAction, todayProgress, srsSummary, allSubjectMastery,
-  MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions } from '../engine.js';
+  MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions,
+  examGap, worstExamSubjects, answerQualitySignals } from '../engine.js';
 
 /** Koç planı bugün için bir kez tazelenir — her render'da ağ isteği yok. */
 let planRefreshed = false;
@@ -42,6 +43,11 @@ export function render() {
   const auto = mastery.filter(s => s.mastery.state === 'auto').length;
   const effort = mastery.filter(s => s.mastery.state === 'effort').length;
   const untouched = mastery.filter(s => s.mastery.state === 'none').length;
+
+  // Deneme teşhisi — ham veriden, bayat /api/profil'e bağlı değil.
+  const gap = examGap();
+  const worst = worstExamSubjects(5);
+  const sig = answerQualitySignals();
 
   host.innerHTML = `
     <div class="wrap">
@@ -99,6 +105,8 @@ export function render() {
           <div class="metric-n">${st >= 3 ? 'seriyi bozma' : 'seri kurmaya başla'}</div>
         </div>
       </div>
+
+      ${diagnosisHTML(gap, worst, sig)}
 
       ${due.length ? `
         <div class="section-label">Yanlışlarım · vadesi gelenler (Leitner 1-3-7-14-30)</div>
@@ -165,6 +173,46 @@ function hedefNotu(prog) {
   }
   return `Koç planı bugün yüklenmedi · Stüdyo tabanı ${prog.target}`
     + ' · kağıtta çözülenler bu sayıya girmez';
+}
+
+/**
+ * Deneme teşhisi bloğu. Yalnızca deneme varsa çizilir. Sayılar net cinsindendir
+ * ("31 net açık", "HMK −6 net") — süs değil, sınav puanına doğrudan etki.
+ */
+function diagnosisHTML(gap, worst, sig) {
+  if (!gap) return '';
+  const fastWrong = sig && sig.n >= 20 && sig.fastWrongRate >= 0.15;
+  return `
+    <div class="section-label">Deneme teşhisi · son ${new Date(gap.at).toLocaleDateString('tr-TR')}</div>
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap">
+        <div style="font-size:1.15rem;font-weight:700;color:${gap.gap > 0 ? 'var(--no)' : 'var(--ok)'}">${gap.net} net</div>
+        <div class="hint" style="margin:0">${gap.gap > 0
+          ? `84 net için <b style="color:var(--no)">${gap.gap} net açık</b>`
+          : 'Barajın üstünde — güvenlik payını büyüt'}</div>
+        ${gap.pace ? `<span class="chip">~${gap.pace} sn/soru</span>` : ''}
+      </div>
+      ${fastWrong ? `
+        <div class="trap" style="margin-top:0.85rem">
+          <div class="lbl">Hızlı + yanlış</div>
+          <p>${sig.n} cevabın ${sig.fastWrongN} tanesi hedef sürenin altında verilip yanlış çıkmış (%${Math.round(sig.fastWrongRate * 100)}).
+          Bu "bilmediğini bilmeme" sinyalidir: soru kökünü okumadan tahmin etmek. 75 saniyeye kadar bütçen var — yavaşla, önce kökü ve "hangisi değildir" tuzağını gör.</p>
+        </div>` : ''}
+      ${worst.length ? `
+        <div style="margin-top:0.9rem;display:flex;flex-direction:column;gap:0.55rem">
+          ${worst.map(x => `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem">
+              <div style="min-width:0">
+                <div style="font-size:0.9rem;font-weight:600">${esc(x.name)}</div>
+                <div class="hint" style="margin:0">sınavda ${x.examQ} soru · isabet %${Math.round(x.acc * 100)}${x.blank ? ` · ${x.blank} boş` : ''}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0">
+                <span class="chip red">−${Math.round(x.leak * 10) / 10} net</span>
+                <button class="btn btn-2 btn-s" data-act="practice-subject" data-subject="${esc(x.id)}">Çöz</button>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+    </div>`;
 }
 
 /** Vadesi gelen tekrarları ders bazında topla — en çok bekleyen üstte. */
