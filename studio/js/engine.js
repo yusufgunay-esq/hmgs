@@ -644,3 +644,106 @@ export function scoreOf(correct, total = 120) {
   const pts = (correct / total) * 100;
   return { net: correct, points: Math.round(pts * 10) / 10, pass: correct >= PASS_CORRECT };
 }
+
+/* ==========================================================================
+   AKIŞ MODU — SONU OLMAYAN, SEANS ÖZETİYLE BÖLÜNMEYEN SORU AKIŞI
+   ----------------------------------------------------------------------
+   Kullanıcı "flow moduna geçmek istiyorum, uygulamadan çıkmak istemiyorum"
+   dedi. Sorun içerik kalitesi değil, her gün açıp çözmek (PROFIL_MOTORU_PLANI
+   §2.4: 44 günün 29'u sıfır, 11 gündür kayıt yok). Bu katman o boşluğu kapatır.
+
+   İLKELER:
+     - Soru seçimi UYDURULMAZ: kanıtlanmış buildKarmaSet (ölçülmüş sınav
+       dağılımı + kapsam/isabet açığı) haddelenen bir kaynağa çevrilir.
+     - Yanlıştan sonra aynı kuraldan bir kardeş soru kısa bir gecikmeyle
+       (FLOW_REINFORCE_DELAY) geri gelir — hata sonrası pekiştirme.
+     - Akış skoru türetilmiştir (uydurma puan değil): son cevapların doğruluğu
+       × tempo × kesintisizlik. Cevaplar answers[]'ta zaten duruyor; bu fonk.
+       yalnızca OKUR, şema eklemez.
+   ========================================================================== */
+
+/** Kuyruk bu eşiğin altına düşünce yeniden doldurulur. */
+export const FLOW_REFILL_AT = 8;
+/** Her dolumda çekilen soru sayısı. */
+export const FLOW_BATCH = 16;
+/** Yanlıştan sonra pekiştirme sorusu kaç pozisyon sonra gelir. */
+export const FLOW_REINFORCE_DELAY = 2;
+/** Akış skorunun baktığı son cevap penceresi. */
+export const FLOW_WINDOW = 10;
+/** "Kesintisiz" sayılan iki cevap arası saniye. */
+export const FLOW_GAP_SEC = 8;
+
+/**
+ * Akış kuyruğu için bir parti soru üret. buildKarmaSet'in ince sarmalayıcısı:
+ * vadesi gelen SRS tekrarları önce, kalanı ölçülmüş sınav ağırlığına göre,
+ * aynı ders yan yana gelmeden. Tek doğruluk kaynağı karma motorudur.
+ */
+export function flowFeed(count = FLOW_BATCH, scope = 'core') {
+  return buildKarmaSet(count, scope);
+}
+
+/**
+ * Yanlış yapılan sorudan sonra aynı kuralın bir kardeşini döndürür.
+ * Tercih sırası: aynı konu (topicId) → aynı ders. Yakın zamanda sorulanlar
+ * (excludeIds) ve sorunun kendisi dışlanır. Aday yoksa null (pekiştirme yok,
+ * uydurma yok).
+ */
+export function flowReinforce(q, excludeIds = new Set()) {
+  if (!q) return null;
+  const seen = new Set(excludeIds);
+  seen.add(q.id);
+  let pool = q.topicId ? questionsOfTopic(q.topicId, 'all') : [];
+  if (!pool.length) pool = questionsOf(q.subjectId, 'all');
+  const cands = pool.filter(x => !seen.has(x.id));
+  return shuffle(cands)[0] || null;
+}
+
+/**
+ * Akış skoru 0–1. Uydurma XP değil, Csikszentmihalyi'nin akış tanımının
+ * (net hedef + zorluk≈beceri + anında geri bildirim) sayısal karşılığı:
+ *   score = doğruluk(son N) × tempo faktörü × kesintisizlik faktörü
+ * Doğruluk ana taşıyıcı; tempo ve kesintisizlik akışı inceltir ama ezmez.
+ * @param {Array|null} rows  Cevap kayıtları; null ise state().answers okunur.
+ */
+export function flowScore(rows = null) {
+  const all = rows == null ? state().answers : rows;
+  if (!all || !all.length) return { score: 0, acc: 0, tempo: 0, continuity: 1, label: 'idle', n: 0 };
+
+  const last = all.slice(-FLOW_WINDOW);
+  const acc = last.filter(r => r.ok).length / last.length;
+
+  const secs = last.map(r => (r.ms || 0) / 1000).filter(s => s > 0.5 && s < 900);
+  const med = median(secs);
+  const tempo = med > 0 ? Math.min(1, TARGET_SEC / med) : 0;
+
+  let continuity = 1;
+  if (last.length >= 3) {
+    let fast = 0, gaps = 0;
+    for (let i = 1; i < last.length; i++) {
+      const dt = (new Date(last[i].at).getTime() - new Date(last[i - 1].at).getTime()) / 1000;
+      if (Number.isFinite(dt) && dt >= 0) { gaps++; if (dt <= FLOW_GAP_SEC) fast++; }
+    }
+    continuity = gaps ? fast / gaps : 1;
+  }
+
+  const score = Math.max(0, Math.min(1, acc * (0.6 + 0.4 * tempo) * (0.75 + 0.25 * continuity)));
+
+  let label;
+  if (score >= 0.72) label = 'Akışta';
+  else if (score >= 0.5) label = 'Odaklan';
+  else if (score >= 0.3) label = 'Isınıyor';
+  else label = 'Mola ver';
+
+  return { score, acc, tempo, continuity, label, n: last.length };
+}
+
+/**
+ * Akış içi yetkinlik anı. scheduleAfterAnswer "mezun" döndürdüğünde (kutu
+ * 5) o sorunun temsil ettiği kural aralıklı tekrardan çıkmış demektir — bu
+ * gerçek bir "otomatikleşti" sinyalidir, dekoratif rozet değil.
+ */
+export function flowMilestone(sched) {
+  if (!sched) return null;
+  if (sched.box >= BOXES.length) return 'Kural otomatikleşti — tekrar sırasından çıktı';
+  return null;
+}
