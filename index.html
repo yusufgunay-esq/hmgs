@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
   بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
   رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
@@ -1892,7 +1892,31 @@ const SUBJECT_COLORS = {
     'Hukuk Felsefesi ve Sosyolojisi': 'bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30',
     'Genel Kamu Hukuku': 'bg-blue-600/15 text-blue-200 border-blue-600/30'
 };
-const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+// ORTAK YETKİ SETİ (17 Eylül 2026) — Stüdyo (studio/js/vault-client.js) ile
+// BİREBİR AYNI olmak ZORUNDA. Sebep: tarayıcı, farklı istek listelerini farklı
+// onay ekranı sayar; iki uygulama ayrı set istediği sürece kullanıcı iki kez
+// bağlanmak zorunda kalıyordu. Tek set = tek onay ekranı, tek giriş.
+//
+//   • drive.appdata  : ESKİ veri yeri (gizli uygulama klasörü). Yalnızca tek
+//                      seferlik taşıma (migrasyon) okuması için duruyor; yeni
+//                      veri artık HMGS/ klasöründe. Taşıma tamamlandıktan
+//                      sonra bu kapsam listeden çıkarılabilir.
+//   • drive.readonly : hmgs_vault.json'u (7,4 MB soru/konu kasası) okuyabilmek
+//                      için. Kasa'yı masaüstü araçları yazar, tarayıcı SADECE okur.
+//   • drive.file     : uygulamanın KENDİ oluşturduğu dosyaları yazabilmesi için
+//                      (HMGS/hmgs_2026_data.json). drive.file başka bir
+//                      istemcinin yarattığı dosyayı yazamaz — bu yüzden veri
+//                      dosyasının yaratıcısı tarayıcı olmalı.
+const SCOPES = 'https://www.googleapis.com/auth/drive.appdata '
+             + 'https://www.googleapis.com/auth/drive.readonly '
+             + 'https://www.googleapis.com/auth/drive.file';
+
+// Drive'da verinin durduğu tek görünür klasör. Üç dosya burada yaşar:
+//   hmgs_2026_data.json       (Takip'in verisi — tek yazarı bu dosya)
+//   hmgs_vault.json           (soru+konu kasası, masaüstü yazar / Studio okur)
+//   hmgs_studio_progress.json (Stüdyo'nun SRS/cevap ilerlemesi — tek yazarı Studio)
+//   hmgs_studio_queue.json    (Stüdyo'nun Takip'e aktarım kuyruğu — tek yazarı Studio)
+const HMGS_FOLDER_NAME = 'HMGS';
 
 let CLIENT_ID       = '235274565512-c8oalrvo4idikpbkh2j3g8sgdjsq3v83.apps.googleusercontent.com';
 // Android kabuğu (HMGS_Android) sayfayı açarken `HMGSNative` köprüsünü enjekte eder.
@@ -5594,22 +5618,49 @@ function migrateExistingStudioKarmaEntries() {
 }
 
 /**
- * pendingStudioSessionsQueue'yu güncel Drive verisiyle eşitler, yeni seansları
- * entries'e çevirir, ekranı günceller ve kuyruğu (yerel ayna) tüketildi olarak
- * işaretler. loadFromDrive() ve fetchRemoteExtraFields() tarafından ortak
- * çağrılır ki hem sayfa açılışında hem de bir sonraki kayıt kaydedilirken
- * yakalansın.
+ * pendingStudioSessionsQueue'yu güncel Drive verisiyle EŞİTLER (üzerine yazmaz),
+ * yeni seansları entries'e çevirir, ekranı günceller ve YALNIZCA çevrilemeyenleri
+ * kuyrukta bırakır. loadFromDrive() ve fetchRemoteExtraFields() tarafından ortak
+ * çağrılır ki hem sayfa açılışında hem de bir sonraki kayıt kaydedilirken yakalansın.
+ *
+ * NEDEN BİRLEŞTİRME (merge) — eski sürüm `pendingStudioSessionsQueue = rawQueue`
+ * yapıp ardından tümünü boşaltıyordu. Aynı origin'de (GitHub Pages) Stüdyo kendi
+ * seanslarını `hmgs_pending_studio_sessions` anahtarına yazdığı için şu kayıp
+ * senaryosu oluşuyordu:
+ *   1. Stüdyo 3 seans yazdı → açılışta kuyruk bunlarla doldu.
+ *   2. Drive'da 2 BAŞKA seans vardı → eski kod kuyruğu bu 2 ile DEĞİŞTİRDİ.
+ *   3. O 2'si çevrildi, kuyruk boşaltıldı → Stüdyo'nun 3 seansı ne Drive'a
+ *      yazıldı ne entries'e çevrildi: sessizce kayboldu.
+ * Artık iki kaynak id bazında birleştirilir; hiçbir seans bir diğerini ezmez.
  */
 function applyPendingStudioSessions(rawQueue) {
     if (!Array.isArray(rawQueue)) return;
-    pendingStudioSessionsQueue = rawQueue;
+
+    // id bazında birleştir — gelen kayıt aynı id'li yerel kaydın yerine geçer.
+    const merged = new Map();
+    pendingStudioSessionsQueue.forEach(s => { if (s && s.id) merged.set(s.id, s); });
+    rawQueue.forEach(s => { if (s && s.id) merged.set(s.id, s); });
+    pendingStudioSessionsQueue = [...merged.values()];
+
     const added = convertPendingStudioSessions(pendingStudioSessionsQueue);
+
+    // Çevrilemeyenleri kuyrukta bırak. "Tükettim" kararı tahmine dayanmasın:
+    // gerçek ölçüt, entries[] içinde studioSessionId'si bulunmayan seanslardır —
+    // convertPendingStudioSessions()'ın idempotentlik için kullandığı ölçütün aynısı.
+    const aktarilan = new Set(entries.map(e => e.studioSessionId).filter(Boolean));
+    const kalan = pendingStudioSessionsQueue.filter(s => s && s.id && !aktarilan.has(s.id));
+    pendingStudioSessionsQueue = kalan;
+
     if (added) {
-        pendingStudioSessionsQueue = []; // tükettik, Drive'daki kuyruk bir sonraki kayıtta boşaltılacak
         renderLogs(); renderSubjectCards();
         showToast("Stüdyo'dan yeni pratik seansları çalışma kaydına eklendi ✓", 'emerald');
     }
-    localStorage.setItem('hmgs_pending_studio_sessions', JSON.stringify(pendingStudioSessionsQueue));
+    if (kalan.length) {
+        console.warn(`[studio queue] ${kalan.length} seans çevrilemedi, kuyrukta bekliyor:`, kalan.map(s => s.id));
+    }
+    try {
+        localStorage.setItem('hmgs_pending_studio_sessions', JSON.stringify(pendingStudioSessionsQueue));
+    } catch (e) {}
 }
 
 /**
@@ -5635,59 +5686,227 @@ function migrateStudioNoteField() {
     return changed;
 }
 
+let hmgsFolderId = null;
+try { hmgsFolderId = localStorage.getItem('hmgs_drive_folder_id') || null; } catch (e) {}
+
+// Çözülen dosya ESKİ bir konumdan (appDataFolder / Drive kökü) geldiyse true.
+// Bu durumda içerik okunduktan sonra HMGS/ klasörüne taşınır — eski dosya
+// SİLİNMEZ (veri kaybı riski alınmaz), kullanıcı isterse elle temizler.
+let driveFileIdLegacy = false;
+
+/** Drive'da adı verilen dosyayı arar; bulursa id döner. Yetki hatasında null. */
+async function driveFindFileId(name, parentsParam) {
+    if (!accessToken) return null;
+    const q = encodeURIComponent(`name='${name}' and trashed=false`);
+    const parent = parentsParam ? ` and '${parentsParam}' in parents` : '';
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}${parent}`
+              + `&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.files && data.files.length) ? data.files[0].id : null;
+}
+
+/**
+ * Drive kökünde `HMGS/` klasörünü bulur, yoksa oluşturur ve id'yi önbelleğe alır.
+ *
+ * Neden klasör: kullanıcı verisinin Drive arayüzünde GÖRÜNÜR ve yedeklenebilir
+ * olması gerekiyordu; gizli appDataFolder'da masaüstü araçları onu göremiyor
+ * (appDataFolder OAuth istemcisi başına ayrıdır).
+ */
+async function ensureHmgsFolder() {
+    if (!accessToken) return null;
+    if (hmgsFolderId) return hmgsFolderId;
+
+    const mevcut = await driveFindFileId(
+        HMGS_FOLDER_NAME,
+        null
+    );
+    // driveFindFileId 'root' kısıtı koymaz; klasörün gerçekten klasör olduğunu
+    // ve kökte durduğunu ayrıca doğrula. Yanlış tipte eş adlı bir dosya varsa
+    // (ör. kullanıcı elle "HMGS" adlı bir Docs oluşturduysa) onu klasör sanmayalım.
+    if (mevcut) {
+        const res = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${mevcut}?fields=id,mimeType,parents`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (res.ok) {
+            const meta = await res.json();
+            const isFolder = meta.mimeType === 'application/vnd.google-apps.folder';
+            const inRoot = !meta.parents || meta.parents.includes('root');
+            if (isFolder && inRoot) {
+                hmgsFolderId = mevcut;
+                try { localStorage.setItem('hmgs_drive_folder_id', hmgsFolderId); } catch (e) {}
+                return hmgsFolderId;
+            }
+        }
+    }
+
+    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json; charset=UTF-8'
+        },
+        body: JSON.stringify({
+            name: HMGS_FOLDER_NAME,
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: ['root']
+        })
+    });
+    if (!createRes.ok) {
+        console.error('[drive] HMGS klasörü oluşturulamadı:', createRes.status, await createRes.text());
+        return null;
+    }
+    const folder = await createRes.json();
+    hmgsFolderId = folder.id || null;
+    try { if (hmgsFolderId) localStorage.setItem('hmgs_drive_folder_id', hmgsFolderId); } catch (e) {}
+    console.log('[drive] HMGS klasörü oluşturuldu:', hmgsFolderId);
+    return hmgsFolderId;
+}
+
+/**
+ * Veri dosyasını çözer ve id'yi önbelleğe yazar.
+ *
+ * Sıra ÖNEMLİ — ilk bulunan kazanır:
+ *   1) HMGS/ klasörü       → yeni standart (görünür, yedeklenebilir)
+ *   2) appDataFolder       → eski yer; buradaysa içerik taşınacak (migrasyon)
+ *   3) Drive kökü          → daha eski yer; aynı şekilde taşınır
+ *
+ * Önbellekteki id'nin bayatlaması: Drive'daki dosya silinir/yeniden yaratılırsa
+ * `hmgs_drive_file_id` ölür ve eski kod kalıcı 404 veriyordu. Çağıranlar artık
+ * 404 aldıklarında bu fonksiyonu yeniden koşturup tazeliyor.
+ */
+async function resolveDriveFileId() {
+    if (!accessToken) return null;
+
+    // 1) Yeni standart: HMGS/ klasörü
+    const folderId = await ensureHmgsFolder();
+    if (folderId) {
+        const inFolder = await driveFindFileId(DRIVE_FILE, folderId);
+        if (inFolder) {
+            driveFileId = inFolder;
+            driveFileIdLegacy = false;
+            try { localStorage.setItem('hmgs_drive_file_id', driveFileId); } catch (e) {}
+            return driveFileId;
+        }
+    }
+
+    // 2) Eski gizli uygulama klasörü (appDataFolder)
+    try {
+        const q = encodeURIComponent(`name='${DRIVE_FILE}' and trashed=false`);
+        const res = await fetch(
+            `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (res.ok) {
+            const data = await res.json();
+            if (data.files && data.files.length) {
+                driveFileId = data.files[0].id;
+                driveFileIdLegacy = true;
+                try { localStorage.setItem('hmgs_drive_file_id', driveFileId); } catch (e) {}
+                return driveFileId;
+            }
+        }
+    } catch (e) { /* sıradaki yere düş */ }
+
+    // 3) Drive kökü (en eski yer)
+    try {
+        const rootId = await driveFindFileId(DRIVE_FILE, 'root');
+        if (rootId) {
+            driveFileId = rootId;
+            driveFileIdLegacy = true;
+            try { localStorage.setItem('hmgs_drive_file_id', driveFileId); } catch (e) {}
+            return driveFileId;
+        }
+    } catch (e) { /* yok say */ }
+
+    driveFileId = null;
+    driveFileIdLegacy = false;
+    try { localStorage.removeItem('hmgs_drive_file_id'); } catch (e) {}
+    return null;
+}
+
+/**
+ * STÜDYO KUYRUĞU — doğrudan Drive'daki `HMGS/hmgs_studio_queue.json`.
+ *
+ * Neden ayrı bir dosya: eskiden Stüdyo'nun pratik seansları ancak masaüstü
+ * `hmgs-sync.mjs sessions-push` çalıştığında Takip'e ulaşıyordu. O script ayrı
+ * bir OAuth istemcisi kullandığı için appDataFolder'ı göremiyor ve refresh
+ * token'ı sürekli ölüyordu → zincir hiç kapanmıyordu. Artık Stüdyo kuyruğu
+ * doğrudan buraya yazıyor, Takip de açılışta okuyor. Masaüstü ayağı opsiyonel.
+ *
+ * ÇEVİRİCİ AYNI: convertPendingStudioSessions() kullanılıyor — hem eski
+ * `pendingStudioSessions` alanı hem bu dosya aynı biçimi taşır, dolayısıyla
+ * iki kaynaktan gelen aynı seans `studioSessionId` sayesinde İKİ KEZ eklenmez.
+ *
+ * TEK YAZAR: bu dosyayı SADECE Stüdyo yazar. Burası yalnız okur, kuyruğu
+ * boşaltmak için dosyayı SİLMEZ veya DEĞİŞTİRMEZ (entries[]'in tek yazarı
+ * olma kuralı böyle korunuyor).
+ */
+async function pullStudioQueue() {
+    if (!accessToken) return false;
+    try {
+        const q = encodeURIComponent(`name='hmgs_studio_queue.json' and trashed=false`);
+        const res = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (!data.files || !data.files.length) return false;
+
+        const dl = await fetch(`https://www.googleapis.com/drive/v3/files/${data.files[0].id}?alt=media`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (!dl.ok) return false;
+        const queue = await dl.json();
+        const sessions = Array.isArray(queue?.sessions) ? queue.sessions : [];
+        if (!sessions.length) return false;
+
+        const added = convertPendingStudioSessions(sessions);
+        if (added) {
+            renderLogs(); renderSubjectCards();
+            showToast("Stüdyo kuyruğundan yeni seanslar çalışma kaydına eklendi ✓", 'emerald');
+        }
+        return added;
+    } catch (e) {
+        console.warn('[studio queue] okunamadı:', e);
+        return false;
+    }
+}
+
 async function loadFromDrive() {
     if (!accessToken) accessToken = await gAccessToken();
     if (!accessToken) return;
     setDriveStatus('syncing');
     try {
         if (!driveFileId) {
-            // Önce Google Drive'ın gizli klasöründe (appDataFolder) ara
-            const q = encodeURIComponent(`name='${DRIVE_FILE}' and trashed=false`);
-            const res = await fetch(
-                `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
-                { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            const data = await res.json();
-            if (data.files && data.files.length > 0) {
-                driveFileId = data.files[0].id;
-                localStorage.setItem('hmgs_drive_file_id', driveFileId);
-            } else {
-                // MİGRASYON: appDataFolder içinde henüz dosya yoksa, kullanıcının
-                // eski kök Drive'ındaki mevcut dosyasını bulup içeriğini appDataFolder'a taşı.
-                try {
-                    const legacyRes = await fetch(
-                        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
-                        { headers: { Authorization: `Bearer ${accessToken}` } }
-                    );
-                    if (legacyRes.ok) {
-                        const legData = await legacyRes.json();
-                        if (legData.files && legData.files.length > 0) {
-                            const legDl = await fetch(`https://www.googleapis.com/drive/v3/files/${legData.files[0].id}?alt=media`, {
-                                headers: { Authorization: `Bearer ${accessToken}` }
-                            });
-                            if (legDl.ok) {
-                                const legPayload = await legDl.json();
-                                if (legPayload && typeof legPayload === 'object') {
-                                    console.log('Eski kök Drive dosyası bulundu, appDataFolder gizli klasörüne taşınıyor...');
-                                    if (Array.isArray(legPayload.entries)) entries = legPayload.entries;
-                                    if (Array.isArray(legPayload.denemeler)) denemeler = legPayload.denemeler;
-                                    if (Array.isArray(legPayload.dayNotes)) dayNotes = legPayload.dayNotes;
-                                    if (legPayload.siraProgress) siraProgress = legPayload.siraProgress;
-                                    await saveToDrive();
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                } catch(eMig) {
-                    console.warn('Eski kök dosya kontrolü:', eMig);
-                }
-            }
+            // Tek kapı: HMGS/ klasörü → appDataFolder → kök. Eski kod burada
+            // ikinci bir kök-Drive araması daha yapıyordu; o arama artık
+            // resolveDriveFileId()'nin 3. adımı, tekrar etmiyoruz.
+            await resolveDriveFileId();
         }
         if (driveFileId) {
-            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
+            let res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
                 headers: { Authorization: `Bearer ${accessToken}` }
             });
+            if (res.status === 404) {
+                // Önbellekteki id bayat: dosya silinmiş/taşınmış. Ada göre yeniden çöz,
+                // bulunursa BİR kez daha oku. Eski kod burada hata atıp kalıcı olarak
+                // "Drive okuma hatası (404)" durumunda kalıyordu.
+                console.warn('[drive] önbellekteki dosya bulunamadı (404), ada göre yeniden aranıyor:', driveFileId);
+                await resolveDriveFileId();
+                if (!driveFileId) {
+                    console.warn('[drive] Drive\'da "' + DRIVE_FILE + '" yok; yerel veri kullanılıyor.');
+                    setDriveStatus('connected');
+                    return;
+                }
+                console.log('[drive] dosya yeniden bulundu:', driveFileId);
+                res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                });
+            }
             if (!res.ok) {
                 const errBody = await res.text();
                 throw new Error(`Drive okuma hatası (${res.status}): ${errBody}`);
@@ -5734,6 +5953,10 @@ async function loadFromDrive() {
                     if (Array.isArray(remotePayload.pendingStudioSessions) && remotePayload.pendingStudioSessions.length) {
                         applyPendingStudioSessions(remotePayload.pendingStudioSessions);
                     }
+                    // HMGS/ klasörüne doğrudan bakan yeni kuyruk (masaüstü scripti
+                    // gerekmeden). pendingStudioSessions ile aynı çeviriciyi kullanır,
+                    // studioSessionId üzerinden idempotenttir.
+                    await pullStudioQueue();
                     syncInboxWithSparkMessage();
                 }
                 localStorage.setItem('hmgs_entries', JSON.stringify(entries));
@@ -5741,6 +5964,11 @@ async function loadFromDrive() {
                 localStorage.setItem('hmgs_day_notes', JSON.stringify(dayNotes));
                 renderLogs(); renderSubjectCards(); renderDenemeler(); renderWeaknessHeatmap(); renderSparkMessage(); renderInboxView(); renderSira();
                 showToast("Drive'dan senkronize edildi ✓",'emerald');
+
+                // Eski konumdan (appDataFolder / kök) okunduysa veriyi HMGS/
+                // klasörüne taşı. Okuma bittikten SONRA çağrılıyor ki taşıma
+                // başarısız olsa bile veri elleçlenmiş olsun.
+                migrateDataFileToHmgsFolder();
             }
         }
         setDriveStatus('connected');
@@ -5820,6 +6048,73 @@ async function fetchRemoteExtraFields() {
     }
 }
 
+/**
+ * HMGS/ klasöründe `hmgs_2026_data.json`'u SIFIRDAN oluşturur (multipart POST).
+ * Dosyanın yaratıcısı tarayıcı olur — drive.file kapsamı altında sonraki
+ * PATCH'lerin çalışabilmesi buna bağlı.
+ * @returns {string|null} yeni dosya id'si
+ */
+async function createDataFileInHmgsFolder(body) {
+    const folderId = await ensureHmgsFolder();
+    const parents = folderId ? [folderId] : ['root'];
+    const boundary = "hmgsSinir";
+    const multipartBody =
+        "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" +
+        JSON.stringify({ name: DRIVE_FILE, parents: parents }) + "\r\n" +
+        "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" +
+        body + "\r\n--" + boundary + "--";
+
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'multipart/related; boundary="' + boundary + '"'
+        },
+        body: multipartBody
+    });
+    const file = await res.json();
+    if (!res.ok || !file.id) {
+        throw new Error(`Drive dosya oluşturma hatası (${res.status}): ${file?.error?.message || JSON.stringify(file)}`);
+    }
+    driveFileId = file.id;
+    try { localStorage.setItem('hmgs_drive_file_id', driveFileId); } catch (e) {}
+    return driveFileId;
+}
+
+/**
+ * TEK SEFERLİK TAŞIMA: eski konumdaki (appDataFolder / Drive kökü) veri dosyasını
+ * HMGS/ klasörüne kopyalar. Eski dosya SİLİNMEZ — veri kaybı riski alınmaz.
+ * Başarısız olursa sessizce eski konumda çalışmaya devam edilir.
+ */
+async function migrateDataFileToHmgsFolder() {
+    if (!driveFileIdLegacy || !driveFileId) return false;
+    const eskiId = driveFileId;
+    try {
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${eskiId}?alt=media`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        if (!res.ok) return false;
+        const body = await res.text();
+        JSON.parse(body); // bozuk içeriği taşımayalım
+
+        // Eski dosyayı işaretle ki yeni dosya onun yerine geçsin
+        driveFileId = null;
+        const yeniId = await createDataFileInHmgsFolder(body);
+        driveFileIdLegacy = false;
+        console.log(
+            '[drive] TAŞIMA TAMAM: veri dosyası HMGS/ klasörüne kopyalandı (' + yeniId + ').\n' +
+            '   Eski dosya (' + eskiId + ') SİLİNMEDİ — Drive\'da arama yapıp elle temizleyebilirsin.'
+        );
+        showToast('Drive verisi HMGS klasörüne taşındı ✓', 'emerald');
+        return true;
+    } catch (e) {
+        console.warn('[drive] taşıma başarısız, eski konumda devam ediliyor:', e);
+        driveFileId = eskiId;
+        driveFileIdLegacy = true;
+        return false;
+    }
+}
+
 async function saveToDrive() {
     if (!accessToken) accessToken = await gAccessToken();
     if (!accessToken) return;
@@ -5859,37 +6154,30 @@ async function saveToDrive() {
 
         const body = JSON.stringify(payload, null, 2);
 
-        // appDataFolder içinde ara
-        if (!driveFileId) {
-            try {
-                const q = encodeURIComponent(`name='${DRIVE_FILE}' and trashed=false`);
-                const findRes = await fetch(
-                    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
-                    { headers: { Authorization: `Bearer ${accessToken}` } }
-                );
-                if (findRes.ok) {
-                    const found = await findRes.json();
-                    if (found.files && found.files.length) {
-                        driveFileId = found.files[0].id;
-                        localStorage.setItem('hmgs_drive_file_id', driveFileId);
-                    }
-                } else {
-                    console.error('Drive dosya arama başarısız:', findRes.status, await findRes.text());
-                }
-            } catch (e) {
-                console.error('Drive dosya arama hatası:', e);
-            }
-        }
+        // Dosyayı ada göre çöz (appDataFolder → kök). Önbellekteki id bayatsa
+        // burada tazelenir; hiç dosya yoksa aşağıda yeni oluşturulur.
+        if (!driveFileId) await resolveDriveFileId();
+
+        // Tek yazma denemesi (PATCH). 404 dönerse dosya silinmiş/taşınmış demektir.
+        const driveYaz = (id) => fetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`, {
+            method: 'PATCH',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: body
+        });
 
         if (driveFileId) {
-            const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
-                method: 'PATCH',
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: body
-            });
+            let res = await driveYaz(driveFileId);
+            if (!res.ok && res.status === 404) {
+                // Dosya taşınmış olabilir: ada göre yeniden çöz ve oraya yaz.
+                // Eski kod doğrudan yeni dosya oluşturuyordu → Drive'da mükerrer kopya.
+                console.warn('[drive] kayıt sırasında dosya bulunamadı (404), ada göre yeniden aranıyor.');
+                driveFileId = null;
+                await resolveDriveFileId();
+                if (driveFileId) res = await driveYaz(driveFileId);
+            }
             if (res.ok) {
                 setDriveStatus('connected');
                 showToast("Drive'a kaydedildi ✓", 'emerald');
@@ -5903,29 +6191,10 @@ async function saveToDrive() {
             driveFileId = null;
         }
 
-        // appDataFolder gizli klasöründe multipart oluştur
-        const boundary = "hmgsSinir";
-        const multipartBody = 
-            "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" +
-            JSON.stringify({ name: DRIVE_FILE, parents: ["appDataFolder"] }) + "\r\n" +
-            "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" +
-            body + "\r\n--" + boundary + "--";
-
-        const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'multipart/related; boundary="' + boundary + '"'
-            },
-            body: multipartBody
-        });
-        const file = await res.json();
-        if (!res.ok || !file.id) {
-            throw new Error(`Drive dosya oluşturma hatası (${res.status}): ${file?.error?.message || JSON.stringify(file)}`);
-        }
-        driveFileId = file.id;
-        localStorage.setItem('hmgs_drive_file_id', driveFileId);
-        showToast("Drive gizli klasörüne kaydedildi ✓", 'emerald');
+        // Hiç dosya yok (veya silinmiş): HMGS/ klasöründe sıfırdan oluştur.
+        // Eski kod burada appDataFolder'a yazıyordu; veri yeri artık HMGS/.
+        await createDataFileInHmgsFolder(body);
+        showToast("Drive HMGS klasörüne kaydedildi ✓", 'emerald');
         setDriveStatus('connected');
     } catch(e) {
         console.error('Drive Kaydetme Hatası:', e);
@@ -8592,6 +8861,14 @@ function updateCountdown() {
 
 function init() {
     migrateDayNotes();
+    // Aynı origin'de (GitHub Pages) Stüdyo, seanslarını doğrudan
+    // `hmgs_pending_studio_sessions` anahtarına yazar. Bu kuyruk modül yüklenirken
+    // belleğe alınıyor (bkz. pendingStudioSessionsQueue) ama Drive okuması
+    // tetiklenmezse hiç çevrilmezdi — burada açıkça çeviriyoruz. Idempotenttir:
+    // studioSessionId zaten entries'te olan seans tekrar eklenmez.
+    if (Array.isArray(pendingStudioSessionsQueue) && pendingStudioSessionsQueue.length) {
+        applyPendingStudioSessions(pendingStudioSessionsQueue);
+    }
     renderLogs();
     renderSubjectCards();
     renderDenemeler();
