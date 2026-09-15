@@ -10,6 +10,7 @@ import { daysLeft, streak, lastExam, PASS_CORRECT, state, getDailyPlan } from '.
 import { nextAction, todayProgress, srsSummary, allSubjectMastery,
   MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions,
   examGap, worstExamSubjects, answerQualitySignals } from '../engine.js';
+import { bugun as planBugun, planDurumu } from '../pregel.js';
 
 /** Koç planı bugün için bir kez tazelenir — her render'da ağ isteği yok. */
 let planRefreshed = false;
@@ -60,6 +61,8 @@ export function render() {
           ${act.alts.map((a, i) => `<button class="btn btn-2 btn-s" data-act="do-alt" data-alt="${i}">${esc(a.label)}</button>`).join('')}
         </div>
       </div>
+
+      ${pregelHTML()}
 
       <div class="grid grid-3" style="margin-top:1.25rem">
         <div class="metric">
@@ -164,6 +167,78 @@ export function render() {
  * "0 / 50" görüp koçun 200 soru taahhüdünü hatırlayan kullanıcı hangisinin
  * doğru olduğunu bilemez. Sayıyı gösterdiğimiz gibi kaynağını da söylüyoruz.
  */
+/**
+ * 11 GÜNLÜK PLAN KARTI — "bugün ne yapacağım" sorusunun tek cevabı.
+ *
+ * Kaynak: SINAV_ALGORITMASI.md (238 gerçek ÖSYM sorusundan ölçüldü).
+ * Bloklar DONMUŞ DEĞİL: ders önceliği engine.karmaWeights()'ten (sınav ağırlığı ×
+ * kapsam açığı × isabet açığı), konu önceliği engine.bleedingTopics()'ten (senin
+ * gerçek hataların) türetilir. Yani cevap verdikçe plan kendini günceller.
+ *
+ * Uydurma sayı yok: hedef = kalan iş ÷ kalan gün. Pazar günü tam deneme.
+ */
+function pregelHTML() {
+  const p = planBugun();
+  const d = planDurumu();
+
+  if (p.bitti) {
+    return `<div class="card" style="margin-top:1.25rem;border-left:3px solid var(--ok)">
+      <div class="metric-k">11 günlük plan</div>
+      <p class="hint" style="margin:0.4rem 0 0">Sınav geçti. Plan kapandı.</p></div>`;
+  }
+
+  const baslik = p.gun ? `${p.gun}. gün / 11` : 'Plan penceresi dışında';
+  const durum = p.denemeGunu
+    ? '<span class="chip accent">deneme günü</span>'
+    : p.kapanis
+      ? '<span class="chip amber">kapanış · yeni konu yok</span>'
+      : '';
+
+  const bloklar = p.bloklar.length
+    ? p.bloklar.map(b => `
+        <div class="subj">
+          <div>
+            <div class="subj-name">${esc(b.name)}</div>
+            <div class="subj-meta">sınavda ${b.examQ} soru · bugün ~${b.soru} soru${
+              b.thin ? ' · <span style="color:var(--warn)">havuz ince, kâğıttan da çalış</span>' : ''}</div>
+            ${b.neden ? `<div class="subj-meta" style="color:var(--warn)">${esc(b.neden)}</div>` : ''}
+            ${b.konular.length ? `<div class="chip-row" style="margin-top:0.35rem">${
+              b.konular.map(k => `<button class="chip" data-act="go-flow-topic" data-topic="${esc(k.topicId)}"
+                title="${esc(k.title)} · ${k.n} çözüm, %${Math.round(k.rate * 100)} hata">${
+                esc(String(k.title).replace(/^\s*\d+\.\s*/, '').slice(0, 42))}</button>`).join('')
+            }</div>` : ''}
+          </div>
+          <div class="subj-right">
+            <button class="btn btn-2 btn-s" data-act="go-flow-topic" data-topic="${
+              b.konular.length ? esc(b.konular[0].topicId) : ''}">${b.konular.length ? 'Konuyu oku' : '—'}</button>
+            <button class="btn btn-s" data-act="practice-subject" data-subject="${esc(b.subjectId)}">Çöz</button>
+          </div>
+        </div>`).join('')
+    : '<p class="hint" style="margin:0">Bugün için önerilen ders yok — havuza bak, koç önerisini izle.</p>';
+
+  return `
+    <div class="section-label" style="margin-top:1.5rem">Bugünün planı · ${esc(baslik)} ${durum}</div>
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap">
+        <div style="font-size:1.15rem;font-weight:700">${p.hedef} soru</div>
+        <div class="hint" style="margin:0">bugün çözülen <b>${p.cozulen}</b> · sınava ${p.kalan} gün</div>
+        <div class="hint" style="margin:0;margin-left:auto">plan toplamı ${d.cozulen} / ${d.toplamHedef} (%${d.yuzde})</div>
+      </div>
+      <div class="track no" style="margin:0.6rem 0 0"><i style="width:${Math.min(100, p.hedef ? (p.cozulen / p.hedef) * 100 : 0)}%"></i></div>
+      ${p.denemeGunu
+        ? `<div class="trap" style="margin-top:0.85rem"><div class="lbl">Bugün deneme günü</div>
+             <p>120 soru · 155 dakika · sabah 10:15'te başla, boş bırakmadan. Deneme bitince net
+             ve ders kırılımı ölçülür; bütün tahminler o gün gerçek sayıya döner.</p>
+             <div class="btn-row" style="margin-top:0.6rem">
+               <button class="btn btn-s" data-act="go-exam">Denemeye git</button></div></div>`
+        : `<div class="btn-row" style="margin-top:0.85rem">
+             <button class="btn btn-s" data-act="pregel-set" data-count="${p.hedef}">Bugünün setini başlat (${p.hedef} soru)</button>
+             <button class="btn btn-2 btn-s" data-act="go-akim">Akış moduna geç</button>
+           </div>`}
+      <div style="margin-top:1rem">${bloklar}</div>
+    </div>`;
+}
+
 function hedefNotu(prog) {
   if (prog.targetSource === 'plan' && prog.plan) {
     const okuma = prog.plan.readingTasks;
