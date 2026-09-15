@@ -749,6 +749,165 @@ body.in-session #view-akim {
   max-width: 22rem;
 }
 
+/* ---------- KURAL KÖPRÜSÜ (yanlıştan interaktif alıştırmaya) ----------
+   Geri bildirim kartının İÇİNDE açılır; seans bölünmez. 124 konunun 77'si
+   interaktif bir kural alıştırması taşıyor (68 predict_then_explore) — bu
+   panel o alıştırmayı soru ekranına taşır. Düz metin yerine "tahmin et"
+   kalıbı: Rowland 2014, geri bildirimli test g=0,73 / geri bildirimsiz 0,39.
+
+   Sakin tutulur: ayrı renk, çerçeve yok — yalnız ayrı bir bölüm çizgisi.
+   Oyunlaştırma yok (AGENTS §1). */
+.kural-slot {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+.kural-slot[hidden] { display: none; }
+.kural-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+.kural-lbl {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--r-s);
+  white-space: nowrap;
+}
+.kural-src {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  min-width: 0;
+}
+.kural-host { margin-bottom: 0.75rem; }
+.kural-host:last-child { margin-bottom: 0; }
+
+/* "Kuralı çalış" düğmesi: ikincil eylem, ama varlığı görünür olsun */
+.btn-kural {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.btn-kural.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* ---------- KENDİ KİTABINDAN ÇALIŞ (konu ekranı) ----------
+   Ölçüm (15 Eyl 2026): konu metni uzunluğu sınav ağırlığının TERSİ —
+   Medeni 15 soruya 2220 karakter (20 dersin en düşüğü), MÖHUK 1 soruya 6965.
+   77 v3 konunun yalnız 1'inde sahne anlatımı (tell) var; yani v3 dönüşümü
+   metnin YERİNE geçmiş, metne EKLENMEMİŞ.
+   Kullanıcı bu yüzden konu anlatımına güvenmiyor ve kendi kitabını okuyor.
+   Bu blok metni büyütmeye çalışmaz — kitabı taklit etmeyi bırakıp
+   kullanıcının kendi kitabına yönlendirir. Sakin: ayrı renk yok. */
+.kitap-kap {
+  margin: 0 0 1.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--bg-raise);
+  overflow: hidden;
+}
+.kitap-ac {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.kitap-ac:hover { background: var(--bg-sunk); }
+.kitap-ac .hint { margin-left: auto; font-weight: 400; font-size: 0.8rem; }
+.kitap-kap > div[style*="none"] { padding: 0 1rem 1rem; }
+.kitap-kaynak { margin-bottom: 1rem; }
+.kitap-kaynak:last-of-type { margin-bottom: 0.5rem; }
+.kitap-ad {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+  margin-bottom: 0.45rem;
+}
+.kitap-tahmin {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--warn);
+  background: var(--warn-soft);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--r-s);
+  margin-left: 0.35rem;
+}
+.kitap-bolumler {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 0.15rem 1.25rem;
+}
+.kitap-bolumler li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  margin: 0 -0.5rem;
+  border-radius: var(--r-s);
+}
+.kitap-bolumler li:hover { background: var(--bg-sunk); }
+.kitap-bolum {
+  font-size: 0.87rem;
+  color: var(--ink-2);
+  min-width: 0;
+}
+.kitap-sayfa {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-family: var(--mono, monospace);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.kitap-not {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  line-height: 1.5;
+  margin: 0.75rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+}
+
+/* Özet etiketi: metnin altına değil ÜSTÜNE, güven sınırı çizsin */
+.ozet-lbl {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+.ozet-lbl > span:first-child {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+  background: var(--bg-sunk);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--r-s);
+  white-space: nowrap;
+}
+.ozet-why { font-size: 0.8rem; color: var(--ink-3); }
+
 /* Sağ Sütun: Çözüm Kartı */
 .q-side {
   height: auto;
