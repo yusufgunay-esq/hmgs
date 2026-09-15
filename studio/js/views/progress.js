@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    views/progress.js — İLERLEME: GERÇEK VERİ, SÜSLEME YOK
    Deneme net geçmişi, hız eğilimi, ders kırılımı ve veri bütünlüğü raporu.
    Kural: hesaplanamayan metrik gösterilmez, "–" yazılır. Uydurma yok.
@@ -7,7 +7,7 @@
 import { esc, $, fmtClock, toast } from '../ui.js';
 import { SUBJECTS, subjectName, integrity, topicById } from '../data.js';
 import { state, exportJSON, hardReset, PASS_CORRECT, TARGET_SEC, save } from '../store.js';
-import { allSubjectMastery, MASTERY_LABEL, srsSummary, BOXES } from '../engine.js';
+import { allSubjectMastery, MASTERY_LABEL, srsSummary, BOXES, examGap, worstExamSubjects, answerQualitySignals } from '../engine.js';
 
 let cachedProfil = null;
 try {
@@ -144,6 +144,8 @@ export function render() {
         ${renderProfileContent(cachedProfil)}
       </div>
 
+      ${diagnosisBlock()}
+
       <div class="grid grid-3">
         <div class="metric">
           <div class="metric-k">Toplam çözüm</div>
@@ -233,6 +235,53 @@ export function render() {
     </div>`;
 
   fetchProfil();
+}
+
+/**
+ * İstemci-taraflı deneme teşhisi — bayat /api/profil'e bağlı değil, localStorage'dan canlı.
+ * Bu blok "kaç net, nerede sızıyor, hızlı+yanlış oranı ne" der; hesaplanamıyorsa hiç çizilmez.
+ */
+function diagnosisBlock() {
+  const gap = examGap();
+  if (!gap) return '';
+  const worst = worstExamSubjects(6);
+  const sig = answerQualitySignals();
+  const fastWrong = sig && sig.n >= 20 && sig.fastWrongRate >= 0.15;
+
+  return `
+    <div class="section-label">Deneme teşhisi (canlı · ham veriden)</div>
+    <div class="card" style="margin-bottom:1.5rem">
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:baseline">
+        <div>
+          <div style="font-size:0.8rem;color:var(--ink-3)">Son deneme</div>
+          <div style="font-size:1.4rem;font-weight:700;color:${gap.gap > 0 ? 'var(--no)' : 'var(--ok)'}">${gap.net} net</div>
+          <div class="hint" style="margin:0">${gap.gap > 0 ? `baraj ${PASS_CORRECT} net için <b>${gap.gap} net açık</b>` : 'baraj üstünde'}</div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;color:var(--ink-3)">Tempo</div>
+          <div style="font-size:1.4rem;font-weight:700">${gap.pace ? '~' + gap.pace : '–'}<span style="font-size:0.9rem"> sn/soru</span></div>
+          <div class="hint" style="margin:0">hedef ${TARGET_SEC} sn</div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;color:var(--ink-3)">Hızlı + yanlış</div>
+          <div style="font-size:1.4rem;font-weight:700;color:${fastWrong ? 'var(--warn)' : 'var(--ok)'}">${sig.n ? Math.round(sig.fastWrongRate * 100) : '–'}<span style="font-size:0.9rem"> %</span></div>
+          <div class="hint" style="margin:0">${fastWrong ? 'okumadan tahmin sinyali' : 'okuma disiplini iyi'}</div>
+        </div>
+      </div>
+
+      ${worst.length ? `
+        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
+          <div style="font-size:0.85rem;font-weight:600;color:var(--ink-2);margin-bottom:0.6rem">En çok net sızdıran dersler</div>
+          ${worst.map(x => `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;padding:0.35rem 0">
+              <div style="min-width:0">
+                <span style="font-size:0.9rem;font-weight:600">${esc(x.name)}</span>
+                <span class="hint" style="margin-left:0.5rem">sınavda ${x.examQ} · isabet %${Math.round(x.acc * 100)}${x.blank ? ` · ${x.blank} boş` : ''}</span>
+              </div>
+              <span class="chip red" style="flex-shrink:0">−${Math.round(x.leak * 10) / 10} net</span>
+            </div>`).join('')}
+        </div>` : ''}
+    </div>`;
 }
 
 function examHistory(exams) {
