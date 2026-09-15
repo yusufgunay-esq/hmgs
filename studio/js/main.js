@@ -11,6 +11,7 @@ import { $, $$, toast } from './ui.js';
 import { initData, initDataAsync, populateData, topicById, questionById } from './data.js';
 import { load, save, daysLeft, state, getSettings, updateSettings } from './store.js';
 import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress } from './vault-client.js';
+import { kuralToggle } from './kural.js';
 
 
 import * as today from './views/today.js';
@@ -161,6 +162,7 @@ document.addEventListener('click', async e => {
     /* --- gezinme --- */
     case 'go-today':   show('today'); break;
     case 'go-exam':    show('exam'); break;
+    case 'go-akim':    show('akim'); break;
     case 'go-flow-subject': flow.setSubject(el.dataset.subject); show('flow'); break;
     case 'go-flow-topic':   if (flow.open(el.dataset.topic)) show('flow'); break;
 
@@ -219,6 +221,13 @@ document.addEventListener('click', async e => {
       if (practice.startSession({ mode: 'subject', subjectId: el.dataset.subject, count: 15 })) show('practice');
       break;
 
+    /* --- 11 günlük plan: günün setini başlat --- */
+    case 'pregel-set': {
+      const n = Number(el.dataset.count) || 20;
+      if (practice.startSession({ mode: 'karma', count: n, customLabel: `Günün planı · ${n} soru` })) show('practice');
+      break;
+    }
+
     /* --- yanlışlarım (SRS tekrarı) — kalıcı giriş, koç ödevine bağlı değil --- */
     case 'review-due': {
       const n = Number(el.dataset.count) || 20;
@@ -257,6 +266,15 @@ document.addEventListener('click', async e => {
         const hint = el.querySelector('.hint');
         if (hint) hint.textContent = open ? 'göster' : 'kapat';
       }
+      break;
+    }
+
+    /* --- kural köprüsü: yanlıştan interaktif kural alıştırmasına --- */
+    case 'kural': {
+      // Seans durumu korunur: render() ÇAĞRILMAZ, yalnız geri bildirim kartının
+      // içine bir panel açılır. practice.js render()'ı S.answered/qStart'ı
+      // sıfırladığı için burada render etmek cevabı silerdi.
+      kuralToggle(el.dataset.topic);
       break;
     }
 
@@ -379,6 +397,11 @@ document.addEventListener('keydown', e => {
 
   if (currentView === 'practice') {
     if (k === 'G') { practice.askGemini(); e.preventDefault(); return; }
+    if (k === 'K' && practice.isAnswered()) {
+      const btn = document.querySelector('#view-practice [data-act="kural"]');
+      if (btn) { kuralToggle(btn.dataset.topic); e.preventDefault(); }
+      return;
+    }
     if (practice.isAnswered()) {
       if (e.key === 'Enter' || e.key === ' ') { practice.next(); e.preventDefault(); }
       else if (k === 'M') { practice.nextLogic(); e.preventDefault(); }
@@ -389,6 +412,11 @@ document.addEventListener('keydown', e => {
   } else if (currentView === 'akim' && akim.hasSession()) {
     if (e.key === 'Escape') { akim.quit(); e.preventDefault(); return; }
     if (k === 'G') { akim.askGemini(); e.preventDefault(); return; }
+    if (k === 'K' && akim.isAnswered()) {
+      const btn = document.querySelector('#view-akim [data-act="kural"]');
+      if (btn) { kuralToggle(btn.dataset.topic); e.preventDefault(); }
+      return;
+    }
     if (akim.isAnswered()) {
       if (e.key === 'Enter' || e.key === ' ') { akim.next(); e.preventDefault(); }
       else if (k === 'M') { akim.nextLogic(); e.preventDefault(); }
