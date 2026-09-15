@@ -205,6 +205,82 @@ export function bleedingTags(limit = 8) {
 }
 
 /* ==========================================================================
+   2b. SINAV TEŞHİSİ — gerçek deneme sonucundan okur
+   İlke: localStorage'daki ham veriye (answers[] + exams[]) ek ölçüm toplamadan
+   bakar. Çıktı net cinsindendir ("31 net açık", "HMK 6 net sızdırıyor") —
+   "dikkat et" değil. Bu, koçun ve Bugün/İlerleme ekranlarının tek doğruluk
+   kaynağıdır; bayat /api/profil'e bağlı değildir.
+   ========================================================================== */
+
+/**
+ * Son denemeden net açığı ve soru başına tempo.
+ * @returns {{net:number,correct:number,total:number,gap:number,pace:number,at:string,pass:boolean}|null}
+ */
+export function examGap() {
+  const ex = lastExam();
+  if (!ex) return null;
+  const correct = ex.correct ?? ex.net ?? 0;
+  const net = ex.net ?? correct;
+  const gap = Math.max(0, PASS_CORRECT - net);
+  const durationSec = (ex.durationMs || 0) / 1000;
+  const pace = ex.total ? Math.round(durationSec / ex.total) : 0;
+  return { net, correct, total: ex.total || 0, gap, pace, at: ex.at, pass: !!ex.pass };
+}
+
+/**
+ * Son denemedeki en çok net sızdıran dersler.
+ * Sızıntı = examQ × (1 − isabet): sınavda o dersten beklenen net kaybı.
+ * Sıralama sabit değil, her çağrıda gerçek veriden hesaplanır.
+ */
+export function worstExamSubjects(limit = 5) {
+  const ex = lastExam();
+  if (!ex || !ex.bySubject) return [];
+  const rows = [];
+  for (const s of SUBJECTS) {
+    const b = ex.bySubject[s.id];
+    if (!b || !b.total) continue;
+    const acc = b.correct / b.total;
+    const leak = s.examQ * (1 - acc);
+    rows.push({
+      id: s.id, name: s.name, examQ: s.examQ,
+      total: b.total, correct: b.correct, blank: b.blank || 0,
+      acc, leak
+    });
+  }
+  return rows.sort((a, b) => b.leak - a.leak).slice(0, limit);
+}
+
+/**
+ * Hızlı+yanlış (YANLIS-KANI) ve tekrar-hatası sinyalleri — ham cevap günlüğünden.
+ * Sınav ve pratik cevapları AYNI günlükte; ms gerçek ölçümdür (exam.js E.times[i]).
+ *   fastWrong  : < %60 hedef süre VE yanlış → "hızlı tahmin, bilmediğini bilmeme"
+ *   slowWrong  : > 1.5× hedef süre VE yanlış → "uzun düşünüp yanlış, bilgi eksiği"
+ *   repeatWrong: aynı soruya 2+ denemede yanlış → "öğrenilmemiş, takılma kalıcı"
+ *   fastCorrect: < %60 hedef VE doğru → "gerçek otomatikleşme" (iyi)
+ */
+export function answerQualitySignals() {
+  const S = state();
+  const rows = S.answers || [];
+  if (!rows.length) {
+    return { n: 0, fastWrongN: 0, fastWrongRate: 0, slowWrongN: 0, repeatWrongN: 0, fastCorrectN: 0 };
+  }
+  const fastCut = TARGET_SEC * 0.6;      // 45 sn
+  const slowCut = TARGET_SEC * 1.5;      // 112 sn
+  const fastWrong = rows.filter(a => !a.ok && (a.ms / 1000) < fastCut);
+  const slowWrong = rows.filter(a => !a.ok && (a.ms / 1000) > slowCut);
+  const repeatWrong = rows.filter(a => !a.ok && (a.attempt || 1) >= 2);
+  const fastCorrect = rows.filter(a => a.ok && (a.ms / 1000) < fastCut);
+  return {
+    n: rows.length,
+    fastWrongN: fastWrong.length,
+    fastWrongRate: fastWrong.length / rows.length,
+    slowWrongN: slowWrong.length,
+    repeatWrongN: repeatWrong.length,
+    fastCorrectN: fastCorrect.length
+  };
+}
+
+/* ==========================================================================
    3. COACH — "ŞİMDİ NE YAPMALI"
    Tek karar döndürür. Kullanıcının seçim yapmasına gerek kalmaz.
    Öncelik sırası bilişsel gerekçeyle sabittir:
@@ -295,13 +371,25 @@ export function nextAction() {
   const lead = w[0];
   const fresh = w.filter(r => r.fresh).length;
 
+  // Deneme ölçümü varsa ve baraj altındaysa, neden metni net açığıyla açılır.
+  // Kural: sayı net cinsindendir; koç "31 net açık" der, "dikkat et" demez.
+  const gapInfo = examGap();
+  const worst = gapInfo && gapInfo.gap > 0 ? worstExamSubjects(2) : [];
+  const gapLead = gapInfo && gapInfo.gap > 0
+    ? `Son deneme netin ${gapInfo.net} — 84 için ${gapInfo.gap} net açık`
+      + (worst.length
+        ? `; en çok ${worst[0].name} sızdırıyor (sınavda ${worst[0].examQ} soru, isabet %${Math.round(worst[0].acc * 100)})`
+        : '')
+      + '. '
+    : '';
+
   let why;
   if (due.length >= 5 && fresh > 0) {
-    why = `Set ${Math.min(due.length, Math.floor(count * KARMA_DUE_SHARE))} tekrar sorusuyla açılıyor, kalanı yeni malzeme. Hiç açmadığın ${fresh} ders var; bunlar ilk temasta blok hâlinde geliyor, tanıdıktan sonra harmana karışıyor.`;
+    why = gapLead + `Set ${Math.min(due.length, Math.floor(count * KARMA_DUE_SHARE))} tekrar sorusuyla açılıyor, kalanı yeni malzeme. Hiç açmadığın ${fresh} ders var; bunlar ilk temasta blok hâlinde geliyor, tanıdıktan sonra harmana karışıyor.`;
   } else if (fresh > 0) {
-    why = `Hiç açmadığın ${fresh} ders var ve sınavın yarısından fazlası oralarda. Set ağırlığı ölçülmüş sınav dağılımından geliyor; en çok pay ${lead ? lead.name : '—'} tarafında.`;
+    why = gapLead + `Hiç açmadığın ${fresh} ders var ve sınavın yarısından fazlası oralarda. Set ağırlığı ölçülmüş sınav dağılımından geliyor; en çok pay ${lead ? lead.name : '—'} tarafında.`;
   } else {
-    why = `Karışık set. Ders adı cevabı verene kadar gizli; sınavda da yazmıyor, hangi kuralın uygulanacağını kendin seçeceksin.`;
+    why = gapLead + `Karışık set. Ders adı cevabı verene kadar gizli; sınavda da yazmıyor, hangi kuralın uygulanacağını kendin seçeceksin.`;
   }
 
   return {
