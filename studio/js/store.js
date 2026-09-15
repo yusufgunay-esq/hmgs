@@ -1,4 +1,4 @@
-﻿/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
    رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
    ==========================================================================
@@ -128,12 +128,13 @@ export function exportJSON() {
 /* ---------- TELEMETRİ: her cevap kaydedilir ---------- */
 
 /**
- * @param {object} q      soru nesnesi
- * @param {string|null} chosen  seçilen şık ('A'..'E') veya null = boş
- * @param {number} ms     soruya harcanan süre (ms)
- * @param {string} mode   'practice' | 'exam' | 'review' | 'flow'
+ * @param {object} q          soru nesnesi
+ * @param {string|null} chosen seçilen şık ('A'..'E') veya null = boş
+ * @param {number} ms         soruya harcanan süre (ms)
+ * @param {string} mode       'practice' | 'exam' | 'review' | 'flow'
+ * @param {object} [flags]    davranış sinyalleri { usedElim, askedGemini }
  */
-export function recordAnswer(q, chosen, ms, mode) {
+export function recordAnswer(q, chosen, ms, mode, flags = {}) {
   const prior = S.answers.filter(a => a.qId === q.id).length;
   const row = {
     qId: q.id,
@@ -143,6 +144,9 @@ export function recordAnswer(q, chosen, ms, mode) {
     correctKey: q.correct,
     ok: chosen === q.correct,
     logicGuess: false,
+    attentionError: false,
+    usedElim: !!flags.usedElim,
+    askedGemini: !!flags.askedGemini,
     ms: Math.max(0, Math.round(ms)),
     attempt: prior + 1,
     mode,
@@ -160,6 +164,19 @@ export function markLastAnswerLogic(flag = true) {
   if (!S.answers.length) return null;
   const last = S.answers[S.answers.length - 1];
   last.logicGuess = !!flag;
+  save();
+  return last;
+}
+
+/**
+ * Son verilen yanlış cevabı "dikkat hatası" olarak etiketler/kaldırır.
+ * SRS'i değiştirmez — yalnızca analitik sinyal.
+ * @param {boolean} flag
+ */
+export function markLastAnswerAttention(flag = true) {
+  if (!S.answers.length) return null;
+  const last = S.answers[S.answers.length - 1];
+  last.attentionError = !!flag;
   save();
   return last;
 }
