@@ -6,37 +6,56 @@
 
 import { loadMasterVault } from './vault-client.js';
 
-/* examQ = ÖLÇÜLDÜ, tahmin değil (11 Eylül 2026).
-   Kaynak: elimizdeki iki gerçek sınavın 238 sorusunun ders etiketleri
-   (hmgs_2026_nisan 120 + hmgs_2025_eylul 118), 120'ye ölçeklenip en büyük
-   kalan yöntemiyle tam sayıya yuvarlandı; toplam tam 120.
-   Önceki tablo elle tahmindi ve dört yerde kayıyordu: Vergi 3→5,
-   Milletlerarası 3→5, Borçlar 12→14 eksik sayılıyordu; buna karşılık
-   Vergi Usul 3→1 ve MÖHUK 3→1 fazla sayılıyordu. Bu tablo karma setin
-   ders payını belirlediği için sapma doğrudan çalışma dağılımına geçiyordu.
-   Sınav etiketleri değişirse burayı ölçümle güncelle, elle değil. */
+/* examQ = ÖLÇÜLMÜŞ resmî dağılım (15 Eylül 2026'da KAYNAK DEĞİŞTİ).
+
+   ÖNCEKİ KAYNAK YANLIŞTI. Bu tablo iki gerçek sınavın 238 sorusunun DERS
+   ETİKETLERİNDEN türetilmişti. Ama o etiketlerin bir kısmı hatalı: ÖSYM blok
+   sınırlarını kanunun adına göre değil konunun doğasına göre çiziyor, etiketleyici
+   ise kanun adına bakmış. Ölçüm: 238 sorudan 11'i bulunduğu resmî blokla uyuşmuyor
+   (ör. N26#46 simsarlık "borclar" etiketli ama Ticaret bloğunda; N26#115-117
+   vatandaşlık/vize/tenfiz "milletlerarasi" etiketli ama MÖHUK bloğunda).
+   Hatalı etiketten türetilen tablo 7 derste resmî dağılımdan sapıyordu.
+
+   DOĞRU KAYNAK: HMGS Yönetmeliği (15 Ocak 2025 değişikliği) yüzde dağılımı.
+   Aynı değerler `topics.js` → `SUBJECTS_DATA[].questionCount` alanında BİREBİR
+   duruyor ve iki sınavın kitapçık numara aralıklarıyla da örtüşüyor. Tek
+   doğruluk kaynağı o alandır; buradaki tablo onun aynasıdır ve
+   `karma/test.mjs` ikisinin eşitliğini test eder.
+
+   DÜZELTİLEN 7 DEĞER (etiketten türetilmiş → resmî):
+     Borçlar          14 → 12      (2 ticari kurum yanlış derse yazılmıştı)
+     Ticaret          11 → 12
+     Vergi            5  → 3
+     Vergi Usul       1  → 3
+     Milletlerarası   5  → 3
+     MÖHUK            1  → 3
+     Genel Kamu       2  → 3
+
+   NEDEN ÖNEMLİ: bu tablo karma setin ders payını belirler. Sapma doğrudan
+   çalışma dağılımına geçiyordu — MÖHUK'un 115 sorusu havuzda dururken ders
+   pratikte hiç gelmiyordu (pay 1/120). Düzeltmeden sonra 3/120. */
 export const SUBJECTS = [
 
   { id: 'medeni_hukuk',        name: 'Medeni Hukuk',              tier: 1, examQ: 15 },
-  { id: 'borclar_hukuku',      name: 'Borçlar Hukuku',            tier: 1, examQ: 14 },
+  { id: 'borclar_hukuku',      name: 'Borçlar Hukuku',            tier: 1, examQ: 12 },
   { id: 'hmk',                 name: 'Medeni Usul Hukuku (HMK)',  tier: 1, examQ: 12 },
-  { id: 'ticaret_hukuku',      name: 'Ticaret Hukuku',            tier: 1, examQ: 11 },
+  { id: 'ticaret_hukuku',      name: 'Ticaret Hukuku',            tier: 1, examQ: 12 },
   { id: 'ceza_hukuku',         name: 'Ceza Hukuku',               tier: 2, examQ: 9  },
   { id: 'anayasa_hukuku',      name: 'Anayasa Hukuku',            tier: 2, examQ: 6  },
   { id: 'idare_hukuku',        name: 'İdare Hukuku',              tier: 2, examQ: 6  },
   { id: 'icra_iflas',          name: 'İcra ve İflas Hukuku',      tier: 2, examQ: 6  },
   { id: 'cmk',                 name: 'Ceza Muhakemesi (CMK)',     tier: 2, examQ: 6  },
   { id: 'is_hukuku',           name: 'İş ve Sosyal Güvenlik',     tier: 2, examQ: 6  },
-  { id: 'vergi_hukuku',        name: 'Vergi Hukuku',              tier: 3, examQ: 5  },
-  { id: 'milletlerarasi_hukuk',name: 'Milletlerarası Hukuk',      tier: 3, examQ: 5  },
+  { id: 'vergi_hukuku',        name: 'Vergi Hukuku',              tier: 3, examQ: 3  },
+  { id: 'vergi_usul',          name: 'Vergi Usul Hukuku',         tier: 3, examQ: 3  },
+  { id: 'milletlerarasi_hukuk',name: 'Milletlerarası Hukuk',      tier: 3, examQ: 3  },
+  { id: 'mohuk',               name: 'Milletlerarası Özel Hukuk', tier: 3, examQ: 3  },
   { id: 'avukatlik',           name: 'Avukatlık Hukuku',          tier: 3, examQ: 3  },
   { id: 'anayasa_yargisi',     name: 'Anayasa Yargısı',           tier: 3, examQ: 3  },
   { id: 'iyuk',                name: 'İdari Yargılama Usulü',     tier: 3, examQ: 3  },
   { id: 'hukuk_felsefesi',     name: 'Hukuk Felsefesi ve Sos.',   tier: 3, examQ: 3  },
   { id: 'hukuk_tarihi',        name: 'Türk Hukuk Tarihi',         tier: 3, examQ: 3  },
-  { id: 'genel_kamu',          name: 'Genel Kamu Hukuku',         tier: 3, examQ: 2  },
-  { id: 'mohuk',               name: 'Milletlerarası Özel Hukuk', tier: 3, examQ: 1  },
-  { id: 'vergi_usul',          name: 'Vergi Usul Hukuku',         tier: 3, examQ: 1  }
+  { id: 'genel_kamu',          name: 'Genel Kamu Hukuku',         tier: 3, examQ: 3  }
 ];
 
 export const SUBJECT_BY_ID = new Map(SUBJECTS.map(s => [s.id, s]));
