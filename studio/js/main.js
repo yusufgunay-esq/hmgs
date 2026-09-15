@@ -1,4 +1,4 @@
-﻿/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
    رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
    ==========================================================================
@@ -261,10 +261,11 @@ document.addEventListener('click', async e => {
     case 'pick':         practice.pick(el.dataset.key); break;
     case 'dontknow':     practice.dontKnow(); break;
     case 'ask-gemini':   practice.askGemini(); break;
-    case 'next':         practice.next(); break;
-    case 'next-logic':   practice.nextLogic(); break;
-    case 'toggle-logic': practice.toggleLogic(); break;
-    case 'quit':         practice.quit(); break;
+    case 'next':            practice.next(); break;
+    case 'next-logic':      practice.nextLogic(); break;
+    case 'toggle-logic':    practice.toggleLogic(); break;
+    case 'toggle-attention':practice.toggleAttention(); break;
+    case 'quit':            practice.quit(); break;
     case 'again':        if (!practice.repeatSession()) show('today'); break;
     case 'push-session': practice.pushSession(); break;
 
