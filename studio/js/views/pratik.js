@@ -19,6 +19,9 @@
    kaynağı değil, indekstir"; kullanıcı kartı görüp kendi hafızasından/
    kitabından hatırlamaya çalışır, sayfa numarası ona kitaptaki yeri gösterir.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, $, toast } from '../ui.js';
 import { subjectName } from '../data.js';
