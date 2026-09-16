@@ -1,0 +1,59 @@
+﻿Copyright (c) 2026 Yusuf GÜNAY. Tüm Hakları Saklıdır / All Rights Reserved.
+
+PROPRIETARY & CONFIDENTIAL — UNLICENSED
+TESCİLLİ VE GİZLİ — LİSANS VERİLMEMİŞTİR
+
+HMGS projesinin kaynak kodları, arayüz ve görselleştirme tasarımları, simülasyon
+motorları, algoritmaları, veri şemaları ve bunlara ilişkin tüm fikri hakları
+münhasıran Yusuf GÜNAY'a aittir.
+
+Bu haklar 5846 sayılı Fikir ve Sanat Eserleri Kanunu (FSEK) m. 1/B ve m. 13 ile
+Bern Sözleşmesi m. 5/2 uyarınca, eserin yaratılmasıyla birlikte ve herhangi bir
+tescil veya bildirim şartı aranmaksızın doğar. İşbu dosyanın bulunmaması hâlinde
+dahi haklar saklıdır.
+
+Yazılı izin olmaksızın bu eserin tamamının veya bir parçasının:
+  · kopyalanması, çoğaltılması veya başka bir depoya/projeye aktarılması,
+  · değiştirilmesi veya türev eser üretilmesi,
+  · üçüncü kişilerle paylaşılması, dağıtılması veya satılması,
+  · ticari veya ticari olmayan herhangi bir ortamda yayınlanması veya barındırılması,
+  · tersine mühendisliğe tabi tutulması
+KESİNLİKLE YASAKTIR.
+
+--------------------------------------------------------------------------------
+AÇIK HÜKÜM — ÇATALLAMA (FORK) İSTİSNASI
+--------------------------------------------------------------------------------
+Bu depo, GitHub Hizmet Şartları'nın her kullanıcıya tanıdığı görüntüleme ve
+çatallama (fork) hakkı kapsamında herkese açıktır; bu hak işbu lisans ile
+sınırlandırılamaz. Buna göre:
+
+  (a) GitHub arayüzü kullanılarak oluşturulan bir çatal bu lisansı İHLAL ETMEZ;
+
+  (b) ancak bu depodan veya bir çataldan alınan kodun kopyalanıp bağımsız bir
+      depo, proje veya ürün olarak yeniden yayınlanması, dağıtılması ya da hak
+      sahibine atıf yapılmaksızın sahiplenilmesi bu lisansı İHLAL EDER ve hak
+      sahibine hukuki yollara başvurma hakkı verir.
+
+Bu istisna, deponun açık olmasının zorunlu bir sonucudur; kod üzerinde hiçbir
+kullanım, kopyalama veya türetme hakkı tanımaz.
+
+--------------------------------------------------------------------------------
+İHLAL BİLDİRİMİ VE İZİN TALEBİ
+--------------------------------------------------------------------------------
+İhlal şüphesini bildirmek veya kullanım izni talep etmek için:
+  https://github.com/yusufgunay-esq
+
+--------------------------------------------------------------------------------
+ENGLISH
+--------------------------------------------------------------------------------
+Strictly no permission is granted for copying, reproducing, distributing,
+modifying, sublicensing, or hosting any part of this software repository, in
+whole or in part and in any medium, whether for commercial or non-commercial
+purposes.
+
+Exception: forking through the GitHub interface is permitted under GitHub's
+Terms of Service and does not breach this license. Republishing code taken from
+this repository, or from any fork of it, as an independent repository, project
+or product is prohibited.
+
+Contact for permission or infringement notice: https://github.com/yusufgunay-esq
