@@ -6,6 +6,9 @@
    Görsel: v3 konularda HMGSV3 motoru; eski tipler okunur şekilde gösterilir
    ve açıkça "v3 bekliyor" olarak işaretlenir (sessizce iyi gibi durmasın).
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import {
   esc, rich, $, $$, toast,
