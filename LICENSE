@@ -38,6 +38,26 @@ Bu istisna, deponun açık olmasının zorunlu bir sonucudur; kod üzerinde hiç
 kullanım, kopyalama veya türetme hakkı tanımaz.
 
 --------------------------------------------------------------------------------
+MAKİNE ÖĞRENMESİ VE VERİ MADENCİLİĞİ (TDM) REZERVİ
+--------------------------------------------------------------------------------
+Bu eser üzerinde metin ve veri madenciliği (TDM) dâhil olmak üzere tüm çoğaltma
+ve çıkarım hakları, (AB) 2019/790 sayılı Direktif m. 4/3, 2001/29/AT sayılı
+Direktif ve 5846 sayılı FSEK uyarınca AÇIKÇA SAKLI TUTULMUŞTUR.
+
+Bu depodaki kaynak kod, arayüz, tasarım, şema ve tüm içeriğin makine öğrenmesi
+veya büyük dil modellerinin eğitimi, ince ayarı, damıtılması, değerlendirilmesi
+ya da çıktı üretimi amacıyla çoğaltılması veya kullanılması
+KESİNLİKLE YASAKTIR.
+
+Bu rezerv, yayınlanan her sayfanın <head> bölümündeki
+<meta name="tdm-reservation" content="1"> ve
+<meta name="robots" content="noai, noimageai"> işaretleriyle makine tarafından
+okunabilir biçimde bildirilmiştir.
+
+Rezervin ihlali hâlinde; tecavüzün ref'i, tazminat ve ihtiyati tedbir talepleri
+dâhil FSEK ve ilgili mevzuattan doğan TÜM hukuki yollara başvurulacaktır.
+
+--------------------------------------------------------------------------------
 İHLAL BİLDİRİMİ VE İZİN TALEBİ
 --------------------------------------------------------------------------------
 İhlal şüphesini bildirmek veya kullanım izni talep etmek için:
@@ -55,5 +75,13 @@ Exception: forking through the GitHub interface is permitted under GitHub's
 Terms of Service and does not breach this license. Republishing code taken from
 this repository, or from any fork of it, as an independent repository, project
 or product is prohibited.
+
+Reservation of rights for text and data mining (TDM): all rights of reproduction
+and extraction for TDM purposes — including the training, fine-tuning,
+distillation, evaluation or output generation of machine-learning or large
+language models — are expressly reserved under Art. 4(3) of Directive (EU)
+2019/790 and are not licensed. This reservation is declared in machine-readable
+form through the "tdm-reservation" and "noai"/"noimageai" directives in the
+<head> of every published page, and in robots.txt.
 
 Contact for permission or infringement notice: https://github.com/yusufgunay-esq
