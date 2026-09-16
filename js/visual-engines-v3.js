@@ -6,6 +6,9 @@
              time_slider · guess_table · step_reveal · interactive_hierarchy ·
              family_tree
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 window.HMGSV3 = (function () {
   const types = ['decision_sim', 'calculator', 'scene_story', 'drag_classify', 'time_slider',
