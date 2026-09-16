@@ -3,6 +3,9 @@
    Gerçek ders dağılımı · geri sayım · boş bırakma · soru haritası
    Kural: HMGS'de yanlış cezası yoktur → net = doğru. Asla boş bırakma.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich, richBlock, splitStem, fmtClock, emptyState, $, toast } from '../ui.js';
 import { buildExamSet, subjectName, SUBJECTS, topicById, pastExamList, pastExamQuestions } from '../data.js';
