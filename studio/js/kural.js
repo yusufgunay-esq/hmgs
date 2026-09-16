@@ -25,6 +25,9 @@
    kala yeni içerik üretmek değil, mevcut 77 alıştırmayı kullanıcıya
    göstermek doğru yatırım.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc } from './ui.js';
 import { topicById, V3_TYPES } from './data.js';
