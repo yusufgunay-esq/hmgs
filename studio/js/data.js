@@ -3,6 +3,9 @@
    topics.js / questions.js global sabitleri okur, tek seferde indeksler.
    O(n) tam tarama yerine hazır Map'ler.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { loadMasterVault } from './vault-client.js';
 import { setKitaplar } from './kitaplar.js';
