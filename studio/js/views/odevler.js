@@ -19,6 +19,9 @@
    olay bağlama, projenin kuralı gereği (main.js: "inline onclick yok")
    data-act üzerinden merkezî dinleyiciye taşındı.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, $ } from '../ui.js';
 import { SUBJECTS, SUBJECT_BY_ID, subjectName, topicById, topicsOf, questionsOfTopic, questionsOfTopics, questionsOf } from '../data.js';
