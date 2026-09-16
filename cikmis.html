@@ -1,0 +1,639 @@
+﻿<!DOCTYPE html>
+<html lang="tr" class="bg-slate-950 text-slate-100 antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>HMGS 240 Çıkmış Soru & ÖSYM Odak Röntgeni</title>
+  <meta name="description" content="27 Eylül 2026 HMGS Sınavı Odaklı 240 Çıkmış Soru, Çekirdek Kural, ÖSYM Tuzağı ve İkiz Sınav Tahmini İstasyonu" />
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png" />
+  <link rel="shortcut icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- Google Identity Services (kasa: 240 çıkmış soru yalnız girişten sonra) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+    }
+    .roentgen-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      transition: all 0.2s ease;
+    }
+    .roentgen-card:hover {
+      border-color: #334155;
+    }
+    .roentgen-card.completed {
+      border-color: #065f46;
+      background: #061e18;
+    }
+    .roentgen-card.starred {
+      border-color: #854d0e;
+    }
+    .badge-tier1 { background: #1e1b4b; color: #a5b4fc; border: 1px solid #312e81; }
+    .badge-tier2 { background: #0c4a6e; color: #7dd3fc; border: 1px solid #075985; }
+    .badge-tier3 { background: #1f2937; color: #9ca3af; border: 1px solid #374151; }
+    .tab-btn.active {
+      background: #334155;
+      color: #f8fafc;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-indigo-900 selection:text-indigo-200">
+
+  <!-- Üst Bar -->
+  <header class="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md px-4 sm:px-6 py-3.5">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <a href="index.html" class="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-colors text-slate-400 hover:text-white" title="Ana Portala Dön">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          </a>
+          <div>
+            <h1 class="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
+              <span>HMGS 240 Odak Röntgeni</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">27 Eylül Sınavı</span>
+            </h1>
+            <p class="text-[11px] text-slate-400 font-medium">Eylül 2025 (120) &middot; Nisan 2026 (120) &middot; Çekirdek Kural &middot; ÖSYM Tuzağı &middot; İkiz Tahmin</p>
+          </div>
+        </div>
+
+        <!-- Sayaç -->
+        <div class="flex items-center gap-2 md:hidden">
+          <span id="mobileProgressText" class="text-xs font-mono font-semibold text-emerald-400">0/240</span>
+        </div>
+      </div>
+
+      <!-- İlerleme Özeti ve Kontroller -->
+      <div class="flex items-center gap-3">
+        <div class="hidden md:flex flex-col items-end">
+          <div class="text-xs font-mono font-semibold text-slate-300 flex items-center gap-2">
+            <span>Pekiştirilen Odak:</span>
+            <span id="progressStats" class="text-emerald-400 font-bold">0 / 240 (%0)</span>
+          </div>
+          <div class="w-44 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
+            <div id="progressBar" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%;"></div>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-1.5">
+          <button id="resetProgressBtn" class="px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 text-[11px] text-slate-400 hover:text-slate-200 transition-colors" title="İlerlemeyi Sıfırla">
+            Sıfırla
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Filtre ve Kontrol Paneli -->
+  <section class="border-b border-slate-800/80 bg-slate-900/50 px-4 sm:px-6 py-3">
+    <div class="max-w-7xl mx-auto space-y-2.5">
+      
+      <!-- Satır 1: 19 Günlük Doz Seçici & Hızlı Butonlar -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
+        <span class="text-slate-500 font-mono text-[11px] whitespace-nowrap">Doz:</span>
+        <button data-day="all" class="day-filter-btn px-2.5 py-1 rounded bg-slate-800 text-white font-semibold border border-slate-700 whitespace-nowrap active">Tümü (240)</button>
+        <button data-day="1" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G1: Medeni Kişiler (10)</button>
+        <button data-day="2" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G2: Medeni Aile (10)</button>
+        <button data-day="3" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G3: Miras & Eşya (9)</button>
+        <button data-day="4" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G4: Borçlar Genel (14)</button>
+        <button data-day="5" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G5: Borçlar Özel (13)</button>
+        <button data-day="6" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G6: HMK Görev/Yetki (12)</button>
+        <button data-day="7" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G7: HMK İspat/Kanun (12)</button>
+        <button data-day="8" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G8: Ticaret İşletme (11)</button>
+        <button data-day="9" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G9: Kıymetli Evrak (10)</button>
+        <button data-day="10" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G10: Ceza Genel (10)</button>
+        <button data-day="11" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G11: Ceza Özel (8)</button>
+        <button data-day="12" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G12: CMK (12)</button>
+        <button data-day="13" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G13: İcra-İflas (12)</button>
+        <button data-day="14" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G14: İdare (12)</button>
+        <button data-day="15" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G15: İYUK + Anayasa 1 (12)</button>
+        <button data-day="16" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G16: Anayasa 2 + AYM (12)</button>
+        <button data-day="17" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G17: İş Hukuku + VUK (14)</button>
+        <button data-day="18" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G18: Vergi + Avukatlık (17)</button>
+        <button data-day="19" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G19: Uluslararası & Kültür (37)</button>
+      </div>
+
+      <!-- Satır 2: Ders, Tier, Sınav, Durum Filtresi ve Arama -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+        
+        <!-- Arama -->
+        <div class="col-span-2 sm:col-span-1 md:col-span-2">
+          <input type="text" id="searchInput" placeholder="Madde no, kural veya kavram ara..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono" />
+        </div>
+
+        <!-- Ders Filtresi -->
+        <div>
+          <select id="subjectFilter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-slate-600">
+            <option value="all">Tüm Dersler (20)</option>
+            <option value="medeni_hukuk">Medeni Hukuk (29)</option>
+            <option value="borclar_hukuku">Borçlar Hukuku (27)</option>
+            <option value="hmk">HMK (24)</option>
+            <option value="ticaret_hukuku">Ticaret Hukuku (21)</option>
+            <option value="ceza_hukuku">Ceza Hukuku (18)</option>
+            <option value="cmk">CMK (12)</option>
+            <option value="icra_iflas">İcra ve İflas (12)</option>
+            <option value="idare_hukuku">İdare Hukuku (12)</option>
+            <option value="iyuk">İYUK (6)</option>
+            <option value="anayasa_hukuku">Anayasa Hukuku (12)</option>
+            <option value="anayasa_yargisi">Anayasa Yargısı (6)</option>
+            <option value="is_hukuku">İş Hukuku (12)</option>
+            <option value="vergi_hukuku">Vergi Hukuku (10)</option>
+            <option value="vergi_usul">Vergi Usul (2)</option>
+            <option value="avukatlik">Avukatlık Hukuku (7)</option>
+            <option value="milletlerarasi_hukuk">Milletlerarası Hukuk (10)</option>
+            <option value="mohuk">MÖHUK (3)</option>
+            <option value="hukuk_felsefesi">Hukuk Felsefesi (6)</option>
+            <option value="hukuk_tarihi">Türk Hukuk Tarihi (6)</option>
+            <option value="genel_kamu">Genel Kamu Hukuku (5)</option>
+          </select>
+        </div>
+
+        <!-- Tier Filtresi -->
+        <div>
+          <select id="tierFilter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-slate-600">
+            <option value="all">Tüm Öncelikler</option>
+            <option value="1">Tier 1: Büyük 5 Ders (119 Soru)</option>
+            <option value="2">Tier 2: İkinci Omurga (84 Soru)</option>
+            <option value="3">Tier 3: Usul & Kültür (37 Soru)</option>
+          </select>
+        </div>
+
+        <!-- Sınav Filtresi -->
+        <div>
+          <select id="examFilter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-slate-600">
+            <option value="all">Tüm Sınavlar (240)</option>
+            <option value="HMGS Nisan 2026">Nisan 2026 (120)</option>
+            <option value="HMGS Eylul 2025">Eylül 2025 (120)</option>
+          </select>
+        </div>
+
+        <!-- Durum Filtresi -->
+        <div>
+          <select id="statusFilter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-slate-600">
+            <option value="all">Tüm Durumlar</option>
+            <option value="pending">Henüz Bakılmayanlar</option>
+            <option value="completed">Pekiştirilenler</option>
+            <option value="starred">Yıldızlı Odaklar</option>
+          </select>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Kart Listesi Alanı (Yan Yana Izgara) -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
+
+    <!-- Kasa Girişi: 240 çıkmış soru public'te yok, Google kasasından gelir -->
+    <div id="roentgenLogin" class="hidden max-w-lg mx-auto mb-6">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-center">
+        <div class="mx-auto mb-3 w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        <h3 class="text-sm font-bold text-white mb-1">Çıkmış Röntgeni Kasada</h3>
+        <p class="text-xs text-slate-400 leading-relaxed mb-4">
+          240 çıkmış soru, doğru cevap ve ÖSYM tuzağı analizi telifli veri sınıfındadır;
+          bu yüzden public depoda tutulmaz. Kendi Google hesabınızla giriş yaptığınızda
+          kişisel kasanızdan yüklenir.
+        </p>
+        <button id="roentgenLoginBtn" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors">
+          Google ile Giriş Yap
+        </button>
+        <p id="roentgenLoginErr" class="hidden mt-3 text-[11px] text-rose-400 leading-relaxed"></p>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between mb-4">
+      <div class="text-xs text-slate-400 font-mono">
+        <span id="filteredCount">240</span> odak noktası listeleniyor
+      </div>
+      <div class="text-[11px] text-slate-500 font-mono hidden sm:block">
+        Her kart: Çekirdek Hüküm + ÖSYM Tuzağı + 27 Eylül İkiz Tahmini + Aktif Test
+      </div>
+    </div>
+
+    <!-- Modüler Izgara -->
+    <div id="cardsGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <!-- JavaScript tarafından dinamik oluşturulur -->
+    </div>
+
+    <!-- Boş Durum -->
+    <div id="emptyState" class="hidden py-16 text-center">
+      <p class="text-sm font-semibold text-slate-300 mb-1">Arama kriterlerine uygun odak bulunamadı.</p>
+      <p class="text-xs text-slate-500">Lütfen filtrelerinizi temizleyin veya farklı bir arama terimi girin.</p>
+    </div>
+  </main>
+
+  <!-- Alt Bilgi -->
+  <footer class="border-t border-slate-900 bg-slate-950 px-4 sm:px-6 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>HMGS 240 Çıkmış Soru & ÖSYM Odak Röntgeni &middot; 27 Eylül 2026 Hedefli</span>
+      <span class="font-mono text-[11px] text-slate-600">İlerleme LocalStorage'da · Soru verisi Google kasanızda</span>
+    </div>
+  </footer>
+
+  <!-- Soru & Veri Yükleme -->
+  <!-- cikmis_roentgen_data.js: yalnız YEREL geliştirmede var (window.HMGS_ROENTGEN_DATA).
+       Prod'da yoktur, 404 sessizce yutulur — veri Google kasasından (vault.roentgen) gelir. -->
+  <script src="cikmis_roentgen_data.js"></script>
+  <script>
+    // LocalStorage Yönetimi
+    const STORAGE_KEY_COMPLETED = 'hmgs_roentgen_completed';
+    const STORAGE_KEY_STARRED = 'hmgs_roentgen_starred';
+    const STORAGE_KEY_DRILL_ANSWERS = 'hmgs_roentgen_drills';
+
+    let completedIds = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_COMPLETED) || '[]'));
+    let starredIds = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_STARRED) || '[]'));
+    let drillAnswers = JSON.parse(localStorage.getItem(STORAGE_KEY_DRILL_ANSWERS) || '{}');
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY_COMPLETED, JSON.stringify([...completedIds]));
+      localStorage.setItem(STORAGE_KEY_STARRED, JSON.stringify([...starredIds]));
+      localStorage.setItem(STORAGE_KEY_DRILL_ANSWERS, JSON.stringify(drillAnswers));
+      updateProgressUI();
+    }
+
+    function updateProgressUI() {
+      const total = window.HMGS_ROENTGEN_DATA ? window.HMGS_ROENTGEN_DATA.length : 240;
+      const done = completedIds.size;
+      const pct = Math.round((done / total) * 100);
+
+      const statsEl = document.getElementById('progressStats');
+      const barEl = document.getElementById('progressBar');
+      const mobText = document.getElementById('mobileProgressText');
+
+      if (statsEl) statsEl.textContent = `${done} / ${total} (%${pct})`;
+      if (barEl) barEl.style.width = `${pct}%`;
+      if (mobText) mobText.textContent = `${done}/${total}`;
+    }
+
+    // Filtreleme Durumu
+    let currentFilters = {
+      day: 'all',
+      subject: 'all',
+      tier: 'all',
+      exam: 'all',
+      status: 'all',
+      search: ''
+    };
+
+    function renderCards() {
+      const grid = document.getElementById('cardsGrid');
+      const emptyState = document.getElementById('emptyState');
+      const countEl = document.getElementById('filteredCount');
+
+      if (!window.HMGS_ROENTGEN_DATA) return;
+
+      const filtered = window.HMGS_ROENTGEN_DATA.filter(item => {
+        // Day filter
+        if (currentFilters.day !== 'all' && item.gun !== parseInt(currentFilters.day)) return false;
+        // Subject filter
+        if (currentFilters.subject !== 'all' && item.dersSlug !== currentFilters.subject) return false;
+        // Tier filter
+        if (currentFilters.tier !== 'all' && item.tier !== parseInt(currentFilters.tier)) return false;
+        // Exam filter
+        if (currentFilters.exam !== 'all' && item.sinav !== currentFilters.exam) return false;
+        // Status filter
+        if (currentFilters.status === 'completed' && !completedIds.has(item.id)) return false;
+        if (currentFilters.status === 'starred' && !starredIds.has(item.id)) return false;
+        if (currentFilters.status === 'pending' && completedIds.has(item.id)) return false;
+        // Search
+        if (currentFilters.search) {
+          const q = currentFilters.search.toLowerCase();
+          const match = item.konu.toLowerCase().includes(q) ||
+                        item.cekirdekKural.toLowerCase().includes(q) ||
+                        item.mevzuatRef.toLowerCase().includes(q) ||
+                        item.soruKoku.toLowerCase().includes(q) ||
+                        item.dersAdi.toLowerCase().includes(q);
+          if (!match) return false;
+        }
+        return true;
+      });
+
+      countEl.textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+
+      grid.innerHTML = filtered.map(item => {
+        const isDone = completedIds.has(item.id);
+        const isStar = starredIds.has(item.id);
+        const drillAns = drillAnswers[item.id]; // undefined, true, false
+        const tierBadgeClass = item.tier === 1 ? 'badge-tier1' : (item.tier === 2 ? 'badge-tier2' : 'badge-tier3');
+
+        return `
+          <div class="roentgen-card rounded-xl p-5 flex flex-col justify-between ${isDone ? 'completed' : ''} ${isStar ? 'starred' : ''}" id="card-${item.id}">
+            <div>
+              <!-- Üst Meta Bilgileri -->
+              <div class="flex items-center justify-between gap-2 mb-3">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                    ${item.sinav.replace('HMGS ', '')} &middot; S${item.soruNo}
+                  </span>
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded ${tierBadgeClass}">
+                    ${item.dersAdi}
+                  </span>
+                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
+                    G${item.gun}
+                  </span>
+                </div>
+
+                <div class="flex items-center gap-1">
+                  <!-- Yıldız Butonu -->
+                  <button onclick="toggleStar('${item.id}')" class="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors" title="${isStar ? 'Yıldızı Kaldır' : 'Yıldızla'}">
+                    <svg class="w-4 h-4 ${isStar ? 'text-amber-400 fill-amber-400' : 'fill-none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                  </button>
+
+                  <!-- Tamamlandı Butonu -->
+                  <button onclick="toggleDone('${item.id}')" class="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-emerald-400 transition-colors" title="${isDone ? 'İşareti Kaldır' : 'Pekiştirildi Olarak İşaretle'}">
+                    <svg class="w-4 h-4 ${isDone ? 'text-emerald-400 fill-emerald-500/20' : 'fill-none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Konu ve Kanun Referansı -->
+              <div class="mb-3">
+                <h3 class="text-sm font-bold text-white tracking-tight">${item.konu}</h3>
+                <p class="text-[11px] font-mono text-indigo-400 mt-0.5">${item.mevzuatRef}</p>
+              </div>
+
+              <!-- Çekirdek Hüküm (Kural) -->
+              <div class="bg-slate-900/90 border border-slate-800 rounded-lg p-3 mb-3">
+                <div class="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider mb-1">
+                  Çekirdek Pozitif Hukuk Kuralı
+                </div>
+                <p class="text-xs text-slate-200 leading-relaxed font-medium">
+                  ${item.cekirdekKural}
+                </p>
+              </div>
+
+              <!-- ÖSYM Tuzağı -->
+              <div class="bg-slate-900/60 border border-slate-800/80 rounded-lg p-2.5 mb-3">
+                <div class="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider mb-1">
+                  ÖSYM Çeldirici Mekanizması & Tuzağı
+                </div>
+                <p class="text-[11px] text-slate-300 leading-normal">
+                  ${item.osymTuzagi}
+                </p>
+              </div>
+
+              <!-- 27 Eylül İkiz Tahmin -->
+              <div class="bg-indigo-950/40 border border-indigo-900/40 rounded-lg p-2.5 mb-3">
+                <div class="text-[10px] font-mono font-bold text-indigo-300 uppercase tracking-wider mb-1">
+                  27 Eylül 2026 Sınav Projeksiyonu
+                </div>
+                <p class="text-[11px] text-indigo-100 leading-normal">
+                  ${item.ikizTahmin2026}
+                </p>
+              </div>
+
+              <!-- Orijinal Soru Akordeonu (Aç/Kapa) -->
+              <div class="mb-3">
+                <button onclick="toggleStem('${item.id}')" class="text-[11px] font-mono text-slate-400 hover:text-slate-200 flex items-center gap-1.5 focus:outline-none">
+                  <span id="stem-arrow-${item.id}">›</span>
+                  <span>Orijinal Sınav Sorusu ve Şıkları Göster</span>
+                </button>
+                <div id="stem-content-${item.id}" class="hidden mt-2 p-3 rounded-lg bg-slate-950 border border-slate-900 text-xs text-slate-300 space-y-2">
+                  <p class="font-medium text-slate-200 leading-relaxed whitespace-pre-line">${item.soruKoku}</p>
+                  <div class="space-y-1 pt-2 border-t border-slate-800 text-[11px]">
+                    <div class="${item.dogruCevap === 'A' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">A) ${item.secenekler.A}</div>
+                    <div class="${item.dogruCevap === 'B' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">B) ${item.secenekler.B}</div>
+                    <div class="${item.dogruCevap === 'C' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">C) ${item.secenekler.C}</div>
+                    <div class="${item.dogruCevap === 'D' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">D) ${item.secenekler.D}</div>
+                    <div class="${item.dogruCevap === 'E' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">E) ${item.secenekler.E}</div>
+                  </div>
+                  <div class="pt-2 text-[11px] text-slate-400 border-t border-slate-800">
+                    <span class="text-emerald-400 font-bold">Doğru Şık: ${item.dogruCevap}</span> &middot; ${item.otopsi}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Hızlı Aktif Hatırlama Testi (Flash-Check) -->
+              <div class="border-t border-slate-800/80 pt-3">
+                <div class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Hızlı Pekiştirme Testi</span>
+                  ${drillAns !== undefined ? `<span class="text-[10px] ${drillAns ? 'text-emerald-400' : 'text-red-400'}">${drillAns ? '✓ Doğru Bildin' : '✕ Hatalı Seçim'}</span>` : ''}
+                </div>
+                <p class="text-xs text-slate-300 mb-2 font-medium">${item.hizliTest.soru}</p>
+                <div class="space-y-1.5" id="drill-options-${item.id}">
+                  ${item.hizliTest.secenekler.map((opt, oIdx) => {
+                    const isCorrectChoice = oIdx === item.hizliTest.dogruIndex;
+                    let btnClass = 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700';
+                    if (drillAns !== undefined) {
+                      if (isCorrectChoice) {
+                        btnClass = 'bg-emerald-950/60 border-emerald-700 text-emerald-300 font-semibold';
+                      } else {
+                        btnClass = 'bg-slate-950 border-slate-900 text-slate-500 opacity-60';
+                      }
+                    }
+                    return `
+                      <button onclick="answerDrill('${item.id}', ${oIdx})" ${drillAns !== undefined ? 'disabled' : ''} class="w-full text-left p-2 rounded text-[11px] border transition-colors flex items-start gap-2 ${btnClass}">
+                        <span class="font-mono text-slate-500 shrink-0">${['A', 'B', 'C'][oIdx]})</span>
+                        <span class="leading-tight">${opt}</span>
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+                <div id="drill-feedback-${item.id}" class="${drillAns !== undefined ? '' : 'hidden'} mt-2 text-[10px] font-mono text-slate-400 bg-slate-950/80 p-2 rounded border border-slate-900">
+                  ${item.hizliTest.gerekce}
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Kart Altı Butonları -->
+            <div class="pt-3 mt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
+              <button onclick="toggleDone('${item.id}')" class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${isDone ? 'bg-emerald-900/40 border-emerald-700 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'}">
+                ${isDone ? '✓ Pekiştirildi' : 'Pekiştirildi Olarak İşaretle'}
+              </button>
+              <button onclick="toggleStar('${item.id}')" class="text-xs text-slate-400 hover:text-amber-400 transition-colors">
+                ${isStar ? 'Yıldızı Kaldır' : 'Tekrar Bakmak İçin Yıldızla'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Kart Etkileşim Fonksiyonları
+    window.toggleDone = function(id) {
+      if (completedIds.has(id)) {
+        completedIds.delete(id);
+      } else {
+        completedIds.add(id);
+      }
+      saveState();
+      renderCards();
+    };
+
+    window.toggleStar = function(id) {
+      if (starredIds.has(id)) {
+        starredIds.delete(id);
+      } else {
+        starredIds.add(id);
+      }
+      saveState();
+      renderCards();
+    };
+
+    window.toggleStem = function(id) {
+      const content = document.getElementById(`stem-content-${id}`);
+      const arrow = document.getElementById(`stem-arrow-${id}`);
+      if (!content) return;
+      if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        if (arrow) arrow.textContent = '▼';
+      } else {
+        content.classList.add('hidden');
+        if (arrow) arrow.textContent = '›';
+      }
+    };
+
+    window.answerDrill = function(id, choiceIdx) {
+      const item = window.HMGS_ROENTGEN_DATA.find(x => x.id === id);
+      if (!item) return;
+      const isCorrect = choiceIdx === item.hizliTest.dogruIndex;
+      drillAnswers[id] = isCorrect;
+      if (isCorrect) {
+        completedIds.add(id);
+      }
+      saveState();
+      renderCards();
+    };
+
+    // Event Listener Bağlantıları
+    document.addEventListener('DOMContentLoaded', () => {
+      updateProgressUI();
+      renderCards();
+
+      // Doz butonları
+      document.querySelectorAll('.day-filter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.day-filter-btn').forEach(b => {
+            b.classList.remove('active', 'bg-slate-800', 'text-white');
+            b.classList.add('bg-slate-900', 'text-slate-400');
+          });
+          btn.classList.add('active', 'bg-slate-800', 'text-white');
+          btn.classList.remove('bg-slate-900', 'text-slate-400');
+          currentFilters.day = btn.getAttribute('data-day');
+          renderCards();
+        });
+      });
+
+      // Ders filtresi
+      document.getElementById('subjectFilter').addEventListener('change', (e) => {
+        currentFilters.subject = e.target.value;
+        renderCards();
+      });
+
+      // Tier filtresi
+      document.getElementById('tierFilter').addEventListener('change', (e) => {
+        currentFilters.tier = e.target.value;
+        renderCards();
+      });
+
+      // Sınav filtresi
+      document.getElementById('examFilter').addEventListener('change', (e) => {
+        currentFilters.exam = e.target.value;
+        renderCards();
+      });
+
+      // Durum filtresi
+      document.getElementById('statusFilter').addEventListener('change', (e) => {
+        currentFilters.status = e.target.value;
+        renderCards();
+      });
+
+      // Arama filtresi
+      let searchTimeout;
+      document.getElementById('searchInput').addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          currentFilters.search = e.target.value.trim();
+          renderCards();
+        }, 150);
+      });
+
+      // Sıfırla butonu
+      document.getElementById('resetProgressBtn').addEventListener('click', () => {
+        if (confirm('Tüm pekiştirme ve test ilerlemenizi sıfırlamak istediğinize emin misiniz?')) {
+          completedIds.clear();
+          starredIds.clear();
+          drillAnswers = {};
+          saveState();
+          renderCards();
+        }
+      });
+    });
+  </script>
+
+  <!-- Kasa Bootstrap: veriyi pasif çeker (yerel global → IndexedDB); yoksa giriş ister.
+       Verinin kendisi bu sayfada DEĞİL — public repoya soru/cevap girmesi yasak. -->
+  <script type="module">
+    import { loadRoentgen, requestRoentgenFromDrive } from './studio/js/vault-client.js';
+
+    const loginEl = document.getElementById('roentgenLogin');
+    const btn = document.getElementById('roentgenLoginBtn');
+    const errEl = document.getElementById('roentgenLoginErr');
+
+    function apply(data) {
+      window.HMGS_ROENTGEN_DATA = data;
+      loginEl.classList.add('hidden');
+      errEl.classList.add('hidden');
+      if (typeof updateProgressUI === 'function') updateProgressUI();
+      if (typeof renderCards === 'function') renderCards();
+    }
+
+    function showLogin(msg) {
+      loginEl.classList.remove('hidden');
+      if (msg) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+    }
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Bağlanılıyor...';
+      try {
+        apply(await requestRoentgenFromDrive());
+      } catch (e) {
+        showLogin(e && e.message ? e.message : 'Kasa verisine ulaşılamadı.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Google ile Giriş Yap';
+      }
+    });
+
+    // İlk açılışta pasif dene; veri yoksa giriş ekranı kalır.
+    try {
+      const data = await loadRoentgen();
+      if (data && data.length) apply(data);
+      else if (!window.HMGS_ROENTGEN_DATA || !window.HMGS_ROENTGEN_DATA.length) showLogin();
+    } catch (e) {
+      showLogin();
+    }
+  </script>
+</body>
+</html>
