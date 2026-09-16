@@ -1,7 +1,7 @@
 /* HMGS 2026 — Service Worker
    Amaç: uygulama telefonda internetsiz de açılsın; Drive trafiği ASLA önbelleğe girmesin. */
 
-const VERSION = 'hmgs-v30';
+const VERSION = 'hmgs-v31';
 const SHELL = VERSION + '-shell';
 
 // Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
@@ -26,13 +26,22 @@ const PRECACHE = [
   './studio/js/ui.js',
   './studio/js/book-map.js',
   './studio/js/vault-client.js',
+  './studio/js/kural.js',
+  './studio/js/pregel.js',
+  './studio/js/kitap.js',
+  './studio/js/kitaplar.js',
   './studio/js/views/today.js',
   './studio/js/views/odevler.js',
   './studio/js/views/flow.js',
   './studio/js/views/practice.js',
   './studio/js/views/pratik.js',
+  './studio/js/views/akim.js',
   './studio/js/views/exam.js',
   './studio/js/views/progress.js',
+  './studio/js/gen/ciro.js',
+  './studio/js/gen/ehliyet.js',
+  './studio/js/gen/icra.js',
+  './studio/js/gen/miras.js',
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'
 ];
