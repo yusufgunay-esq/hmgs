@@ -1,4 +1,8 @@
 // HMGS 2025 Kitap Okuma Rehberi Veritabanı (Yetki 2025 & Müessir 2025)
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
+
 const BOOK_GUIDE_DATA = [
   {
     "id": "tpc_medeni_001",
