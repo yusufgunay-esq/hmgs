@@ -12,6 +12,9 @@
    bir şık, kendisini oluşturan öncüllerden biri bile elenmiş kaldıkça çizili
    kalır (mantıksal olarak artık doğru olamaz).
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich } from './ui.js';
 
