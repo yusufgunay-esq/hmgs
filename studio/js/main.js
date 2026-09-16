@@ -6,6 +6,9 @@
    Inline onclick yok: tüm etkileşim document seviyesinde data-act ile yakalanır.
    Bu sayede yeniden render sonrası handler bağlamak gerekmez.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { $, $$, toast } from './ui.js';
 import { initData, initDataAsync, populateData, topicById, questionById } from './data.js';
@@ -477,6 +480,7 @@ function renderDriveConnectScreen() {
 
 async function boot() {
   window.__STUDIO_LOADED__ = true;
+  console.log('%c© 2026 Yusuf GÜNAY — Tüm hakları saklıdır. İzinsiz kullanım ve kopyalama yasaktır.', 'font-weight:600;color:#6f7ce6');
   try {
     load();
     const curSettings = getSettings();
