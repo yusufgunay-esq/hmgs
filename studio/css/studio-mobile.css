@@ -10,6 +10,9 @@
    Hedef cihaz: Pixel 9 Pro XL (CSS genişliği ~412px), Edge/Chrome Android.
    Kırılma noktası 760px — tablet dikey de mobil düzeni alır.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 /* ---------- Her genişlikte geçerli dokunma ve kaydırma düzeltmeleri ---------- */
 html {
