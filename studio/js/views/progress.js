@@ -3,6 +3,9 @@
    Deneme net geçmişi, hız eğilimi, ders kırılımı ve veri bütünlüğü raporu.
    Kural: hesaplanamayan metrik gösterilmez, "–" yazılır. Uydurma yok.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, $, fmtClock, toast } from '../ui.js';
 import { SUBJECTS, subjectName, integrity, topicById } from '../data.js';
