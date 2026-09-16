@@ -1,6 +1,9 @@
 /* ==========================================================================
    HMGS 2025 FİZİKSEL KİTAP REHBERİ VE CANLI TAKİP SENKRONİZASYON ARAYÜZÜ
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 function renderBookGuideCard(topicTitle, subjectName) {
     if (typeof BOOK_GUIDE_DATA === 'undefined') return '';
