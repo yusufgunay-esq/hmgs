@@ -15,6 +15,9 @@
 
    Kaynak: SINAV_ALGORITMASI.md (238 gerçek ÖSYM sorusundan ölçüldü).
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { SUBJECTS, subjectName, questionsOf } from './data.js';
 import { karmaWeights, bleedingTopics, allSubjectMastery } from './engine.js';
