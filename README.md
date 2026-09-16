@@ -40,10 +40,20 @@ Kaynak kodu görüntülemek serbesttir. Ancak izin verilmemiş olan:
 | Değiştirilmesi veya türev eser üretilmesi | **Yasak** |
 | Ticari veya ticari olmayan herhangi bir ortamda barındırılması | **Yasak** |
 | Tersine mühendisliğe tabi tutulması | **Yasak** |
+| Model eğitimi veya veri madenciliği (TDM) amacıyla kullanılması | **Yasak** |
 | GitHub arayüzü üzerinden çatallama (fork) | Serbest (GitHub Hizmet Şartları) |
 
 Çatallama izni yalnızca platformun kendi şartlarından doğar; kod üzerinde
 hiçbir kullanım hakkı tanımaz. Ayrıntılar: [LICENSE](LICENSE)
+
+## AI ve veri madenciliği (TDM)
+
+Bu depodaki kod ve arayüz, **makine öğrenmesi veya büyük dil modellerinin
+eğitimi, ince ayarı, damıtılması ya da çıktı üretimi için lisanslı değildir.**
+Bu haklar (AB) 2019/790 m. 4/3 uyarınca açıkça saklı tutulmuştur ve yayınlanan
+her sayfada `tdm-reservation` / `noai` işaretleriyle makine tarafından okunabilir
+biçimde bildirilmiştir. Yani: bu repoyu okumak serbest, **eğitim verisi olarak
+kullanmak değildir.** Ayrıntılar: [LICENSE](LICENSE)
 
 ## İletişim
 
