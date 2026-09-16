@@ -5,6 +5,9 @@
      güvenle çekilir ve telefonun IndexedDB yerel veritabanına kalıcı yazılır.
    - İlk indirmeden sonra %100 çevrimdışı (offline / PWA) çalışır.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 const DB_NAME = 'HMGS_VAULT_DB';
 const DB_VERSION = 1;
