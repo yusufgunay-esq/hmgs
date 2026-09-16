@@ -3,6 +3,9 @@
    Kullanıcı bu ekranda ne çalışacağına karar vermez; koç karar verir ve
    gerekçesini söyler. Seçenekler ikincil kalır.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, $, pct } from '../ui.js';
 import { subjectName, topicById } from '../data.js';
