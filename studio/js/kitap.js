@@ -28,6 +28,9 @@
    uygulamasıdır (kullanıcının kendi kuralı, .agents/MEMORY.md). Studio'nun
    burada ikinci bir doğruluk kaynağı açması yanlış olur.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc } from './ui.js';
 import { kitaplarOf } from './kitaplar.js';
