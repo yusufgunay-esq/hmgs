@@ -576,7 +576,9 @@ export async function loadMasterVault() {
         source: 'globals',
         questions: window.QUESTIONS_DATA,
         topics: window.TOPICS_DATA,
-        subjects: window.SUBJECTS_DATA || []
+        subjects: window.SUBJECTS_DATA || [],
+        kitaplar: window.KITAPLAR_DATA,
+        roentgen: window.HMGS_ROENTGEN_DATA
       };
     }
   }
@@ -589,6 +591,8 @@ export async function loadMasterVault() {
       questions: cached.questions,
       topics: cached.topics || [],
       subjects: cached.subjects || [],
+      kitaplar: cached.kitaplar,
+      roentgen: cached.roentgen,
       syncedAt: cached.generatedAt
     };
   }
@@ -600,5 +604,58 @@ export async function loadMasterVault() {
     topics: [],
     needAuth: true
   };
+}
+
+// ------------------------------------------------ Çıkmış Röntgeni (cikmis.html)
+
+/**
+ * Çıkmış Röntgeni verisini PASİF getirir: önce yerel global (cikmis_roentgen_data.js),
+ * sonra IndexedDB kasası. Oturum AÇMAZ — yoksa null döner, sayfa giriş istemi gösterir.
+ */
+export async function loadRoentgen() {
+  if (typeof window !== 'undefined'
+      && Array.isArray(window.HMGS_ROENTGEN_DATA) && window.HMGS_ROENTGEN_DATA.length > 0) {
+    return window.HMGS_ROENTGEN_DATA;
+  }
+  const cached = await loadVaultFromIndexedDB();
+  if (cached && Array.isArray(cached.roentgen) && cached.roentgen.length > 0) {
+    return cached.roentgen;
+  }
+  return null;
+}
+
+/**
+ * Çıkmış Röntgeni için Google girişi başlatır, kasayı indirir ve roentgen dizisini
+ * döner. requestDriveLoginAndDownload ile AYNI istemci/scope/prompt — tek onay ekranı.
+ */
+export function requestRoentgenFromDrive() {
+  return new Promise((resolve, reject) => {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+      return reject(new Error('Google kimlik kütüphanesi yüklenemedi. İnternet bağlantınızı kontrol edin.'));
+    }
+
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: async resp => {
+        if (resp.error) {
+          return reject(new Error(`Google Giriş İptal Edildi / Hata: ${resp.error}`));
+        }
+        try {
+          setActiveToken(resp.access_token);
+          saveSharedToken(resp.access_token, resp.expires_in);
+          const vault = await fetchVaultFromDrive(resp.access_token);
+          if (!Array.isArray(vault.roentgen) || !vault.roentgen.length) {
+            return reject(new Error('Kasada "roentgen" verisi bulunamadı.'));
+          }
+          resolve(vault.roentgen);
+        } catch (e) {
+          reject(e);
+        }
+      }
+    });
+
+    client.requestAccessToken({ prompt: '' });
+  });
 }
 
