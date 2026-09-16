@@ -22,6 +22,9 @@
      bankaOf(subjectId)    → tur === 'banka' olan ilk kayıt, yoksa null
    Envanter yokken ikisi de boş döner ve panel hiç çizilmez (kitap.js:47, :87).
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 /** Kasadan gelen envanter. Yalnızca setKitaplar() yazar. */
 let ENVANTER = null;
