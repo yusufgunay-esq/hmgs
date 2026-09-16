@@ -1,7 +1,7 @@
 /* HMGS 2026 — Service Worker
    Amaç: uygulama telefonda internetsiz de açılsın; Drive trafiği ASLA önbelleğe girmesin. */
 
-const VERSION = 'hmgs-v32';
+const VERSION = 'hmgs-v33';
 const SHELL = VERSION + '-shell';
 
 // Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
@@ -14,6 +14,7 @@ const PRECACHE = [
   './icon-192.png',
   './icon-512.png',
   './studio.html',
+  './cikmis.html',
   './studio.webmanifest',
   './js/visual-engines-v3.js',
   './studio/css/studio.css',
