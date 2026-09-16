@@ -5,6 +5,7 @@
    ========================================================================== */
 
 import { loadMasterVault } from './vault-client.js';
+import { setKitaplar } from './kitaplar.js';
 
 /* examQ = ÖLÇÜLMÜŞ resmî dağılım (15 Eylül 2026'da KAYNAK DEĞİŞTİ).
 
@@ -237,6 +238,7 @@ function readGlobal(...names) {
 export function populateData(vaultData) {
   TOPICS = (vaultData.topics || []).slice();
   QUESTIONS = (vaultData.questions || []).slice();
+  setKitaplar(vaultData.kitaplar);   // kitap envanteri de ayni kapi: tek gecis noktasi
 
   topicById.clear();
   topicsBySubject.clear();
