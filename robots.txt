@@ -1,0 +1,61 @@
+﻿# HMGS 2026 - (c) 2026 Yusuf GUNAY. Tum Haklari Saklidir / All Rights Reserved.
+# Bu depo tescillidir ve lisans verilmemistir. Lisans: depo kokundeki LICENSE dosyasi.
+#
+# AMAC
+# Bu dosya, depoyu okuyan kaziyiciya, arastirmaciya ve denetciye "izin verilmedi"
+# bildirimidir. Asagidaki yapay zeka / veri madenciligi (TDM) kaziyicilari icin
+# deponun tamami kapalidir. Normal arama motorlari (Google, Bing, Yandex) icin
+# kapali DEGILDIR: bu calismanin insanlar tarafindan bulunup gorulmesi isteniyor.
+#
+# DURUST KAYIT (teknik sinir - sonraki okuyucu bunu bilmeli)
+# RFC 9309 geregi uyumlu kaziyicilar robots.txt dosyasini yalnizca ALAN ADI
+# KOKUNDEN okur (https://yusufgunay-esq.github.io/robots.txt). Bu depo GitHub
+# Pages'te proje sitesi olarak /hmgs/ altinda yayinlandigi icin bu dosya
+# https://yusufgunay-esq.github.io/hmgs/robots.txt adresinde servis edilir ve
+# alan adi koku su an bos (404) oldugundan cogu kaziyici bu dosyayi OKUMAZ.
+# Buna ragmen burada tutulur; cunku degeri sudur:
+#   (1) depoyu inceleyen insan ve denetciye TARIHLI, YAZILI bir rezerv kaydi
+#       birakir (asagidaki AI kaziyici listesi bu turda olculerek secildi),
+#   (2) bir ihlali "bilincli (willful)" hale getirir - tazminat ve DMCA
+#       sureclerinde bu ayrim belirleyicidir,
+#   (3) yol bazinda robots.txt okuyan araclara ve AI ajanlarina sinyal verir.
+# Alan adi kokunden de gecerli olmasi isteniyorsa: ayni icerik
+# "yusufgunay-esq.github.io" adli ayri bir deponun kokune konulmalidir.
+# Asil teknik koruma bu dosya degil; LICENSE lisans metni, sayfalardaki
+# tdm-reservation/noai isaretleri ve SIFIR-VERI KABUGU mimarisidir.
+#
+# TDM REZERVI
+# Metin ve veri madenciligi dahil tum cikarim haklari (AB) 2019/790 m. 4/3
+# uyarinca acikca sakli tutulmustur. Ayrinti: LICENSE
+#   > MAKINE OGRENMESI VE VERI MADENCILIGI (TDM) REZERVI
+
+# ---- Yapay zeka / veri madenciligi kaziyicilari: TAMAMEN KAPALI ----
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-User
+User-agent: Claude-SearchBot
+User-agent: anthropic-ai
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Bytespider
+User-agent: Amazonbot
+User-agent: meta-externalagent
+User-agent: FacebookBot
+User-agent: Diffbot
+User-agent: ImagesiftBot
+User-agent: Omgilibot
+User-agent: Timpibot
+User-agent: YouBot
+User-agent: ai2bot
+User-agent: cohere-ai
+User-agent: DuckAssistBot
+Disallow: /
+
+# ---- Diger tum kaziyicilar (arama motorlari dahil): serbest ----
+User-agent: *
+Allow: /
