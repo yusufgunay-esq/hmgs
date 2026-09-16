@@ -11,6 +11,9 @@
    istemi ve Takip kuyruğu mantığı da aynı modüllerden gelir — kopya yok,
    kaynak tektir.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich, richBlock, splitStem, fmtSec, $, toast } from '../ui.js';
 import { subjectName, topicById } from '../data.js';
