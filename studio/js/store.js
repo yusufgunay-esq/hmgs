@@ -243,6 +243,30 @@ export function saveExam(result) {
 }
 
 /**
+ * Takip Uygulamasından gelen denemeleri içeri aktarır.
+ * Mükerrerliği önler, kronolojik sıralar ve durumu kaydeder.
+ */
+export function importTakipExams(list) {
+  if (!Array.isArray(list) || !list.length) return false;
+  let added = 0;
+  list.forEach(ex => {
+    const exists = S.exams.some(e => {
+      if (e.id && ex.id) return String(e.id) === String(ex.id);
+      return e.at && ex.at && e.at.slice(0, 16) === ex.at.slice(0, 16) && e.label === ex.label;
+    });
+    if (!exists) {
+      S.exams.push(ex);
+      added++;
+    }
+  });
+  if (added > 0) {
+    S.exams.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
+    save();
+  }
+  return added > 0;
+}
+
+/**
  * Pratik seansı (küçük/karma test) bitince özetini kaydeder. `saveExam`in
  * küçük hâli — result şekli için bkz. views/practice.js finalizeSession().
  */
