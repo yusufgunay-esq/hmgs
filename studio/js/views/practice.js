@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    views/practice.js — SÜRE ÖLÇEN SORU MOTORU
    Her cevap telemetriye yazılır, SRS'e işlenir. Süre ölçümü pazarlıksızdır.
    ========================================================================== */
@@ -7,9 +7,9 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich, richBlock, splitStem, fmtSec, emptyState, groupLegalRefs, $, toast } from '../ui.js';
-import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions } from '../data.js';
+import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions, aiQuestions } from '../data.js';
 import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
-import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet } from '../engine.js';
+import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet, buildDeadlinesSet } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
 import { kuralButtonHTML } from '../kural.js';
 import { pushStudioQueueToDrive, getActiveToken, setActiveToken } from '../vault-client.js';
@@ -41,6 +41,10 @@ export function startSession(opts = {}) {
     pool = built.questions;
     karmaMeta = { plan: built.plan, due: built.due, gaps: built.gaps };
     label = customLabel || 'Karma set';
+  } else if (mode === 'deadlines') {
+    const built = buildDeadlinesSet(count);
+    pool = built.questions;
+    label = customLabel || 'Süreler ve Parasal Sınırlar';
   } else if (mode === 'review') {
     let due = dueQuestions();
     if (subjectId) due = due.filter(d => d.q.subjectId === subjectId);
@@ -74,6 +78,10 @@ export function startSession(opts = {}) {
   } else if (mode === 'pastExam') {
     pool = shuffle(pastExamQuestions());
     label = 'Çıkmış sorular · karışık pratik';
+  } else if (mode === 'hmgsBenzeri' || mode === 'aiHmgs') {
+    const raw = aiQuestions(subjectId);
+    pool = shuffle(raw);
+    label = customLabel || (subjectId ? `HMGS Benzeri (AI) · ${subjectName(subjectId)}` : 'HMGS Benzeri Sorular (AI)');
   } else {
     let raw = subjectId ? questionsOf(subjectId, targetScope) : allQuestions();
     if (targetScope === 'core') {
@@ -122,6 +130,7 @@ function allQuestions() {
 }
 
 export function hasSession() { return !!S && S.i < S.questions.length; }
+export function currentQuestion() { return S && S.questions ? S.questions[S.i] : null; }
 export function endSession() {
   S = null;
   stopTick();
@@ -152,6 +161,8 @@ export function render() {
         Sınava kalan kritik günlerde doğrudan HMGS sınav ayarındaki sorularla çalışabilir veya ileri düzey (Hakimlik) sorularıyla derinleşebilirsin.
       </p>
       <div class="btn-row" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <button class="btn" data-act="start-hmgs-benzeri" style="background:var(--accent);color:#fff">HMGS Benzeri Hızlı Pratik (20 Soru)</button>
+        <button class="btn btn-2" data-act="practice-hmgs-benzeri-all">HMGS Benzeri Tüm Havuz (${aiQuestions().length} Soru)</button>
         <button class="btn btn-2" data-act="practice-core-karma">HMGS Çekirdek Karma (20 Soru)</button>
         <button class="btn btn-2" data-act="practice-all-karma">Tüm Havuz Karma (İleri Dahil)</button>
         <button class="btn btn-2" data-act="practice-pastexam">Çıkmış Soruları Çöz</button>
@@ -187,6 +198,7 @@ export function render() {
           </button>
           <span class="q-strip-subj" id="q-subj">${S.hideSubject ? '<span class="hint">ders gizli</span>' : esc(subjectName(q.subjectId))}</span>
           ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
+          ${q.sourceBadgeLabel ? `<span class="chip accent" style="font-size:0.75rem">${esc(q.sourceBadgeLabel)}</span>` : ''}
         </div>
         <div class="q-strip-center">
           <div class="q-progress-box">
@@ -341,6 +353,13 @@ function paintResult(q, chosen, row, sched, ms) {
         ? `<button class="btn btn-2 btn-s" data-act="ask-gemini" title="Doğru şıkkı, diğer şıkların tuzağını ve uygulama açıklamasını sağlama istemi olarak kopyalar (G)">Sağlamasını Yap <span class="kbd">G</span></button>`
         : `<button class="btn btn-2 btn-s" data-act="ask-gemini" title="Seçtiğin şık, doğru şık ve uygulama açıklaması analiz istemi olarak kopyalanır (G)">Yanlışı Analiz Et <span class="kbd">G</span></button>`;
 
+    const fastWrong = !row.ok && sec < 40 && chosen !== null;
+    const fastWrongHTML = fastWrong ? `
+      <div class="fast-wrong-hint" style="margin:0.75rem 0;padding:0.6rem 0.85rem;background:var(--card-2, rgba(0,0,0,0.03));border-left:3px solid var(--warn, #f59e0b);border-radius:4px;font-size:0.84rem;color:var(--ink-2);line-height:1.45">
+        Bu soruyu hızlı işaretledin (${Math.round(sec)} sn). Hata bilgi eksiğinden ziyade acele kaynaklı olabilir; soru kökündeki olumsuz ifadeyi ve çeldiriciyi tekrar incele.
+      </div>
+    ` : '';
+
     fb.innerHTML = `
       <div class="feedback ${row.ok ? 'ok' : 'no'}">
         <div class="fb-head">
@@ -354,6 +373,7 @@ function paintResult(q, chosen, row, sched, ms) {
         </div>
         <div class="fb-body">
           ${explanationHTML(q, chosen)}
+          ${fastWrongHTML}
           ${q.legalBasis ? `<div class="fb-basis-wrap"><span class="basis">${esc(q.legalBasis)}</span></div>` : ''}
           <div class="kural-slot" id="kural-slot" hidden></div>
         </div>
@@ -415,7 +435,10 @@ function formatExplanationText(text) {
 function explanationHTML(q, chosen) {
   const text = q.explanation || 'Bu soru için gerekçeli açıklama henüz yazılmamış.';
   const formatted = formatExplanationText(text);
-  return `<div class="fb-lead">${richBlock(formatted)}</div>`;
+  const badgeHTML = q.sourceBadgeLabel
+    ? `<div style="margin-bottom:0.6rem"><span class="chip accent" style="font-size:0.75rem">${esc(q.sourceBadgeLabel)}</span></div>`
+    : '';
+  return `${badgeHTML}<div class="fb-lead">${richBlock(formatted)}</div>`;
 }
 
 function $$opts() { return [...document.querySelectorAll('#opts .opt')]; }
