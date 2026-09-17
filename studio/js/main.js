@@ -1,4 +1,4 @@
-﻿/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
    رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
    ==========================================================================
@@ -12,7 +12,7 @@
 
 import { $, $$, toast } from './ui.js';
 import { initData, initDataAsync, populateData, topicById, questionById } from './data.js';
-import { load, save, daysLeft, state, getSettings, updateSettings } from './store.js';
+import { load, save, daysLeft, state, getSettings, updateSettings, importTakipExams } from './store.js';
 import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress } from './vault-client.js';
 import { kuralToggle } from './kural.js';
 
@@ -223,6 +223,9 @@ document.addEventListener('click', async e => {
     case 'practice-subject':
       if (practice.startSession({ mode: 'subject', subjectId: el.dataset.subject, count: 15 })) show('practice');
       break;
+    case 'start-deadlines':
+      if (practice.startSession({ mode: 'deadlines', count: 20, customLabel: 'Süreler ve Parasal Sınırlar' })) show('practice');
+      break;
 
     /* --- 11 günlük plan: günün setini başlat --- */
     case 'pregel-set': {
@@ -242,6 +245,15 @@ document.addEventListener('click', async e => {
       if (practice.startSession({ mode: 'review', subjectId: el.dataset.subject, count: n })) show('practice');
       break;
     }
+    case 'practice-hmgs-benzeri':
+      if (practice.startSession({ mode: 'hmgsBenzeri', count: 50, customLabel: 'HMGS Benzeri Sorular' })) show('practice');
+      break;
+    case 'practice-hmgs-benzeri-all':
+      if (practice.startSession({ mode: 'hmgsBenzeri', count: 999, customLabel: 'HMGS Benzeri Tüm Havuz' })) show('practice');
+      break;
+    case 'start-hmgs-benzeri':
+      if (practice.startSession({ mode: 'hmgsBenzeri', count: 20, customLabel: 'HMGS Benzeri Hızlı Pratik (20 Soru)' })) show('practice');
+      break;
     case 'practice-pastexam':
       if (practice.startSession({ mode: 'pastExam', count: 999 })) show('practice');
       break;
@@ -321,6 +333,7 @@ document.addEventListener('click', async e => {
     /* --- sınav --- */
     case 'exam-start':  exam.start(); break;
     case 'exam-start-real': exam.startReal(el.dataset.source); break;
+    case 'exam-start-ai': if (exam.startAi()) show('exam'); break;
     case 'exam-pick':   exam.pick(el.dataset.key); break;
     case 'exam-clear':  exam.clear(); break;
     case 'exam-mark':   exam.mark(); break;
@@ -476,6 +489,44 @@ function renderDriveConnectScreen() {
 }
 
 
+/* ---------- Takip Uygulaması Deneme Köprüsü ---------- */
+
+async function syncTakipExams() {
+  if (typeof window === 'undefined') return;
+  try {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    let exams = [];
+    if (isLocal) {
+      try {
+        const res = await fetch('/api/takip-denemeler');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && Array.isArray(data.exams)) exams = data.exams;
+        }
+      } catch (err) {}
+    }
+    if (!exams.length) {
+      try {
+        const resExp = await fetch('studio_sessions_export.json');
+        if (resExp.ok) {
+          const dataExp = await resExp.json();
+          if (Array.isArray(dataExp.exams)) exams = dataExp.exams;
+        }
+      } catch (err) {}
+    }
+    if (exams.length) {
+      const changed = importTakipExams(exams);
+      if (changed) {
+        if (currentView === 'today') today.render();
+        else if (currentView === 'progress') progress.render($('#view-progress'));
+      }
+    }
+  } catch (e) {
+    // sessiz geçiş
+  }
+}
+
+
 /* ---------- başlangıç ---------- */
 
 async function boot() {
@@ -506,6 +557,9 @@ async function boot() {
     syncStudioProgress(false).then(res => {
       if (res && currentView === 'progress') progress.render($('#view-progress'));
     }).catch(() => {});
+
+    // Takip Uygulamasından gelen denemeleri içeri aktar
+    syncTakipExams().catch(() => {});
 
 
     // Veri sorunlarını sessizce geçme
