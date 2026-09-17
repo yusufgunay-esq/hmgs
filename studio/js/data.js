@@ -240,7 +240,11 @@ function readGlobal(...names) {
 
 export function populateData(vaultData) {
   TOPICS = (vaultData.topics || []).slice();
-  QUESTIONS = (vaultData.questions || []).slice();
+  const rawQuestions = (vaultData.questions || []).slice();
+  const aiQuestions = readGlobal('QUESTIONS_AI_DATA', 'QUESTIONS_AI');
+  const seen = new Set(rawQuestions.map(q => q.id));
+  const extraAi = aiQuestions.filter(q => q && q.id && !seen.has(q.id));
+  QUESTIONS = rawQuestions.concat(extraAi);
   setKitaplar(vaultData.kitaplar);   // kitap envanteri de ayni kapi: tek gecis noktasi
 
   topicById.clear();
