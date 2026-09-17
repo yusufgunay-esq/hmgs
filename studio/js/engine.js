@@ -1,4 +1,4 @@
-﻿/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
    رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
    ==========================================================================
@@ -747,6 +747,42 @@ export function flowScore(rows = null) {
  */
 export function flowMilestone(sched) {
   if (!sched) return null;
-  if (sched.box >= BOXES.length) return 'Kural otomatikleşti — tekrar sırasından çıktı';
+  if (sched.box >= BOXES.length) return 'Kural otomatikleşti, tekrar sırasından çıktı';
   return null;
+}
+
+/* ==========================================================================
+   SÜRELER VE PARASAL SINIRLAR HAP SETİ (SINAVIN %12'Sİ)
+   Sınav analizinde ölçülen ~%12'lik süre ve parasal sınır sorularını
+   doğrudan hedefler. Soru kökünde veya etiketlerinde süre, zaman, faiz
+   veya parasal eşik geçen soruları seçer.
+   ========================================================================== */
+
+const DEADLINE_PATTERN = /\b(\d+)\s*(gün|gun|hafta|ay|yıl|yil|lira|tl|saat|dakika)\b|senetle\s+ispat|istinaf\s+sınırı|temyiz\s+sınırı|parasal\s+sınır|hak\s+düşürücü\s+süre|zamanaşımı|yasal\s+faiz|temerrüt\s+faizi|kaç\s+(gün|gun|ay|yıl|yil|hafta|saat)|hangi\s+süre|ne\s+kadar\s+süre|kaç\s+yaş|kaç\s+kişi|kaç\s+üye|oranı\s+kaçtır/i;
+const DEADLINE_TAGS = new Set(['sure', 'zamanasimi', 'hak_dusurucu', 'sinir', 'parasal', 'oran', 'faiz', 'sureler']);
+
+export function isDeadlinesQuestion(q) {
+  if (!q) return false;
+  const tags = Array.isArray(q.tags) ? q.tags : [];
+  if (tags.some(t => DEADLINE_TAGS.has(String(t).toLowerCase()))) return true;
+  return DEADLINE_PATTERN.test(q.stem || '');
+}
+
+export function buildDeadlinesSet(count = 20) {
+  const S = state();
+  const seen = new Set(S.answers.filter(a => a.ok).map(a => a.qId));
+  const pool = [...questionById.values()].filter(isDeadlinesQuestion);
+
+  const fresh = pool.filter(q => !seen.has(q.id));
+  const rest = pool.filter(q => seen.has(q.id));
+
+  const picked = shuffle(fresh).concat(shuffle(rest)).slice(0, count);
+
+  const planMap = new Map();
+  picked.forEach(q => planMap.set(q.subjectId, (planMap.get(q.subjectId) || 0) + 1));
+  const plan = [...planMap.entries()]
+    .map(([id, n]) => ({ id, name: (SUBJECTS.find(s => s.id === id) || {}).name || id, n }))
+    .sort((a, b) => b.n - a.n);
+
+  return { questions: picked, plan, totalPool: pool.length };
 }
