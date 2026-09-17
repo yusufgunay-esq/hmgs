@@ -515,8 +515,19 @@ body.in-session main {
   max-height: 100vh !important;
   overflow: hidden !important;
 }
-body.in-session #view-practice,
-body.in-session #view-akim {
+/* BUG (17 Eyl 2026): Bu kural ".on" sınıfını aramadan HEM #view-practice HEM
+   #view-akim'i "!important" ile zorla görünür/tam-ekran flex yapıyordu.
+   Sonuç: pratik ekranına girildiğinde, DOM sırasında ondan önce gelen
+   (ve normalde ".view{display:none}" ile gizlenmesi gereken) boş #view-akim
+   de aynı anda 100vh yükseklikte flex kutusu olarak görünür kalıyor, gerçek
+   soru içeriğinin TAM BİR EKRAN BOYU altına itilmesine yol açıyordu.
+   overflow:hidden masaüstünde sayfa kaydırmayı tamamen kilitlediği için
+   kullanıcı o boş (koyu lacivert = "mavi") ekranın ötesine hiç geçemiyordu;
+   mobilde/dar ekranda sayfa kaydırma serbest bırakıldığından bir ekran
+   boyu aşağı kaydırınca soru görünüyordu. Düzeltme: yalnızca GERÇEKTEN
+   AKTİF olan görünüm (".on" sınıfına sahip olan) bu tam-ekran düzeni alsın. */
+body.in-session #view-practice.on,
+body.in-session #view-akim.on {
   height: 100vh !important;
   max-height: 100vh !important;
   overflow: hidden !important;
