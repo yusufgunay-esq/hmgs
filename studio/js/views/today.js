@@ -8,7 +8,7 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, $, pct } from '../ui.js';
-import { subjectName, topicById } from '../data.js';
+import { subjectName, topicById, aiQuestions } from '../data.js';
 import { daysLeft, streak, lastExam, PASS_CORRECT, state, getDailyPlan } from '../store.js';
 import { nextAction, todayProgress, srsSummary, allSubjectMastery,
   MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions,
@@ -53,17 +53,24 @@ export function render() {
   const worst = worstExamSubjects(5);
   const sig = answerQualitySignals();
 
+  const aiCount = aiQuestions().length;
+
   host.innerHTML = `
     <div class="wrap">
       <div class="hero">
         <div class="hero-kicker">Sırada bu var</div>
         <div class="hero-title">${esc(act.title)}</div>
         <p class="hero-why">${esc(act.why)}</p>
-        <div class="btn-row">
-          <button class="btn" data-act="do-next">${esc(act.cta)}</button>
-          ${act.alts.map((a, i) => `<button class="btn btn-2 btn-s" data-act="do-alt" data-alt="${i}">${esc(a.label)}</button>`).join('')}
-          <button class="btn btn-2 btn-s" data-act="start-hmgs-benzeri" title="3.8 Flash ve Sonnet 3.5 tarafından üretilen 137 HMGS benzeri soru">HMGS Benzeri (137)</button>
-          <button class="btn btn-2 btn-s" data-act="start-deadlines" title="Sınavın yaklaşık %12'si olan süre ve parasal sınır soruları (20 Soru)">Süreler ve Sayılar (20)</button>
+        <div class="hero-actions">
+          <div class="hero-main-cta">
+            <button class="btn" data-act="do-next">${esc(act.cta)}</button>
+          </div>
+          <div class="hero-alts">
+            <span class="hero-alts-label">Alternatifler:</span>
+            ${act.alts.map((a, i) => `<button class="btn btn-2 btn-s" data-act="do-alt" data-alt="${i}">${esc(a.label)}</button>`).join('')}
+            <button class="btn btn-2 btn-s" data-act="start-hmgs-benzeri" title="3.8 Flash ve Sonnet tarafından üretilen ${aiCount} HMGS benzeri soru">HMGS Benzeri (${aiCount})</button>
+            <button class="btn btn-2 btn-s" data-act="start-deadlines" title="Sınavın yaklaşık %12'si olan süre ve parasal sınır soruları (20 Soru)">Süreler ve Sayılar (20)</button>
+          </div>
         </div>
       </div>
 
@@ -74,14 +81,14 @@ export function render() {
           <div>
             <h3 style="font-size:1rem;font-weight:700;margin:0">HMGS Benzeri Soru İstasyonu</h3>
             <p style="font-size:0.85rem;color:var(--ink-2);margin:0.2rem 0 0">
-              3.8 Flash ve Sonnet 3.5 ile üretilmiş 137 özgün soru, ÖSYM soru kalıpları ve güncel mevzuat denetimi.
+              3.8 Flash ve Sonnet ile üretilmiş ${aiCount} özgün soru, ÖSYM soru kalıpları ve güncel mevzuat denetimi.
             </p>
           </div>
-          <span class="chip accent" style="font-size:0.75rem">137 Soru Hazır</span>
+          <span class="chip accent" style="font-size:0.75rem">${aiCount} Soru Hazır</span>
         </div>
         <div class="btn-row" style="margin-top:0.85rem;display:flex;gap:0.5rem;flex-wrap:wrap">
           <button class="btn btn-s" data-act="start-hmgs-benzeri" style="background:var(--accent);color:#fff">Hızlı Pratik (20 Soru)</button>
-          <button class="btn btn-2 btn-s" data-act="practice-hmgs-benzeri-all">Tüm Havuz (137 Soru)</button>
+          <button class="btn btn-2 btn-s" data-act="practice-hmgs-benzeri-all">Tüm Havuz (${aiCount} Soru)</button>
           <button class="btn btn-2 btn-s" data-act="exam-start-ai">Tam Deneme Sınavı (120 Soru)</button>
         </div>
       </div>
