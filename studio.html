@@ -56,7 +56,7 @@
   <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon.png">
   <link rel="shortcut icon" href="icons/favicon.ico">
 
-  <link rel="stylesheet" href="studio/css/studio.css?v=20260913_3">
+  <link rel="stylesheet" href="studio/css/studio.css?v=20260917_1">
   <!-- Mobil katman: studio.css'ten SONRA gelmeli, tüm kuralları @media içinde -->
   <link rel="stylesheet" href="studio/css/studio-mobile.css?v=20260913_3">
   <!-- Google Identity Services (Drive Vault Eşitleme) -->
@@ -81,6 +81,20 @@
     <span class="countdown" id="countdown">Sınava <b>–</b></span>
 
     <div class="topbar-actions">
+      <!-- BUG (17 Eyl 2026): önceden kütüphaneyi Drive'dan elle yeniden çekecek
+           hiçbir erişilebilir buton yoktu (sync-vault yalnızca ilk-açılış
+           ekranında vardı). PC'de yeni soru ekleyip kasayı gönderdiğinizde
+           telefon/tarayıcı eski (önbellekteki) kopyada takılı kalıyordu.
+           Bu buton her zaman görünür; tıklanınca Drive'daki en güncel
+           kasayı indirip anında uygular. -->
+      <button class="icon-btn" id="btnSyncVault" data-act="sync-vault-quiet" title="Kütüphaneyi Drive'dan Yeniden Eşitle (yeni soru eklediysen kullan)" aria-label="Kütüphaneyi yenile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 2v6h-6"></path>
+          <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+          <path d="M3 22v-6h6"></path>
+          <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+        </svg>
+      </button>
       <button class="icon-btn" id="btnToggleFontSize" data-act="toggle-font-size" title="Metin Boyutunu Değiştir" aria-label="Metin boyutu">
         <span style="font-family:var(--sans);font-size:0.72rem;font-weight:700">A±</span>
       </button>
@@ -114,7 +128,7 @@
   <script src="js/visual-engines-v3.js"></script>
 
   <!-- Uygulama: ES modülleri (Vault & IndexedDB Destekli) -->
-  <script type="module" src="studio/js/main.js?v=20260927_1"></script>
+  <script type="module" src="studio/js/main.js?v=20260917_2"></script>
 
   <!-- Servis çalışanı: yalnız güvenli bağlamda (https / localhost) kayıt olur. -->
   <script>
