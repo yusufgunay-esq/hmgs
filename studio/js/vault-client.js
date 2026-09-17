@@ -250,6 +250,13 @@ export async function fetchVaultFromDrive(token) {
     throw new Error('İndirilen dosya geçerli bir HMGS Vault formatında değil.');
   }
 
+  // Kalıcı IndexedDB'ye kaydetmeden önce bellekteki AI sorularını içine kat
+  if (typeof window !== 'undefined' && Array.isArray(window.QUESTIONS_AI_DATA) && window.QUESTIONS_AI_DATA.length > 0) {
+    const seen = new Set((vaultData.questions || []).map(q => q.id));
+    const extra = window.QUESTIONS_AI_DATA.filter(q => q && q.id && !seen.has(q.id));
+    vaultData.questions = (vaultData.questions || []).concat(extra);
+  }
+
   // Kalıcı IndexedDB'ye kaydet
   await saveVaultToIndexedDB(vaultData);
   localStorage.setItem('hmgs_vault_last_synced', new Date().toISOString());
@@ -593,9 +600,13 @@ export async function loadMasterVault() {
   // 2. IndexedDB'den oku (Mobil PWA / Offline)
   const cached = await loadVaultFromIndexedDB();
   if (cached && Array.isArray(cached.questions) && cached.questions.length > 0) {
+    const base = cached.questions;
+    const ai = (typeof window !== 'undefined' && Array.isArray(window.QUESTIONS_AI_DATA)) ? window.QUESTIONS_AI_DATA : [];
+    const seen = new Set(base.map(q => q.id));
+    const extra = ai.filter(q => q && q.id && !seen.has(q.id));
     return {
       source: 'indexedDB',
-      questions: cached.questions,
+      questions: base.concat(extra),
       topics: cached.topics || [],
       subjects: cached.subjects || [],
       kitaplar: cached.kitaplar,
