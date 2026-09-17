@@ -388,6 +388,36 @@ document.addEventListener('click', async e => {
       break;
     }
 
+    /* BUG (17 Eyl 2026): loadMasterVault() bir kez IndexedDB'ye kasa
+       yazdıktan sonra Drive'daki güncel sürümü BİR DAHA HİÇ KONTROL ETMİYOR —
+       "sync-vault" eylemini tetikleyecek görünür bir buton da (ilk açılış
+       ekranı dışında) hiçbir yerde yoktu. Sonuç: PC'de yeni soru ekleyip
+       kasayı Drive'a gönderseniz bile, zaten bir kez eşitlenmiş her cihaz
+       (telefon/tarayıcı) o günkü eski kopyada sonsuza kadar takılı kalıyordu.
+       Düzeltme: üst çubuğa her zaman erişilebilir küçük bir "Kütüphaneyi
+       Yenile" butonu eklendi (bkz. studio.html) — mevcut sync-vault
+       mantığını simge butonuna uyacak şekilde (metne dönüştürmeden) çağırır. */
+    case 'sync-vault-quiet': {
+      const btn = el;
+      btn.disabled = true;
+      btn.style.opacity = '0.45';
+      try {
+        const vault = await requestDriveLoginAndDownload();
+        populateData(vault);
+        const pSync = await syncStudioProgress(false);
+        toast(pSync ? 'Kütüphane ve ilerleme eşitlendi ✓' : 'Kütüphane güncellendi ✓', 'ok');
+        const initial = (location.hash || '#today').slice(1);
+        show(VIEWS.includes(initial) ? initial : 'today', false);
+      } catch (err) {
+        console.error('[vault sync error]', err);
+        toast(`Bağlantı hatası: ${err.message}`, 'no');
+      } finally {
+        btn.disabled = false;
+        btn.style.opacity = '';
+      }
+      break;
+    }
+
     default: break;
   }
 });
