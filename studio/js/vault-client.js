@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    vault-client.js — HMGS STÜDYO SIFIR-VERİ İSTEMCİ & GİZLİ KASA MOTORU
    - GitHub'da 0 telifli soru ve 0 konu barındırır.
    - Soru ve konu kütüphanesi kullanıcının şahsi Google Drive'ından (hmgs_vault.json)
@@ -575,9 +575,13 @@ export async function loadMasterVault() {
     const hasGlobalQ = Array.isArray(window.QUESTIONS_DATA) && window.QUESTIONS_DATA.length > 0;
     const hasGlobalT = Array.isArray(window.TOPICS_DATA) && window.TOPICS_DATA.length > 0;
     if (hasGlobalQ && hasGlobalT) {
+      const base = window.QUESTIONS_DATA;
+      const ai = Array.isArray(window.QUESTIONS_AI_DATA) ? window.QUESTIONS_AI_DATA : [];
+      const seen = new Set(base.map(q => q.id));
+      const extra = ai.filter(q => q && q.id && !seen.has(q.id));
       return {
         source: 'globals',
-        questions: window.QUESTIONS_DATA,
+        questions: base.concat(extra),
         topics: window.TOPICS_DATA,
         subjects: window.SUBJECTS_DATA || [],
         kitaplar: window.KITAPLAR_DATA,
