@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    views/exam.js — 120 SORULUK SINAV SİMÜLASYONU
    Gerçek ders dağılımı · geri sayım · boş bırakma · soru haritası
    Kural: HMGS'de yanlış cezası yoktur → net = doğru. Asla boş bırakma.
@@ -8,7 +8,7 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich, richBlock, splitStem, fmtClock, emptyState, $, toast } from '../ui.js';
-import { buildExamSet, subjectName, SUBJECTS, topicById, pastExamList, pastExamQuestions } from '../data.js';
+import { buildExamSet, buildAiExamSet, subjectName, SUBJECTS, topicById, pastExamList, pastExamQuestions } from '../data.js';
 import { recordAnswer, save, saveExam, state, EXAM_TOTAL, PASS_CORRECT } from '../store.js';
 import { scheduleAfterAnswer, scoreOf } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
@@ -29,6 +29,18 @@ export function start() {
   const { questions, shortfall } = buildExamSet(onlyTagged, scope);
   const scopeLabel = scope === 'core' ? 'HMGS Çekirdek' : 'Tüm Havuz';
   return beginExam(questions, { shortfall, label: `Karma deneme (${scopeLabel})`, real: null });
+}
+
+/**
+ * HMGS Benzeri (3.8 Flash & Sonnet 3.5) sorularından 120 soruluk tam deneme başlatır.
+ */
+export function startAi() {
+  const { questions, shortfall } = buildAiExamSet();
+  return beginExam(questions, {
+    shortfall,
+    label: 'HMGS Benzeri Deneme (3.8 Flash & Sonnet)',
+    real: 'ai_hmgs'
+  });
 }
 
 /**
@@ -100,6 +112,19 @@ export function render() {
         </div>
       </div>` : ''}
 
+      <div class="card" style="margin-top:1.25rem;border-left:3px solid var(--accent)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.5rem">
+          <h3 style="font-size:1rem;font-weight:700;margin:0">HMGS Benzeri Deneme Sınavı</h3>
+          <span class="chip accent" style="font-size:0.75rem">3.8 Flash & Sonnet 3.5</span>
+        </div>
+        <p style="font-size:0.9rem;color:var(--ink-2);margin-bottom:0.9rem">
+          120 soru, 150 dakika. ÖSYM HMGS sınav formatı, madde yazım tekniği ve ders ağırlıklarıyla hazırlanmış yapay zeka denemesi.
+        </p>
+        <div class="btn-row">
+          <button class="btn" data-act="exam-start-ai" style="background:var(--accent);color:#fff">HMGS Benzeri Denemeyi Başlat (120 Soru)</button>
+        </div>
+      </div>
+
       <div class="card" style="margin-top:1.25rem">
         <h3 style="font-size:1rem;font-weight:700;margin-bottom:0.6rem">Karma deneme</h3>
         <p style="font-size:0.9rem;color:var(--ink-2);margin-bottom:0.9rem">
@@ -158,6 +183,7 @@ export function render() {
           <span>Soru ${E.i + 1} / ${E.questions.length}</span>
           <span>${esc(subjectName(q.subjectId))}</span>
           ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
+          ${q.sourceBadgeLabel ? `<span class="chip accent" style="font-size:0.75rem">${esc(q.sourceBadgeLabel)}</span>` : ''}
           ${q.difficulty && q.difficulty !== 'etiketsiz' ? `<span class="chip">${esc(q.difficulty)}</span>` : ''}
           <button class="btn btn-2 btn-s" data-act="exam-mark" style="margin-left:auto">
             ${E.marked.has(E.i) ? 'İşareti kaldır' : 'Sonra dön'}
@@ -292,11 +318,13 @@ export function finish(auto = false) {
       correct: q.correct,
       chosen: chosen === null ? null : chosen,
       explanation: q.explanation || '',
-      legalBasis: q.legalBasis || ''
+      legalBasis: q.legalBasis || '',
+      sourceBadgeLabel: q.sourceBadgeLabel || ''
     });
   });
 
   const result = {
+    id: 'exam_' + Date.now(),
     at: new Date().toISOString(),
     label: E.label,
     real: E.real,
@@ -432,6 +460,7 @@ function missesHTML(r) {
       <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.4rem">
         <span class="chip">${idx + 1}. ${esc(subjectName(m.subjectId))}</span>
         ${topic ? `<span class="chip" style="background:var(--accent-soft);color:var(--accent-ink);border:1px solid var(--line)">${esc(topic.title)}</span>` : ''}
+        ${m.sourceBadgeLabel ? `<span class="chip accent" style="font-size:0.75rem">${esc(m.sourceBadgeLabel)}</span>` : ''}
         <span class="chip ${m.chosen ? 'red' : 'amber'}">${m.chosen ? 'yanlış' : 'boş'}</span>
       </div>
       <div class="q-ask" style="font-size:0.92rem;font-weight:600">${rich(m.stem)}</div>
