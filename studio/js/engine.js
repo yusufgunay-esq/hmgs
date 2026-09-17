@@ -379,7 +379,7 @@ export function nextAction() {
   const gapInfo = examGap();
   const worst = gapInfo && gapInfo.gap > 0 ? worstExamSubjects(2) : [];
   const gapLead = gapInfo && gapInfo.gap > 0
-    ? `Son deneme netin ${gapInfo.net} — 84 için ${gapInfo.gap} net açık`
+    ? `Son deneme netin ${gapInfo.net} (84 barajı için ${gapInfo.gap} net açık)`
       + (worst.length
         ? `; en çok ${worst[0].name} sızdırıyor (sınavda ${worst[0].examQ} soru, isabet %${Math.round(worst[0].acc * 100)})`
         : '')
@@ -390,7 +390,7 @@ export function nextAction() {
   if (due.length >= 5 && fresh > 0) {
     why = gapLead + `Set ${Math.min(due.length, Math.floor(count * KARMA_DUE_SHARE))} tekrar sorusuyla açılıyor, kalanı yeni malzeme. Hiç açmadığın ${fresh} ders var; bunlar ilk temasta blok hâlinde geliyor, tanıdıktan sonra harmana karışıyor.`;
   } else if (fresh > 0) {
-    why = gapLead + `Hiç açmadığın ${fresh} ders var ve sınavın yarısından fazlası oralarda. Set ağırlığı ölçülmüş sınav dağılımından geliyor; en çok pay ${lead ? lead.name : '—'} tarafında.`;
+    why = gapLead + `Hiç açmadığın ${fresh} ders var ve sınavın yarısından fazlası oralarda. Set ağırlığı ölçülmüş sınav dağılımından geliyor; en çok pay ${lead ? lead.name : 'ilgili ders'} tarafında.`;
   } else {
     why = gapLead + `Karışık set. Ders adı cevabı verene kadar gizli; sınavda da yazmıyor, hangi kuralın uygulanacağını kendin seçeceksin.`;
   }
