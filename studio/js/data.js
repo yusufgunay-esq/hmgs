@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    data.js — VERİ ERİŞİM KATMANI VE İNDEKSLER
    topics.js / questions.js global sabitleri okur, tek seferde indeksler.
    O(n) tam tarama yerine hazır Map'ler.
@@ -283,7 +283,11 @@ export async function initDataAsync() {
 
 export function initData() {
   TOPICS = readGlobal('TOPICS_DATA', 'TOPICS').slice();
-  QUESTIONS = readGlobal('QUESTIONS_DATA', 'QUESTIONS').slice();
+  const baseQuestions = readGlobal('QUESTIONS_DATA', 'QUESTIONS').slice();
+  const aiQuestions = readGlobal('QUESTIONS_AI_DATA', 'QUESTIONS_AI');
+  const seen = new Set(baseQuestions.map(q => q.id));
+  const extra = aiQuestions.filter(q => q && q.id && !seen.has(q.id));
+  QUESTIONS = baseQuestions.concat(extra);
 
   if (!TOPICS.length && !QUESTIONS.length) {
     return { questions: 0, topics: 0, needAsync: true };
@@ -348,6 +352,13 @@ export function filterQuestions(pool, scope = 'core') {
   return pool.filter(q => q.examTarget === 'hmgs_core');
 }
 
+/** HMGS Benzeri (AI Üretimi) soruları döndürür. */
+export function aiQuestions(subjectId = null) {
+  const list = QUESTIONS.filter(q => /ai_|ai-|hmgsai/i.test(String(q.source || '')) || String(q.id).startsWith('hmgsai_'));
+  if (subjectId) return list.filter(q => q.subjectId === subjectId);
+  return list;
+}
+
 /** Deterministik olmayan karıştırma (Fisher-Yates). */
 export function shuffle(arr) {
   const a = arr.slice();
@@ -379,6 +390,32 @@ export function buildExamSet(onlyTagged = false, scope = 'core') {
     const pool = shuffle(rawPool);
     const take = pool.slice(0, s.examQ);
     if (take.length < s.examQ) shortfall.push({ subject: s.name, want: s.examQ, got: take.length });
+    picked.push(...take);
+  });
+  return { questions: shuffle(picked), shortfall };
+}
+
+/**
+ * HMGS Benzeri (AI) havuzundan resmi dağılıma göre 120 soruluk deneme seti kurar.
+ * 20 resmi ders dağılımına sadık kalınır, eksik kalan birkaç soru çekirdek havuzdan tamamlanır.
+ */
+export function buildAiExamSet() {
+  const picked = [];
+  const shortfall = [];
+  SUBJECTS.forEach(s => {
+    let aiPool = aiQuestions(s.id);
+    let take = shuffle(aiPool).slice(0, s.examQ);
+    if (take.length < s.examQ) {
+      const needed = s.examQ - take.length;
+      let nonAi = questionsOf(s.id, 'core').filter(q => !String(q.source || '').includes('ai') && !String(q.id).startsWith('hmgsai_'));
+      if (nonAi.length < needed) {
+        nonAi = questionsOf(s.id, 'all').filter(q => !String(q.source || '').includes('ai') && !String(q.id).startsWith('hmgsai_'));
+      }
+      take = take.concat(shuffle(nonAi).slice(0, needed));
+    }
+    if (take.length < s.examQ) {
+      shortfall.push({ subject: s.name, want: s.examQ, got: take.length });
+    }
     picked.push(...take);
   });
   return { questions: shuffle(picked), shortfall };
