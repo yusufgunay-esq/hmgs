@@ -13,6 +13,7 @@ import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, 
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
 import { kuralButtonHTML } from '../kural.js';
 import { pushStudioQueueToDrive, getActiveToken, setActiveToken } from '../vault-client.js';
+import { tuyoSec } from '../tuyolar.js';
 
 let S = null;   // aktif seans
 let tick = null;
@@ -192,7 +193,7 @@ export function render() {
     <div class="q-screen">
       <div class="q-strip">
         <div class="q-strip-left">
-          <button class="btn btn-2 btn-s" data-act="quit" title="Seansı bitir">
+          <button class="q-quit-link" data-act="quit" title="Seansı bitir">
             <span class="q-quit-x">✕</span>
             <span>Bitir</span>
           </button>
@@ -235,7 +236,7 @@ export function render() {
           <div class="q-main-foot" id="q-actions">
             <button class="btn btn-2 btn-s" data-act="dontknow">Bilmiyorum · çözümü göster</button>
             <button class="btn btn-2 btn-s" data-act="ask-gemini" title="Soruyu ve beş şıkkı ipucu istemi olarak kopyalar — doğru şık gönderilmez (G)">İpucu İste <span class="kbd">G</span></button>
-            <button class="btn btn-2 btn-s" data-act="quit">Seansı bitir</button>
+            <button class="q-quit-link" data-act="quit">Seansı bitir</button>
             <span class="hint">
               <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">G</span> Gemini · <span class="kbd">Enter</span> devam
             </span>
@@ -273,12 +274,14 @@ export function pick(key) {
   S.answered = true;
   stopTick();
 
+  // Cevap öncesi Gemini'ye sorulmuşsa (ipucu) → logicGuess gibi davranır: SRS'te
+  // kutu ilerlemez, mastery/hız ortalamasına da girmez (satıra da yazılır).
+  const treatAsLogic = S.geminiAskedPreAnswer;
   const row = recordAnswer(q, key, ms, S.mode === 'review' ? 'review' : 'practice', {
     usedElim: S.elimUsed,
-    askedGemini: S.geminiAsked
+    askedGemini: S.geminiAsked,
+    logicGuess: treatAsLogic
   });
-  // Cevap öncesi Gemini'ye sorulmuşsa (ipucu) → logicGuess gibi SRS ilerletme
-  const treatAsLogic = S.geminiAskedPreAnswer;
   const sched = scheduleAfterAnswer(q.id, row.ok, treatAsLogic);
   save();
   S.log.push({ ...row, sched });
@@ -296,7 +299,10 @@ export function dontKnow() {
 
   const row = recordAnswer(q, null, ms, S.mode === 'review' ? 'review' : 'practice', {
     usedElim: S.elimUsed,
-    askedGemini: S.geminiAsked
+    askedGemini: S.geminiAsked,
+    // Boş bırakılan soru zaten yanlış sayılıp kutu 0'a dönüyor; logicGuess
+    // burada süreyi (ipucu okuma dahil) hız ortalamasından çıkarmak için var.
+    logicGuess: S.geminiAskedPreAnswer
   });
   const sched = scheduleAfterAnswer(q.id, false);
   save();
@@ -358,10 +364,14 @@ function paintResult(q, chosen, row, sched, ms) {
         ? `<button class="btn btn-2 btn-s" data-act="ask-gemini" title="Doğru şıkkı, diğer şıkların tuzağını ve uygulama açıklamasını sağlama istemi olarak kopyalar (G)">Sağlamasını Yap <span class="kbd">G</span></button>`
         : `<button class="btn btn-2 btn-s" data-act="ask-gemini" title="Seçtiğin şık, doğru şık ve uygulama açıklaması analiz istemi olarak kopyalanır (G)">Yanlışı Analiz Et <span class="kbd">G</span></button>`;
 
+    // Soru tipine özel ÖSYM tüyosu (öncüllü / "ifadelerden hangisi" / olumsuz kök /
+    // olay / kısa şıklı) — kaynak: 4 gerçek HMGS sınavının ölçülmüş biçimi.
+    // Hızlı yanlışta o tipin "hız tuzağı" versiyonu, normal yanlışta genel versiyonu gösterilir.
     const fastWrong = !row.ok && sec < 40 && chosen !== null;
-    const fastWrongHTML = fastWrong ? `
+    const tuyo = tuyoSec(q, { ok: row.ok, hizli: fastWrong });
+    const fastWrongHTML = tuyo ? `
       <div class="fast-wrong-hint" style="margin:0.75rem 0;padding:0.6rem 0.85rem;background:var(--card-2, rgba(0,0,0,0.03));border-left:3px solid var(--warn, #f59e0b);border-radius:4px;font-size:0.84rem;color:var(--ink-2);line-height:1.45">
-        Bu soruyu hızlı işaretledin (${Math.round(sec)} sn). Hata bilgi eksiğinden ziyade acele kaynaklı olabilir; soru kökündeki olumsuz ifadeyi ve çeldiriciyi tekrar incele.
+        ${fastWrong ? `<b>Bu soruyu hızlı işaretledin (${Math.round(sec)} sn).</b> ` : ''}<b>${esc(tuyo.baslik)}:</b> ${esc(tuyo.metin)}
       </div>
     ` : '';
 
@@ -550,11 +560,16 @@ function renderSummary(host) {
   }
 
   const done = S.log;
-  const ok = done.filter(r => r.ok).length;
-  const acc = done.length ? Math.round((ok / done.length) * 100) : 0;
-  const secs = done.map(r => r.ms / 1000);
+  // Mantıkla/cevaptan önce ipucu istenerek geçilen sorular "net soru çözme"
+  // sayılmaz: doğruluk %, ortalama süre ve "en uzun süren soru" bunlardan
+  // hesaplanır, hint sırasındaki bekleme/okuma süresi hız gibi görünmesin.
+  // "logics" (aşağıda) bu satırları zaten ayrı bir rozet olarak gösteriyordu.
+  const clean = done.filter(r => !r.logicGuess);
+  const ok = clean.filter(r => r.ok).length;
+  const acc = clean.length ? Math.round((ok / clean.length) * 100) : 0;
+  const secs = clean.map(r => r.ms / 1000);
   const avg = secs.length ? secs.reduce((a, b) => a + b, 0) / secs.length : 0;
-  const slowest = done.slice().sort((a, b) => b.ms - a.ms)[0];
+  const slowest = clean.slice().sort((a, b) => b.ms - a.ms)[0];
   const wrongs = done.filter(r => !r.ok);
   const logics = done.filter(r => r.logicGuess);
 
@@ -631,26 +646,54 @@ function renderSummary(host) {
 
       ${syncPanelHTML()}
 
-      <div class="btn-row" style="margin-top:2rem">
-        <button class="btn" data-act="go-today">Bugün ekranına dön</button>
+      <!-- Buton sırası bilinçli: önce hep "devam et", sonuncu ve en sönük "çık"
+           (18 Eylül 2026, kullanıcı talimatı — stüdyo hep soru çözmeye
+           yönlendirmeli, sayfadan çıkmaya değil). Kapanmayan akışa geçmek
+           birincil; aynı türden sabit set ikincil; Bugün'e dönmek düz metin
+           bağlantısı — kaldırılmadı, yalnız görsel ağırlığı en düşük. -->
+      <div class="btn-row" style="margin-top:2rem;margin-bottom:0.75rem">
+        <button class="btn" data-act="continue-flow">Akışa Devam Et</button>
         <button class="btn btn-2" data-act="again">Aynı türden bir set daha</button>
       </div>
+      <button class="btn-link" data-act="go-today">Bugün ekranına dön</button>
     </div>`;
 }
 
 /**
- * Seans sonu ekranındaki "HMGS Takip'e gönder" paneli.
- * İki iş yapar: seansa serbest bir not eklettirir (ör. "saat çok geç, dikkat
- * hataları") ve gönderimi kullanıcının onayına bağlar. Otomatik aktarım zaten
- * arka planda var (pushSessionsToServer -> studio_sessions_export.json) ama o
- * dosyayı Drive kuyruğuna taşıyan adım ayrı bir süreç; bu düğme onu tetikler.
+ * Seans sonu ekranındaki "HMGS Takip" paneli.
+ * Gönderim OTOMATİKTİR — seans bitince (finalizeSession) arka planda kendiliğinden
+ * denenir, kullanıcının bir şeye tıklaması gerekmez (18 Eylül 2026, kullanıcı
+ * talimatı: "otomatik gitmeli zaten"). Panel sadece durumu gösterir (gönderildi /
+ * gönderiliyor / cihazda bekliyor) ve isteğe bağlı bir not alanı sunar; not
+ * eklemek veya başarısız bir denemeyi elle tekrar tetiklemek için buton kalır,
+ * ama normal akışta hiç dokunulması gerekmez.
+ * Önceden "trap" (uyarı/amber) kutusu kullanılıyordu — rutin bir senkron durumu
+ * bir hata gibi göründüğü için nötr "card" stiline çevrildi (18 Eylül 2026).
  */
 function syncPanelHTML() {
-  const sent = S.pushState === 'ok';
+  const st = S.pushState;
+  const sent = st === 'ok';
+  const busy = st === 'busy';
+  const pending = st === 'pending' || !st;
+  const chip = sent
+    ? '<span class="chip green">Gönderildi ✓</span>'
+    : busy
+      ? '<span class="chip accent">Gönderiliyor…</span>'
+      : pending
+        ? '<span class="chip">Birazdan gönderilecek</span>'
+        : '<span class="chip">Cihazda bekliyor</span>';
+  const statusLine = (!sent && !busy && !pending && S.pushMsg) ? S.pushMsg : '';
+  const btnLabel = sent ? 'Gönderildi ✓' : busy ? 'Gönderiliyor…' : pending ? 'Şimdi gönder' : 'Notu kaydet ve tekrar dene';
+
   return `
-    <div class="trap" style="margin-top:2rem" id="sync-panel">
-      <div class="lbl">HMGS Takip'e Gönder</div>
-      <p style="margin-bottom:0.75rem">Bu seansın ders kırılımı çalışma kaydına yazılacak. İstersen bir not düş (nasıl geçtiğini sonra hatırlarsın).</p>
+    <div class="card" style="margin-top:2rem" id="sync-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:0.6rem;flex-wrap:wrap">
+        <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-3)">HMGS Takip</div>
+        ${chip}
+      </div>
+      <p style="margin-bottom:0.75rem;color:var(--ink-2);font-size:0.9rem">${pending
+        ? 'Bu seansın ders kırılımı birazdan kendiliğinden çalışma kaydına gönderilecek. Önce bir not düşmek istersen birkaç saniyen var (nasıl geçti, hangi konu takıldı).'
+        : 'Bu seansın ders kırılımı otomatik olarak çalışma kaydına gönderiliyor. İstersen bir not düş (nasıl geçtiğini sonra hatırlarsın).'}</p>
       <label style="display:block;font-size:0.82rem;font-weight:600;color:var(--ink-2);margin-bottom:0.3rem">
         Hissiyat Notu <span style="font-weight:400;opacity:.7">(nasıl geçti, zorluk, dikkat hataları…)</span>
       </label>
@@ -665,41 +708,98 @@ function syncPanelHTML() {
         placeholder="Örn: Muris muvazaasında ispat yükü davalıda; Yargıtay HGK 2020."
         style="width:100%;padding:0.6rem 0.75rem;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:0.95rem;resize:vertical;background:var(--bg);color:inherit"
         ${sent ? 'disabled' : ''}>${esc(S.highlights || '')}</textarea>
-      <div class="btn-row" style="margin-top:0.75rem">
-        <button class="btn${sent ? ' btn-2' : ''}" data-act="push-session" ${sent ? 'disabled' : ''}>
-          ${sent ? 'Gönderildi ✓' : "Takip'e gönder"}
+      <div class="btn-row" style="margin-top:0.75rem;align-items:center">
+        <button class="btn${sent ? ' btn-2' : ''}" data-act="push-session" ${sent || busy ? 'disabled' : ''}>
+          ${btnLabel}
         </button>
-        <span id="sync-status" class="hint" style="margin:0;align-self:center">${esc(S.pushMsg || '')}</span>
+        ${!sent ? `<button class="btn btn-2" data-act="copy-session-to-takip">Panoya kopyala (Takip'e yapıştır)</button>` : ''}
+        <span id="sync-status" class="hint" style="margin:0;align-self:center">${esc(statusLine)}</span>
       </div>
+      ${!sent ? `<p class="hint" style="margin-top:0.5rem">
+        Yerel geliştirmede Stüdyo ve Takip ayrı adreslerde (8766 / 8000) çalıştığı için
+        otomatik gönderim bazen bu ikisi arasında geçemez. Panoya kopyala düğmesi
+        Drive'a veya yerel sunucuya hiç ihtiyaç duymaz: Takip'i açtığında oradaki
+        "Stüdyo'dan İçe Aktar" ile yapıştırınca seans anında çalışma kaydına düşer.
+      </p>` : ''}
     </div>`;
 }
 
 /**
- * Notu seansa yazar, güncel seans listesini sunucuya bastırır, sonra
- * sessions-push'u tetikler. Not gönderim başarısız olsa da kaydedilir —
- * kullanıcı yazdığını kaybetmesin, HMGS_Sync.bat ile sonra gönderebilsin.
+ * Otomatik/PC-yerel gönderimin hiçbiri işlemediğinde (Drive jetonu yok, yerel
+ * sunucu kapalı, ya da Stüdyo/Takip farklı origin'lerde çalışıyorsa) devreye
+ * giren, HİÇBİR ağ/sunucu/OAuth'a ihtiyaç duymayan üçüncü yol. `exam.js`'teki
+ * "Takip Uygulamasına Aktar (Kopyala)" ile aynı desen: JSON panoya yazılır,
+ * Takip tarafında "Stüdyo'dan İçe Aktar" bunu okur. Format exam export'tan
+ * farklı bir `type` taşır ('HMGS_STUDIO_SESSION_EXPORT') çünkü bu bir deneme
+ * değil, tek bir pratik/karma seansı — Takip tarafında zaten var olan ve test
+ * edilmiş `applyPendingStudioSessions()` dönüştürücüsüne doğrudan verilir
+ * (18 Eylül 2026, kullanıcı talimatı: "otomatik gitmeli zaten... çalışmıyor,
+ * çöz" — buradaki gerçek arıza yerel geliştirmede Stüdyo/Takip'in farklı
+ * port/origin'de çalışması, bu yüzden localStorage kuyruğu ve paylaşılan Drive
+ * jetonu ikisi de sessizce devre dışı kalıyordu; bu yol o sınırlamayı atlar).
  */
-export async function pushSession() {
+export function copySessionToClipboard() {
+  if (!S || !S.sessionId) return;
+  const sess = state().sessions.find(x => x.id === S.sessionId);
+  const session = sess || {
+    id: S.sessionId,
+    note: S.note || '',
+    highlights: S.highlights || '',
+    isoDate: new Date().toISOString().slice(0, 10),
+    mode: S.mode,
+    label: S.label,
+    total: S.questions ? S.questions.length : 0
+  };
+  const payload = {
+    type: 'HMGS_STUDIO_SESSION_EXPORT',
+    source: 'HMGS_STUDIO',
+    exportedAt: new Date().toISOString(),
+    session
+  };
+  const jsonStr = JSON.stringify(payload, null, 2);
+  const done = () => toast('Seans panoya kopyalandı — Takip\'te "Stüdyo\'dan İçe Aktar" ile yapıştır.');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(jsonStr).then(done).catch(() => {
+      prompt('Seansı kopyalayın:', jsonStr);
+    });
+  } else {
+    prompt('Seansı kopyalayın:', jsonStr);
+  }
+}
+
+/**
+ * Gönderimin gerçek gövdesi. `auto=true` iken seans bittiği an kendiliğinden
+ * (finalizeSession'dan) tetiklenir — kullanıcı hiçbir şeye tıklamaz. `auto=false`
+ * iken kullanıcı butona bastığında çalışır: textarea'lardaki notu/vurguyu okur,
+ * seans kaydına işler, sonra aynı gönderim adımlarını (yerel kuyruk → yerel
+ * sunucu → Drive) tekrar dener. Otomatik deneme sessizce kuyruğa düşse bile not
+ * eklemek isteyen kullanıcı butonla tekrar deneyebilir; iki yol da aynı yere çıkar.
+ */
+async function doSync(auto) {
   if (!S || S.pushState === 'ok' || S.pushState === 'busy') return;
 
-  const ta = $('#sess-note');
-  const note = (ta?.value || '').trim();
-  S.note = note;
+  let note = S.note || '';
+  let highlights = S.highlights || '';
+  if (!auto) {
+    const ta = $('#sess-note');
+    note = (ta?.value || '').trim();
+    S.note = note;
 
-  const hlEl = $('#sess-highlight');
-  const highlights = (hlEl?.value || '').trim();
-  S.highlights = highlights;
+    const hlEl = $('#sess-highlight');
+    highlights = (hlEl?.value || '').trim();
+    S.highlights = highlights;
+  }
 
   // Notu ve highlight'ı localStorage'daki seans kaydına işle (id ile; sıraya güvenme).
   const sess = state().sessions.find(x => x.id === S.sessionId);
-  if (sess) {
+  if (sess && !auto) {
     sess.note = note;
     sess.highlights = highlights;
     save();
   }
 
   S.pushState = 'busy';
-  setSyncUI(true, 'Kaydediliyor…');
+  setSyncUI(true, auto ? 'Otomatik gönderim deneniyor…' : 'Kaydediliyor…');
 
   const targetSess = sess || {
     id: S.sessionId || ('sess_' + Date.now()),
@@ -730,15 +830,24 @@ export async function pushSession() {
     S.pushState = 'ok';
     S.pushMsg = 'Google Drive\'a gönderildi — Takip uygulamasını açtığında çalışma kaydında görünecek.';
     render();
-    toast('Seans Takip kaydına gönderildi ✓');
+    if (!auto) toast('Seans Takip kaydına gönderildi ✓');
   } else {
     S.pushState = 'queued';
     S.pushMsg = localPush.attempted
       ? (localPush.message || 'Gönderim tamamlanmadı — Google Drive yetkisi geçersiz olabilir.')
       : 'Seans bu cihazda sıraya alındı. PC\'de Takip uygulamasını açtığında eşitlenir.';
     render();
-    toast('Seans sıraya alındı — gönderim tamamlanmadı');
+    if (!auto) toast('Seans sıraya alındı — gönderim tamamlanmadı');
   }
+}
+
+/**
+ * Kullanıcının "Notu kaydet ve tekrar dene" butonuna basmasıyla çalışır.
+ * Otomatik gönderim (finalizeSession) zaten arka planda denenmiştir; bu sadece
+ * not eklemek veya kuyrukta kalmış bir denemeyi elle tekrar tetiklemek içindir.
+ */
+export async function pushSession() {
+  return doSync(false);
 }
 
 function setSyncUI(busy, msg) {
@@ -845,14 +954,31 @@ function finalizeSession() {
 
   saveSession(result);
   save();
-  // Seans sonu ekranındaki "Takip'e gönder" paneli notu bu id ile bulup yazar.
+  // Seans sonu ekranındaki "HMGS Takip" paneli notu bu id ile bulup yazar.
   S.sessionId = result.id;
 
-  // Kullanıcı hiçbir ek not girmese dahi seans asla kaybolmasın:
-  // Seansı otomatik olarak yerel Takip kuyruğuna ekle ve varsa doğrudan Drive'a ilet.
+  // Kullanıcı hiçbir ek not girmese dahi seans asla kaybolmasın: cihaz-içi
+  // kuyruğa hemen yazılır (ücretsiz, ağ gerekmez, id ile idempotent).
   queueSessionForTakip(result);
-  pushSessionToDriveDirectly(result).catch(() => {});
-  pushToLocalServer().catch(() => {});
+
+  // Gerçek gönderim (yerel sunucu / Drive) OTOMATİKTİR, kullanıcının bir şeye
+  // tıklaması gerekmez (18 Eylül 2026, kullanıcı talimatı: "otomatik gitmeli
+  // zaten"). AMA anında değil — 8 Ağustos'ta kullanıcı BİLİNÇLİ olarak "not
+  // göndermeden önce yazılabilsin" diye düğmeyi elle bıraktırmıştı (bkz.
+  // log/2026-08-08_seans_gonder_butonu.md, "cursor tuzağı": bir seans bir kez
+  // gönderilince Takip tarafında aynı id ikinci kez işlenmiyor, yani gönderimden
+  // SONRA eklenen not hiçbir zaman Takip'e ulaşmıyor). Bu iki isteği birleştirmek
+  // için kısa bir bekleme payı var: ekran "birazdan gönderilecek" diye açılır,
+  // not alanları o sırada hâlâ açık, kullanıcı isterse "Şimdi gönder"le bekletmeden
+  // yollar. Süre dolunca hâlâ bekliyorsa (S.pushState === 'pending') otomatik
+  // gönderim kendiliğinden tetiklenir.
+  S.pushState = 'pending';
+  const sid = result.id;
+  setTimeout(() => {
+    if (S && S.sessionId === sid && S.pushState === 'pending') {
+      doSync(true).catch(() => {});
+    }
+  }, 7000);
 }
 
 /**
