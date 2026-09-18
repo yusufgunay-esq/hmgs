@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    views/practice.js — SÜRE ÖLÇEN SORU MOTORU
    Her cevap telemetriye yazılır, SRS'e işlenir. Süre ölçümü pazarlıksızdır.
    ========================================================================== */
@@ -7,7 +7,7 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich, richBlock, stripEmoji, splitStem, fmtSec, emptyState, groupLegalRefs, $, toast } from '../ui.js';
-import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions, aiQuestions } from '../data.js';
+import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions, aiQuestions, isCoreTarget } from '../data.js';
 import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
 import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet, buildDeadlinesSet } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
@@ -50,7 +50,7 @@ export function startSession(opts = {}) {
     if (subjectId) due = due.filter(d => d.q.subjectId === subjectId);
     pool = due.map(d => d.q);
     if (targetScope === 'core') {
-      const coreOnly = pool.filter(q => q.examTarget === 'hmgs_core');
+      const coreOnly = pool.filter(isCoreTarget);
       if (coreOnly.length) pool = coreOnly;
     }
     label = subjectId ? `Tekrar · ${subjectName(subjectId)}` : 'Tekrar seansı';
@@ -70,7 +70,7 @@ export function startSession(opts = {}) {
   } else if (mode === 'unseen') {
     let unseen = unseenQuestions(subjectId);
     if (targetScope === 'core') {
-      const coreOnly = unseen.filter(q => q.examTarget === 'hmgs_core');
+      const coreOnly = unseen.filter(isCoreTarget);
       if (coreOnly.length) unseen = coreOnly;
     }
     pool = shuffle(unseen);
@@ -85,7 +85,7 @@ export function startSession(opts = {}) {
   } else {
     let raw = subjectId ? questionsOf(subjectId, targetScope) : allQuestions();
     if (targetScope === 'core') {
-      const coreOnly = raw.filter(q => q.examTarget === 'hmgs_core');
+      const coreOnly = raw.filter(isCoreTarget);
       if (coreOnly.length) raw = coreOnly;
     }
     pool = shuffle(raw);
@@ -197,7 +197,9 @@ export function render() {
             <span>Bitir</span>
           </button>
           <span class="q-strip-subj" id="q-subj">${S.hideSubject ? '<span class="hint">ders gizli</span>' : esc(subjectName(q.subjectId))}</span>
-          ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
+          ${''/* Kaynak/hedef rozeti bilinçli olarak yok: sınavda sorunun kaynağı yazmıyor.
+               "Bu hâkimlik sorusu, zor olacak" beklentisi cevabı da değiştiriyor. Kaynak,
+               cevaptan sonraki geri bildirimde görünür (aşağıda sourceBadgeLabel). */}
         </div>
         <div class="q-strip-center">
           <div class="q-progress-box">
