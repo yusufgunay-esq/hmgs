@@ -135,7 +135,9 @@ export function exportJSON() {
  * @param {string|null} chosen seçilen şık ('A'..'E') veya null = boş
  * @param {number} ms         soruya harcanan süre (ms)
  * @param {string} mode       'practice' | 'exam' | 'review' | 'flow'
- * @param {object} [flags]    davranış sinyalleri { usedElim, askedGemini }
+ * @param {object} [flags]    davranış sinyalleri { usedElim, askedGemini, logicGuess }
+ *   logicGuess: cevaptan ÖNCE ipucu istendiyse true — bu satır SRS'te olduğu gibi
+ *   mastery/hız hesaplarında da bağımsız bir "çözüm" sayılmaz (bkz. engine.js computeMastery).
  */
 export function recordAnswer(q, chosen, ms, mode, flags = {}) {
   const prior = S.answers.filter(a => a.qId === q.id).length;
@@ -146,7 +148,7 @@ export function recordAnswer(q, chosen, ms, mode, flags = {}) {
     chosen: chosen,
     correctKey: q.correct,
     ok: chosen === q.correct,
-    logicGuess: false,
+    logicGuess: !!flags.logicGuess,
     attentionError: false,
     usedElim: !!flags.usedElim,
     askedGemini: !!flags.askedGemini,
