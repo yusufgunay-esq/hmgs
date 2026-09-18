@@ -13,6 +13,7 @@ import { recordAnswer, save, saveExam, state, EXAM_TOTAL, PASS_CORRECT } from '.
 import { scheduleAfterAnswer, scoreOf } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
 import { bookLocationFor, NO_BOOK_SUBJECTS } from '../book-map.js';
+import { pushStudioQueueToDrive, getActiveToken, setActiveToken, requestSilentToken } from '../vault-client.js';
 
 /** ÖSYM HMGS: 120 soru / 150 dakika. */
 const DURATION_MS = 150 * 60 * 1000;
@@ -344,6 +345,15 @@ export function finish(auto = false) {
   saveExam(result);
   save();
   pushExamToLocalServer().catch(() => {});
+  // 18 Eylül 2026, kullanıcı talimatı: "denemeleri de benim yapıştırmamam
+  // lazım... aynı link zaten GitHub'da hepsi." Pratik seanslarıyla AYNI kuyruk
+  // dosyasına (hmgs_studio_queue.json → exams[]) yazar; Takip açılışta bunu
+  // okuyup denemeler[]'e idempotent çevirir (studioExamId ile). Notu
+  // kullanıcının yazacağı bir alan yok (deneme ekranında serbest not girişi
+  // pratik seansındaki gibi değil, tamamı sayılardan hesaplanıyor), o yüzden
+  // pratik seansındaki 7 saniyelik bekleme payına burada gerek yok — anında
+  // dener.
+  pushExamToDriveDirectly(result).catch(() => {});
   lastResult = result;
   E.finished = true;
   render();
@@ -367,6 +377,32 @@ async function pushExamToLocalServer() {
       body: JSON.stringify({ exams: state().exams || [] })
     });
   } catch (_) { /* yerel sunucu kapalıysa sessizce geç */ }
+}
+
+/**
+ * Deneme sonucunu Drive'daki `HMGS/hmgs_studio_queue.json` kuyruğuna yazar —
+ * `practice.js`'teki `pushSessionToDriveDirectly` ile birebir aynı yol
+ * (aynı dosya, aynı jeton, aynı sessiz-yenileme). GitHub Pages'te Stüdyo ve
+ * Takip aynı origin olduğu için paylaşılan jeton (`hmgs_gtoken`) çalışır;
+ * yalnız o jetonun ~1 saatlik ömrü dolmuşsa önce sessizce (popup'sız)
+ * yenilemeyi dener, o da olmazsa sessizce vazgeçer (kullanıcıya hata
+ * gösterilmez — "Kopyala" düğmesi hâlâ orada, elle yedek yol).
+ */
+async function pushExamToDriveDirectly(examResult) {
+  if (!examResult || !examResult.id) return false;
+  let token = getActiveToken();
+  if (!token) {
+    try { token = await requestSilentToken(); } catch (_) { token = null; }
+  }
+  if (!token) return false;
+  setActiveToken(token);
+  try {
+    const s = state();
+    return await pushStudioQueueToDrive(token, s.sessions || [], (s.answers || []).slice(-2000), s.exams || []);
+  } catch (err) {
+    console.warn('[sync] Deneme Drive kuyruk güncelleme uyarısı:', err);
+    return false;
+  }
 }
 
 /* ---------- sonuç ---------- */
