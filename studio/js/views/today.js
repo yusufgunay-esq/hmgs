@@ -8,7 +8,7 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, $, pct } from '../ui.js';
-import { subjectName, topicById, aiQuestions } from '../data.js';
+import { subjectName, topicById, aiQuestions, pastExamQuestions } from '../data.js';
 import { daysLeft, streak, lastExam, PASS_CORRECT, state, getDailyPlan } from '../store.js';
 import { nextAction, todayProgress, srsSummary, allSubjectMastery,
   MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions,
@@ -54,6 +54,7 @@ export function render() {
   const sig = answerQualitySignals();
 
   const aiCount = aiQuestions().length;
+  const realCount = pastExamQuestions().length;
 
   host.innerHTML = `
     <div class="wrap">
@@ -75,6 +76,21 @@ export function render() {
       </div>
 
       ${pregelHTML()}
+
+      <div class="card" style="margin-top:1.25rem;border-left:3px solid var(--ok)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.5rem">
+          <div>
+            <h3 style="font-size:1rem;font-weight:700;margin:0">HMGS Gerçek Çıkmış Sorular</h3>
+            <p style="font-size:0.85rem;color:var(--ink-2);margin:0.2rem 0 0">
+              Önceki HMGS sınavlarından çıkmış ${realCount} gerçek soru, orijinal kaynağıyla.
+            </p>
+          </div>
+          <span class="chip" style="font-size:0.75rem">${realCount} Soru</span>
+        </div>
+        <div class="btn-row" style="margin-top:0.85rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button class="btn btn-s" data-act="practice-pastexam" style="background:var(--ok);color:#fff">Çıkmış Soruları Çöz (${realCount})</button>
+        </div>
+      </div>
 
       <div class="card" style="margin-top:1.25rem;border-left:3px solid var(--accent)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;flex-wrap:wrap;gap:0.5rem">
@@ -261,8 +277,7 @@ function pregelHTML() {
              <div class="btn-row" style="margin-top:0.6rem">
                <button class="btn btn-s" data-act="go-exam">Denemeye git</button></div></div>`
         : `<div class="btn-row" style="margin-top:0.85rem">
-             <button class="btn btn-s" data-act="pregel-set" data-count="${p.hedef}">Bugünün setini başlat (${p.hedef} soru)</button>
-             <button class="btn btn-2 btn-s" data-act="go-akim">Akış moduna geç</button>
+             <button class="btn btn-s" data-act="pregel-set" data-count="${p.hedef}">Bugünkü akışı başlat (~${p.hedef} soru)</button>
            </div>`}
       <div style="margin-top:1rem">${bloklar}</div>
     </div>`;
