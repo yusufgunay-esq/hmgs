@@ -113,10 +113,20 @@ function show(view, push = true) {
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
-/** Koçun döndürdüğü action nesnesini uygular. */
+/**
+ * Koçun döndürdüğü action nesnesini uygular.
+ * 'karma' önerisi artık pratik'in sabit sayılı, kapanış ekranlı seansına değil
+ * akış'ın kapanışsız kuyruğuna giriyor — stüdyo kullanıcıyı gerçekten flow'a
+ * atmalı, sayfadan çıkmaya değil soru çözmeye devam etmeye yönlendirmeli
+ * (18 Eylül 2026, kullanıcı talimatı). action nesnesinin şekli (view/mode/
+ * count) engine.js testleriyle kilitli, burada yalnız yönlendirme değişiyor.
+ */
 function runAction(a) {
   if (!a) return;
-  if (a.view === 'practice') {
+  if (a.view === 'practice' && a.mode === 'karma') {
+    if (akim.start({ scope: a.targetScope || 'core' })) show('akim');
+    else show('today');
+  } else if (a.view === 'practice') {
     if (practice.startSession(a)) show('practice');
     else show('today');
   } else if (a.view === 'exam') {
@@ -227,10 +237,10 @@ document.addEventListener('click', async e => {
       if (practice.startSession({ mode: 'deadlines', count: 20, customLabel: 'Süreler ve Parasal Sınırlar' })) show('practice');
       break;
 
-    /* --- 11 günlük plan: günün setini başlat --- */
+    /* --- 11 günlük plan: günün akışını başlat (sabit N ile bitmeyen akışa girer) --- */
     case 'pregel-set': {
       const n = Number(el.dataset.count) || 20;
-      if (practice.startSession({ mode: 'karma', count: n, customLabel: `Günün planı · ${n} soru` })) show('practice');
+      if (akim.start({ label: `Günün planı · ~${n} soru` })) show('akim');
       break;
     }
 
@@ -258,10 +268,10 @@ document.addEventListener('click', async e => {
       if (practice.startSession({ mode: 'pastExam', count: 999 })) show('practice');
       break;
     case 'practice-core-karma':
-      if (practice.startSession({ mode: 'karma', count: 20, targetScope: 'core', customLabel: 'HMGS Çekirdek Karma' })) show('practice');
+      if (akim.start({ scope: 'core', label: 'HMGS Çekirdek Karma' })) show('akim');
       break;
     case 'practice-all-karma':
-      if (practice.startSession({ mode: 'karma', count: 20, targetScope: 'all', customLabel: 'Tüm Havuz Karma (İleri Dahil)' })) show('practice');
+      if (akim.start({ scope: 'all', label: 'Tüm Havuz Karma (İleri Dahil)' })) show('akim');
       break;
 
     /* --- akış --- */
@@ -304,6 +314,10 @@ document.addEventListener('click', async e => {
     case 'quit':            practice.quit(); break;
     case 'again':        if (!practice.repeatSession()) show('today'); break;
     case 'push-session': practice.pushSession(); break;
+    case 'copy-session-to-takip': practice.copySessionToClipboard(); break;
+    // Seans/akış kapanışlarındaki ana buton: kapanmayan karma akışına geçer.
+    // Sabit sayılı bir seans bitince bile devam yolu her zaman bu.
+    case 'continue-flow': if (akim.start()) show('akim'); else show('today'); break;
 
     /* --- akış modu --- */
     case 'akim-start':         akim.start(); break;
