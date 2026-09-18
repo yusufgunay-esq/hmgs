@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    views/exam.js — 120 SORULUK SINAV SİMÜLASYONU
    Gerçek ders dağılımı · geri sayım · boş bırakma · soru haritası
    Kural: HMGS'de yanlış cezası yoktur → net = doğru. Asla boş bırakma.
@@ -182,7 +182,7 @@ export function render() {
         <div class="q-head">
           <span>Soru ${E.i + 1} / ${E.questions.length}</span>
           <span>${esc(subjectName(q.subjectId))}</span>
-          ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
+          ${''/* Hedef/kaynak rozeti yok: sınavda da sorunun kaynağı yazmaz. */}
           ${q.difficulty && q.difficulty !== 'etiketsiz' ? `<span class="chip">${esc(q.difficulty)}</span>` : ''}
           <button class="btn btn-2 btn-s" data-act="exam-mark" style="margin-left:auto">
             ${E.marked.has(E.i) ? 'İşareti kaldır' : 'Sonra dön'}
