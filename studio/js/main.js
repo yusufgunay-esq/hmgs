@@ -289,7 +289,7 @@ document.addEventListener('click', async e => {
       // Seans durumu korunur: render() ÇAĞRILMAZ, yalnız geri bildirim kartının
       // içine bir panel açılır. practice.js render()'ı S.answered/qStart'ı
       // sıfırladığı için burada render etmek cevabı silerdi.
-      kuralToggle(el.dataset.topic);
+      kuralToggle(el.dataset.topic, el.dataset.qid);
       break;
     }
 
@@ -445,7 +445,7 @@ document.addEventListener('keydown', e => {
     if (k === 'G') { practice.askGemini(); e.preventDefault(); return; }
     if (k === 'K' && practice.isAnswered()) {
       const btn = document.querySelector('#view-practice [data-act="kural"]');
-      if (btn) { kuralToggle(btn.dataset.topic); e.preventDefault(); }
+      if (btn) { kuralToggle(btn.dataset.topic, btn.dataset.qid); e.preventDefault(); }
       return;
     }
     if (practice.isAnswered()) {
@@ -460,7 +460,7 @@ document.addEventListener('keydown', e => {
     if (k === 'G') { akim.askGemini(); e.preventDefault(); return; }
     if (k === 'K' && akim.isAnswered()) {
       const btn = document.querySelector('#view-akim [data-act="kural"]');
-      if (btn) { kuralToggle(btn.dataset.topic); e.preventDefault(); }
+      if (btn) { kuralToggle(btn.dataset.topic, btn.dataset.qid); e.preventDefault(); }
       return;
     }
     if (akim.isAnswered()) {
