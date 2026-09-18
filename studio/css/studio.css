@@ -318,6 +318,17 @@ p.page-sub { color: var(--ink-2); font-size: 0.9rem; margin-bottom: 1.75rem; }
 .btn-s { padding: 0.45rem 0.85rem; font-size: 0.82rem; border-radius: var(--r-s); }
 .btn-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
 
+/* Düz metin bağlantısı gibi davranan buton — "çık/vazgeç" gibi hep var olması
+   gereken ama görsel olarak öne çıkmaması gereken eylemler için (seans/akış
+   kapanışında "Bugün ekranına dön"). Eylem kaldırılmaz, yalnız ağırlığı azalır. */
+.btn-link {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: none; border: none; padding: 0.6rem 0.3rem;
+  font-size: 0.86rem; font-weight: 500; color: var(--ink-3);
+  text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px;
+}
+.btn-link:hover:not(:disabled) { color: var(--ink-2); text-decoration-color: var(--ink-3); }
+
 /* Hero Buton ve Alternatif Eylemler Düzeni */
 .hero-actions {
   display: flex;
@@ -602,6 +613,17 @@ body.in-session #view-akim.on {
   font-size: 0.75rem;
   opacity: 0.7;
 }
+/* Oturum içi "bitir" — her yerde erişilebilir ama görsel olarak öne çıkmaz.
+   Diğer eylem butonlarıyla (Bilmiyorum, İpucu İste) aynı ağırlıkta durursa
+   "çıkmak" da sıradan bir araç gibi görünür; burada bilerek en sönük eylem
+   (18 Eylül 2026, kullanıcı talimatı). */
+.q-quit-link {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: none; border: none; padding: 0.3rem 0.2rem;
+  font-size: 0.82rem; font-weight: 500; color: var(--ink-3);
+}
+.q-quit-link:hover:not(:disabled) { color: var(--ink-2); }
+.q-main-foot .q-quit-link { font-size: 0.82rem; }
 
 .q-strip-center {
   flex: 1 1 auto;
