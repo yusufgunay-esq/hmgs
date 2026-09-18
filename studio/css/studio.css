@@ -832,6 +832,111 @@ body.in-session #view-akim.on {
 .kural-host { margin-bottom: 0.75rem; }
 .kural-host:last-child { margin-bottom: 0; }
 
+/* Soruya özgü hedef kural kartı */
+.kural-focus-card {
+  background: var(--bg-raise);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1rem;
+}
+.kural-focus-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.55rem;
+}
+.kural-focus-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--r-s);
+}
+.kural-focus-ref {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.kural-focus-text {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--ink);
+  margin-bottom: 0.65rem;
+}
+.kural-focus-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.65rem;
+}
+.kural-pill {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+}
+.kural-focus-trap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-s);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.kural-focus-trap-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.kural-focus-trap-body {
+  color: var(--ink);
+}
+.kural-sim-wrapper {
+  margin-top: 0.9rem;
+}
+.kural-sim-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px dashed var(--line);
+}
+.kural-sim-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.kural-sim-desc {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+.clean-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  color: var(--accent-ink);
+}
+
 /* "Kuralı çalış" düğmesi: ikincil eylem, ama varlığı görünür olsun */
 .btn-kural {
   flex: 0 0 auto;
