@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    elim.js — ŞIK VE ÖNCÜL ELEME
    Pratik ve sınav ekranlarının ortak kullandığı, saf DOM tabanlı eleme mantığı.
    Bilinçli olarak render() TETİKLEMEZ: practice.js/exam.js'te render() süre
@@ -18,12 +18,31 @@
 
 import { esc, rich } from './ui.js';
 
-const ROMAN_LINE = /^(I{1,3}|IV|V|VI{0,3}|VII|VIII|IX|X)\.\s*(.+)$/;
+const ROMAN_LINE = /^(I{1,3}|IV|V|VI{0,3}|VII|VIII|IX|X)\.\s*(.*)$/;
+/* Çıplak rakam satırı ("I." tek başına) ve gerçek madde satırı ("I. metin"). */
+const ROMAN_ONLY = /^(I{1,3}|IV|V|VI{0,3}|VII|VIII|IX|X)\.$/;
+const IS_ITEM = /^(I{1,3}|IV|V|VI{0,3}|VII|VIII|IX|X)\.\s+/;
 
 /** Öncül bloğunu satır satır ayırır; Roma rakamıyla başlayanlar tıklanabilir olur. */
 export function premiseHTML(premise) {
   if (!premise) return '';
-  const lines = String(premise).split('\n').map(l => l.trim()).filter(Boolean);
+  const raw = String(premise).split('\n').map(l => l.trim()).filter(Boolean);
+
+  /* GÜVENLİK AĞI (öncül eleme kırılmasın diye): rakam kendi satırında kalmış
+     ("I." + altındaki satır metin) ise burada birleştirilir. Normalde ui.js
+     splitStem bunu zaten yapar; burası bölme mantığı bir gün değişse veya yeni
+     bir kaynak aynı biçimde gelse bile öncülün TIKLANABİLİR kalmasını garanti
+     eder — kullanıcı "öncülü silemiyorum" durumuna bir daha düşmez. */
+  const lines = [];
+  for (let i = 0; i < raw.length; i++) {
+    if (ROMAN_ONLY.test(raw[i]) && i + 1 < raw.length && !IS_ITEM.test(raw[i + 1])) {
+      lines.push(raw[i] + ' ' + raw[i + 1]);
+      i++;
+      continue;
+    }
+    lines.push(raw[i]);
+  }
+
   const items = lines.map(line => {
     const m = line.match(ROMAN_LINE);
     if (m) {
