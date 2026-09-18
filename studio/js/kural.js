@@ -21,9 +21,22 @@
    Bu modül o köprüyü kurar: yanlış → AYNI EKRANDA o kuralın interaktif
    alıştırması → sonraki soru. Sekme değişmez, seans bölünmez.
 
-   Tasarım kararı: YENİ İÇERİK YOK. Var olanı ulaşılabilir yapıyor. 11 gün
-   kala yeni içerik üretmek değil, mevcut 77 alıştırmayı kullanıcıya
-   göstermek doğru yatırım.
+   ----------------------------------------------------------------------
+   GENİŞLETME (18 Eylül 2026, kapsam denetimi): yukarıdaki "77/124" artık
+   124/124. Kalan 47 konu (comparison_table/hierarchy_pyramid/timeline/
+   decision_tree/flowchart) V3 motorunun bilmediği eski şemadaydı, köprü
+   onlara hiç ulaşmıyordu — CMK, İş Hukuku, İdare Hukuku'nun çoğu ve tüm
+   tier-3 dersler (~sınavın %40'ı, röntgen ölçümü) sessizce dışarıda
+   kalıyordu.
+
+   legacy-adapt.js iki yolla kapatıyor: 43 konunun VAR OLAN metni (title/
+   desc/law/norm) V3'ün zaten çizdiği bir kalıba (guess_table / step_reveal /
+   interactive_hierarchy) yeniden haritalanıyor; kalan 4 konu (felsefe_002,
+   felsefe_003, milletlerarasi_003, genel_kamu_002) gerçek dallı karar
+   grafiği olduğu için düzleştirilmiyor, yazarın kendi düğüm grafiği
+   tıklanarak gezilen ayrı bir görünümle (branch_graph) sunuluyor. İkisinde
+   de yeni içerik yok, yalnızca alan adı eşleme / grafik gezinimi.
+   Ayrıntı: legacy-adapt.js başlığı.
    ========================================================================== */
 /* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
@@ -31,6 +44,7 @@
 
 import { esc } from './ui.js';
 import { topicById, questionById, V3_TYPES } from './data.js';
+import { adaptable, adaptLegacy, hasBranchGraph, renderBranchGraph, legacyLabel } from './legacy-adapt.js';
 
 /** Bu sorunun bağlı olduğu konu, interaktif bir kural alıştırması taşıyor mu? */
 export function kuralVar(q) {
@@ -44,7 +58,11 @@ function konu(q) {
   if (!t) return null;
   // v1 statik tablo "alıştırma" değil — yalnız motorun çizebildiği kalıplar
   const v3 = V3_TYPES.has(t.visualType) || (t.visualExtra && V3_TYPES.has(t.visualExtra.visualType));
-  return v3 ? t : null;
+  if (v3) return t;
+  // Eski şema: V3 doğrudan çizemez ama legacy-adapt.js aynı metni V3 kalıbına
+  // haritalayabiliyorsa ya da dallı grafiği gezilebilir kılabiliyorsa yine
+  // "var" say (18 Eylül köprü genişletmesi).
+  return (adaptable(t) || hasBranchGraph(t)) ? t : null;
 }
 
 /**
@@ -81,7 +99,7 @@ function kuralBaslik(t) {
     fill_slots: 'boşluk doldurma',
     calculator: 'hesap simülatörü'
   }[tip];
-  return ad || 'etkileşimli alıştırma';
+  return ad || legacyLabel(t) || 'etkileşimli alıştırma';
 }
 
 /**
@@ -94,7 +112,7 @@ export function matchRuleChunk(q, t) {
   if (t.chunks.length === 1) return t.chunks[0];
 
   const qText = ((q.stem || '') + ' ' + (q.explanation || '') + ' ' + (q.legalBasis || '')).toLowerCase();
-  
+
   // Madde numarası çıkarımı (örn. 'm. 248', 'm. 166', '248', '166/1', vb.)
   const qArts = [];
   const artMatches = qText.matchAll(/(?:m\.|md\.|madde|fıkra)\s*(\d+[\w\/-]*)/gi);
@@ -174,7 +192,7 @@ function targetChunkHTML(chunk) {
   if (!chunk) return '';
   const ref = cleanRef(chunk.legalRef || '');
   const text = formatRuleText(chunk.text || '');
-  const pills = (chunk.highlights || []).map(h => 
+  const pills = (chunk.highlights || []).map(h =>
     `<span class="kural-pill">${cleanRef(h)}</span>`
   ).join('');
   const detail = chunk.detail ? formatRuleText(chunk.detail) : '';
@@ -222,7 +240,7 @@ export function kuralToggle(topicId, qId = null) {
   slot.hidden = false;
   slot.innerHTML = `
     <div class="kural-head">
-      <span class="kural-lbl">Kural · ${esc(etiket(t.visualType))}</span>
+      <span class="kural-lbl">Kural · ${esc(etiket(t))}</span>
       <span class="kural-src">${esc(shortTitle(t.title))}</span>
     </div>
     ${chunk ? targetChunkHTML(chunk) : ''}
@@ -255,22 +273,39 @@ export function kuralToggle(topicId, qId = null) {
   return true;
 }
 
-/** flow.js:mountVisual ile aynı yol — kaynak tek, kopya yok. */
+/**
+ * flow.js:mountVisual ile aynı yol — kaynak tek, kopya yok.
+ * Konu V3'ün bildiği bir tipteyse doğrudan çizer. Değilse önce legacy-adapt.js
+ * ile V3 kalıbına haritalamayı dener (43 konu); o da olmazsa ve konu gerçekten
+ * dallı bir grafikse ayrı bir gezinim görünümü çizer (4 konu, branch_graph).
+ * Hiçbiri olmazsa BOŞ KUTU BASMAZ.
+ */
 function mount(host, t, key) {
   if (!host || !t.visualData) return false;
   const V = typeof window !== 'undefined' ? window.HMGSV3 : null;
   if (!V || typeof V.render !== 'function') return false;
-  if (!V3_TYPES.has(t.visualType)) return false;
   try {
-    V.render(host, key, t.visualData, t);
-    return host.children.length > 0;
+    if (V3_TYPES.has(t.visualType)) {
+      V.render(host, key, t.visualData, t);
+      return host.children.length > 0;
+    }
+    const adapted = adaptLegacy(t);
+    if (adapted) {
+      V.render(host, key, adapted.data, { ...t, visualType: adapted.type });
+      return host.children.length > 0;
+    }
+    if (hasBranchGraph(t)) {
+      return renderBranchGraph(host, t);
+    }
+    return false;
   } catch (e) {
     console.warn('[kural] render hatası:', e);
     return false;
   }
 }
 
-function etiket(tip) {
+function etiket(t) {
+  const tip = t.visualType;
   return {
     predict_then_explore: 'Tahmin et → keşfet',
     guess_table: 'Gizli hücre tahmini',
@@ -283,7 +318,12 @@ function etiket(tip) {
     interactive_hierarchy: 'Hiyerarşi',
     family_tree: 'Soy ağacı',
     fill_slots: 'Boşluk doldurma',
-    calculator: 'Hesap'
+    calculator: 'Hesap',
+    comparison_table: 'Karşılaştırma · gizli hücre',
+    hierarchy_pyramid: 'Piramit · tıkla-aç',
+    timeline: 'Zaman çizelgesi · sırayla aç',
+    decision_tree: hasBranchGraph(t) ? 'Karar ağacı · kendi yolunu seç' : 'Karar süreci · sırayla aç',
+    flowchart: hasBranchGraph(t) ? 'Akış şeması · kendi yolunu seç' : 'Akış şeması · sırayla aç'
   }[tip] || tip;
 }
 
