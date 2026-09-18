@@ -20,7 +20,7 @@ import { subjectName, topicById } from '../data.js';
 import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
 import {
   scheduleAfterAnswer, reScheduleAsLogic, flowFeed, flowReinforce, flowScore, flowMilestone,
-  FLOW_REFILL_AT, FLOW_REINFORCE_DELAY
+  FLOW_REFILL_AT, FLOW_REINFORCE_DELAY, FLOW_BATCH
 } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
 import { kuralButtonHTML } from '../kural.js';
@@ -34,17 +34,34 @@ export function hasSession() { return !!A; }
 
 /* ---------- kurulum ---------- */
 
-export function start() {
-  const f = flowFeed();
+/**
+ * @param {{scope?:string, label?:string}} opts  scope: 'core' | 'all' (buildKarmaSet'e
+ *   geçer — practice-all-karma gibi çağrılar ileri/hâkimlik havuzunu da ister).
+ *   label: üst şeritte görünen isim — hangi kapıdan girildiğini kullanıcıya söyler
+ *   (ör. "HMGS Çekirdek Karma"), akış davranışını değiştirmez, tek kaynak yine karma motoru.
+ */
+export function start(opts = {}) {
+  const scope = opts.scope || 'core';
+  // Oturum boyu edinim-bloğu hafızası: sonu olmayan kuyruk buildKarmaSet'i
+  // her dolumda yeniden çağırır ve motor "cevaplanmış" sayıya bakar — bir
+  // bloğun soruları kuyrukta bekleyip henüz cevaplanmadıysa motor kendi
+  // başına dersi hâlâ "taze" sanır ve ikinci bir blok verir (ölçüldü, 18
+  // Eylül 2026). Bu Set'i biriktirip her çağrıya geri vermek bunu keser.
+  const blockedSubjects = new Set();
+  const f = flowFeed(FLOW_BATCH, scope, { blockedSubjects });
+  (f.blockedThisCall || []).forEach(id => blockedSubjects.add(id));
   const seedSeen = new Set(state().answers.slice(-50).map(a => a.qId));
 
   A = {
+    scope,
+    label: opts.label || 'Akış',
     queue: [],            // sıradaki sorular (baş = şu anki)
     log: [],              // cevap kayıtları (ham, kapanışta özetlenir)
     answered: false,
     qStart: performance.now(),
     startedAt: performance.now(),
     usedIds: seedSeen,
+    blockedSubjects,      // bkz. yukarısı — oturum boyu edinim-bloğu hafızası
     milestones: [],       // "kural otomatikleşti" anları
     elimUsed: false,
     geminiAsked: false,
@@ -95,10 +112,10 @@ export function render() {
     <div class="q-screen">
       <div class="q-strip akim-strip">
         <div class="q-strip-left">
-          <button class="btn btn-2 btn-s" data-act="akim-quit" title="Akışı bitir">
+          <button class="q-quit-link" data-act="akim-quit" title="Akışı bitir">
             <span class="q-quit-x">✕</span><span>Bitir</span>
           </button>
-          <span class="q-strip-subj">Akış</span>
+          <span class="q-strip-subj">${esc(A.label)}</span>
         </div>
         <div class="q-strip-center">
           <div class="flow-meter" id="flow-meter">
@@ -133,7 +150,7 @@ export function render() {
           <div class="q-main-foot" id="q-actions">
             <button class="btn btn-2 btn-s" data-act="akim-dontknow">Bilmiyorum · çözümü göster</button>
             <button class="btn btn-2 btn-s" data-act="akim-ask-gemini" title="Soruyu ve beş şıkkı ipucu istemi olarak kopyalar — doğru şık gönderilmez (G)">İpucu İste <span class="kbd">G</span></button>
-            <button class="btn btn-2 btn-s" data-act="akim-quit">Akışı bitir</button>
+            <button class="q-quit-link" data-act="akim-quit">Akışı bitir</button>
             <span class="hint">
               <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">G</span> Gemini · <span class="kbd">Enter</span> devam
             </span>
@@ -171,11 +188,20 @@ function landingHTML() {
   </div>`;
 }
 
+/**
+ * Kapanış ekranının önceliği tersti: "Bugün ekranına dön" ana buton, devam
+ * etme ikincildi — akış tam da terk edilmemesi gereken yerde çıkışı en kolay
+ * seçenek yapıyordu (18 Eylül 2026, kullanıcı talimatı). Şimdi devam etmek
+ * dolu/büyük buton; ekrandan çıkmak metin bağlantısına indirgendi ama
+ * KALDIRILMADI — kullanıcı her zaman çıkabilir, yalnız görsel ağırlık artık
+ * "devam et" tarafında. Başlık da "bitti" değil "durdu": akışın doğal bir
+ * sonu yok, bu yalnız bir mola.
+ */
 function closingHTML(run) {
   const acc = run.total ? Math.round((run.correct / run.total) * 100) : 0;
   const avg = run.total ? Math.round(run.durationSec / run.total) : 0;
   return `<div class="wrap-read">
-    <h1 class="page">Akış bitti</h1>
+    <h1 class="page">Akış durdu</h1>
     <p class="page-sub">${run.total} soru · ${Math.round(run.durationSec / 60)} dakika kesintisiz</p>
 
     <div class="grid grid-3" style="margin-bottom:1.5rem">
@@ -203,10 +229,10 @@ function closingHTML(run) {
       </p>
     </div>
 
-    <div class="btn-row">
-      <button class="btn" data-act="akim-start">Tekrar Başla</button>
-      <button class="btn btn-2" data-act="go-today">Bugün ekranına dön</button>
+    <div class="btn-row" style="margin-bottom:0.75rem">
+      <button class="btn" data-act="akim-start" style="font-size:1rem;padding:0.85rem 1.6rem">Akışa Devam Et</button>
     </div>
+    <button class="btn-link" data-act="go-today">Bugün ekranına dön</button>
   </div>`;
 }
 
@@ -382,7 +408,8 @@ export function next() {
 
 function refill() {
   if (A.queue.length >= FLOW_REFILL_AT) return;
-  const f = flowFeed();
+  const f = flowFeed(FLOW_BATCH, A.scope, { blockedSubjects: A.blockedSubjects });
+  (f.blockedThisCall || []).forEach(id => A.blockedSubjects.add(id));
   for (const q of f.questions) {
     if (!A.usedIds.has(q.id)) { A.queue.push(q); A.usedIds.add(q.id); }
   }
