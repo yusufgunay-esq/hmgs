@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    data.js — VERİ ERİŞİM KATMANI VE İNDEKSLER
    topics.js / questions.js global sabitleri okur, tek seferde indeksler.
    O(n) tam tarama yerine hazır Map'ler.
@@ -328,15 +328,43 @@ export function integrity() {
   return rep;
 }
 
+/* ==========================================================================
+   HEDEF VE KATMAN
+   ----------------------------------------------------------------------
+   examTarget iki etiket taşıyor: 'hmgs_core' (3.257 soru) ve 'hmgs' (30 AI
+   sorusu). İkisi de HMGS havuzudur; `=== 'hmgs_core'` karşılaştırması 30 AI
+   sorusunu sessizce eliyordu. Tek ölçüt aşağıdaki isCoreTarget'tır.
+
+   Katman (tier) ise sınav YAKINLIĞIDIR, zorluk değil:
+     1 = gerçek HMGS çıkmış   (category 'Çıkmış Sorular', 460 soru)
+     2 = HMGS benzeri         (AI üretimi: source ai_* / id hmgsai_, 190 soru)
+     3 = hâkimlik-savcılık bankası (kalan ~2.827 soru; HMGS'den daha derin,
+         tali fıkra ve içtihat sorar — sınavın ölçtüğü düzeyin üstü)
+   Soru seçimi bu sıraya göre yapılır (engine.js: candidatesOf). Sıra SET
+   İÇİNDE uygulanmaz: sınav da soruları kaynağına göre sıralamaz.
+   ========================================================================== */
+export const TIER_REAL = 1, TIER_AI = 2, TIER_ADV = 3;
+
+export function tierOf(q) {
+  if (!q) return TIER_ADV;
+  if (q.category === 'Çıkmış Sorular') return TIER_REAL;
+  const src = String(q.source || '');
+  if (/^(ai_|hmgsai)/i.test(src) || String(q.id).startsWith('hmgsai_')) return TIER_AI;
+  return TIER_ADV;
+}
+
+/** Soru HMGS havuzunda mı? 'hmgs_core' ve 'hmgs' aynı havuzdadır. */
+export const isCoreTarget = q => !!q && String(q.examTarget || '').startsWith('hmgs');
+
 export const topicsOf = id => topicsBySubject.get(id) || [];
 export const questionsOf = (id, scope = 'all') => {
   const list = questionsBySubject.get(id) || [];
-  if (scope === 'core') return list.filter(q => q.examTarget === 'hmgs_core');
+  if (scope === 'core') return list.filter(isCoreTarget);
   return list;
 };
 export const questionsOfTopic = (id, scope = 'all') => {
   const list = questionsByTopic.get(id) || [];
-  if (scope === 'core') return list.filter(q => q.examTarget === 'hmgs_core');
+  if (scope === 'core') return list.filter(isCoreTarget);
   return list;
 };
 export const questionsOfTopics = (ids = [], scope = 'all') => {
@@ -345,7 +373,7 @@ export const questionsOfTopics = (ids = [], scope = 'all') => {
   for (const id of set) {
     const qs = questionsByTopic.get(id) || [];
     for (const q of qs) {
-      if (scope === 'all' || q.examTarget === 'hmgs_core') out.push(q);
+      if (scope === 'all' || isCoreTarget(q)) out.push(q);
     }
   }
   return out;
@@ -353,7 +381,7 @@ export const questionsOfTopics = (ids = [], scope = 'all') => {
 
 export function filterQuestions(pool, scope = 'core') {
   if (scope === 'all') return pool;
-  return pool.filter(q => q.examTarget === 'hmgs_core');
+  return pool.filter(isCoreTarget);
 }
 
 /** HMGS Benzeri (AI Üretimi) soruları döndürür. */
