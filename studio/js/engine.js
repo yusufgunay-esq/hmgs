@@ -64,7 +64,27 @@ export function reScheduleAsLogic(qId, flag = true) {
 }
 
 
-/** Bugün vadesi gelmiş (veya geçmiş) sorular. */
+/**
+ * Bir soru bu sayıda takıldıysa karma setin tekrar bloğunun ÖNÜNDEN çıkarılır.
+ *
+ * Neden: kuyruk vade tarihine göre sıralanınca 9 günde 36 → 200+ soruya çıkıyor;
+ * bir blok yalnız ~13 soru taşıyor. Üst üste yanlış yapılan soru her gün
+ * kuyruğun başında kalıp geri kalanı açlığa mahkûm ediyordu: ölçüm, due bloğunun
+ * 9 günde yalnız 36 FARKLI sorudan oluştuğunu ve aynı sorunun 2,9 kez döndüğünü
+ * gösterdi (kuyruğa takılı 14 soru). Eşikle: 83 farklı soru, 1,3 kez, takılı 0.
+ *
+ * Soru HAVUZDAN ÇIKMAZ: karma setin görülmemiş/inceleme kısmında yine gelir ve
+ * "Tekrarları çöz" seansında listenin başında durur. Kaybettiği tek şey, her
+ * gün ilk 13 slottan birini kalıcı işgal etme ayrıcalığıdır. 9 gün kala bu,
+ * tek bir soruyu ezberlemek yerine 100+ kural kalıbı görmek demektir.
+ */
+export const SRS_LEECH = 3;
+
+/**
+ * Bugün vadesi gelmiş (veya geçmiş) sorular — TAMAMI, leech filtresi YOK.
+ * Filtre karma setin tekrar bloğunda uygulanır (buildKarmaSet); "Tekrarları
+ * çöz" seansı bilinçli olarak takıldıklarını da gösterir.
+ */
 export function dueQuestions(now = new Date()) {
   const S = state();
   const out = [];
@@ -75,9 +95,24 @@ export function dueQuestions(now = new Date()) {
       if (q) out.push({ q, srs: r });
     }
   }
-  // En çok takılınan, en eski vadeli önce
-  out.sort((a, b) => (b.srs.lapses - a.srs.lapses) || (new Date(a.srs.dueAt) - new Date(b.srs.dueAt)));
+  /* SIRALAMA — EN ESKİ VADE ÖNCE.
+     Eskiden `lapses DESC` ile sıralanıyordu ("en çok takılınan önce"). Niyet
+     zayıflığa öncelik vermekti ama sonuç kuyruk tıkanmasıydı: en çok takılınan
+     soru her zaman ilk sırada kalıyor, hiç düşmüyor, arkasındaki 200 soru
+     hiç görünmüyordu. Vade sırası kuyruğu kendiliğinden döndürür — erken
+     takılan önce çıkar, bir tur sonra sıradaki gelir. */
+  out.sort((a, b) => new Date(a.srs.dueAt) - new Date(b.srs.dueAt));
   return out;
+}
+
+/** Tekrar kuyruğuna takılıp öne çıkma ayrıcalığını yitiren sorular. */
+export function leechQuestions() {
+  const S = state();
+  return Object.entries(S.srs)
+    .filter(([, r]) => (r.lapses || 0) >= SRS_LEECH)
+    .map(([qId, r]) => ({ q: questionById.get(qId), srs: r }))
+    .filter(d => d.q)
+    .sort((a, b) => b.srs.lapses - a.srs.lapses);
 }
 
 /** Hiç görülmemiş sorular (bir derste veya genelde). */
@@ -457,19 +492,40 @@ export const KARMA_SERVE_PER_EXAMQ = 8;
 /** Bir sette en fazla kaç derse edinim bloğu verilir. */
 export const KARMA_MAX_BLOCKS = 2;
 /**
- * Set içindeki katman dağılımı (toplam 1). KARAR, ölçüm değil — ama ölçüme
- * dayanır: havuzun katman kompozisyonu %17 gerçek / %7 benzeri / %76 hâkimlik.
- * Kota olmasaydı sıralama tek başına çalışır, "en iyi katman her zaman kazanır"
- * ve alt katmanlar HİÇ görünmezdi (ölçüldü: kota olmadan %100 T1).
+ * KATMAN POLİTİKASI — sabit oran YOK, tam sıra var (kullanıcı kararı, 18 Eyl 2026).
  *
- *   T1 gerçek HMGS %45 — sınavın kendi dili ve düzeyi; ÖSYM kalıbı tekrar ediyor
- *                        (kadı yardımcıları sorusu iki sınavda aynı beş şıkla)
- *   T2 HMGS benzeri %25 — ölçülen biçim kota tablosuyla üretilmiş sorular
- *   T3 hâkimlik    %30 — HMGS'den DAHA ZOR; derinlik antrenmanı. Havuzun %76'sı
- *                        ama kota olmadan seti ele geçiriyordu (eski davranış).
- * Kullanıcı iki sınavı birlikte çözüyor; T3 bu yüzden sıfırlanmaz, kısılır.
+ *   TIER_PRIORITY = [1, 2, 3]  →  HMGS önce, hâkimlik SONRA.
+ *
+ * Sıra candidatesOf içinde uygulanır:
+ *   görülmemiş T1 → görülmemiş T2 → takılınan T1 → takılınan T2 → T3
+ *
+ * Neden sabit oran kaldırıldı: bir tur "%45 T1 / %25 T2 / %30 T3" kotası
+ * denendi. Ölçüm, bu kotanın gereksiz olduğunu gösterdi — 650 HMGS sorusu
+ * (T1 460 + T2 190) 9 gün × 45 = 405 soruyu ZATEN karşılıyor. Kota T3'e
+ * erkenden yer açıp sınavın kendi düzeyinden çalıyordu.
+ *
+ * Hâkimlik havuzu (2.105) kaybolmaz: yalnız dersin HMGS havuzu tükendiğinde
+ * (vergi_usul gibi ince derslerde) devreye girer ve havuzdan hiç çıkmaz.
  */
-export const KARMA_TIER_MIX = { 1: 0.45, 2: 0.25, 3: 0.30 };
+export const TIER_PRIORITY = [1, 2, 3];
+/**
+ * SET İÇİ KATMAN PAYI — T1 > T2 > T3 (kullanıcı kararı, 18 Eyl 2026).
+ *
+ *   T1 gerçek HMGS çıkmış   %70  — sınavın kendi dili, biçimi ve düzeyi
+ *   T2 HMGS benzeri (AI)    %20  — aynı biçimle üretilmiş, ikinci sırada
+ *   T3 hâkimlik bankası     %10  — BAŞKA bir sınav; derinlik antrenmanı,
+ *                                  sınavın kendi düzeyinin üstünde
+ *
+ * Sıra önemli: T2 T3'ten FAZLA. Önceki turda T3 tabanı T2'yi ezip %0,7'ye
+ * düşürmüştü (T3 %10,9) — yanlış sıralama. Hâkimlik ayrı bir sınavdır;
+ * HMGS benzeri sorular HMGS'nin ta kendisidir, önce onlar gelir.
+ *
+ * Paylar `secByTier` ile SET GENELİNDE tutulur (küresel açık giderme):
+ * her dersin kotası, hedef orana göre en geride kalmış katmandan doldurulur.
+ * Sabit oran gibi görünür ama ders havuzu yetmediğinde kendiliğinden kayar —
+ * örn. `vergi_usul`ün HMGS havuzu 5 soru olduğu için orada T3 devreye girer.
+ */
+export const KARMA_TIER_MIX = { 1: 0.70, 2: 0.20, 3: 0.10 };
 
 /** Ders bazında ham cevap sayacı: { seen, correct }. */
 function subjectCounts() {
@@ -528,21 +584,27 @@ export function karmaGaps() {
 }
 
 /**
- * Bir dersten seçilebilir sorular — KATMAN SIRASINA GÖRE.
+ * Bir dersten seçilebilir sorular — SINAV YAKINLIĞINA GÖRE.
  *
- * Katman sınav YAKINLIĞIDIR (data.js tierOf):
- *   1 gerçek HMGS çıkmış · 2 HMGS benzeri (AI) · 3 hâkimlik bankası
+ * Katman (data.js tierOf) sınav yakınlığıdır, zorluk değil:
+ *   1 gerçek HMGS çıkmış (460) · 2 HMGS benzeri AI (190) · 3 hâkimlik bankası (2.105)
  *
- * Sıra: önce hiç görülmemişler, sonra takılınanlar. Her iki grupta da
- * T1 → T2 → T3. Katmanın İÇİ karıştırılır, katmanlar arası sıra korunur.
+ * ÖNCELİK SIRASI — "HMGS önce, hâkimlik sonra":
+ *   (1) görülmemiş T1   (2) görülmemiş T2      ← sınavın kendi dili ve biçimi
+ *   (3) takılınan T1    (4) takılınan T2       ← HMGS tekrarı (acil olanı due bloğu alır)
+ *   (5) görülmemiş T3   (6) takılınan T3       ← hâkimlik; HMGS tükendiğinde devreye girer
  *
- * Neden böyle: 460 gerçek + 190 benzeri soru, ~2.075 hâkimlik sorusunun
- * içinde eriyordu; gerçek HMGS sorusu gelme olasılığı %17'ydi. Hâkimlik
- * bankası HMGS'den daha derin sorar (tali fıkra, içtihat); sınavın ölçtüğü
- * düzeyin üstünde soru çözmek, sınavın ölçtüğü düzeyi çalıştırmaz.
+ * Neden T3 en sonda: 650 HMGS sorusu 9 gün × 45 = 405 soruya yetiyor (ölçüldü: toplam
+ * setin ~%99'u T1+T2 olur, T3 yalnız HMGS havuzu ince olan derslerde — vergi_usul gibi —
+ * görünür). Hâkimlik bankası HMGS'den daha derin sorar; sınavın ölçtüğü düzeyin üstünde
+ * soru çözmek o düzeyi çalıştırmaz. T3 havuzdan ÇIKMAZ, yalnız sıranın sonundadır.
  *
- * Sıra SET İÇİNDE uygulanmaz (interleave karıştırır): sınav da soruları
- * kaynağına göre sıralamaz. T1+T2 tükendiğinde (650 soru) T3'e geçilir.
+ * 🔴 ESKİ HATA: `byTier(unseen).concat(byTier(shaky))` idi → görülmemiş HÂKİMLİK
+ * soruları, yanlış yapılmış GERÇEK HMGS sorusundan önce geliyordu. Sıra artık
+ * (katman, tür) çiftiyle kurulur; katmanın İÇİ karıştırılır, katmanlar arası sıra korunur.
+ *
+ * Sıra SET İÇİNDE uygulanmaz (interleave karıştırır): sınav da soruları kaynağına
+ * göre sıralamaz, "hangi kuralın uygulanacağını seçmek" işin yarısıdır.
  */
 function candidatesOf(subjectId, excludeIds, scope = 'core') {
   const S = state();
@@ -551,40 +613,38 @@ function candidatesOf(subjectId, excludeIds, scope = 'core') {
   if (!pool.length && scope === 'core') {
     pool = questionsOf(subjectId, 'all').filter(q => !excludeIds.has(q.id));
   }
-  const unseen = [], shaky = [];
-  for (const q of pool) {
-    if (!seenIds.has(q.id)) { unseen.push(q); continue; }
-    const r = S.srs[q.id];
-    // Mezun olmuş ya da kutusu ilerlemiş ve vadesi gelmemiş soruyu tekrar sormayız.
-    if (r && r.box >= 2) continue;
-    shaky.push(q);
-  }
-  return byTier(unseen).concat(byTier(shaky));
-}
-
-/** Katmana göre grupla, katman sırasını koru; katmanın içini karıştır. */
-function byTier(list) {
-  if (list.length < 2) return list;
+  // Anahtar: katman*10 + tür (1 görülmemiş, 2 takılınan). Küçük anahtar önce gelir.
   const kova = new Map();
-  for (const q of list) {
-    const t = tierOf(q);
-    if (!kova.has(t)) kova.set(t, []);
-    kova.get(t).push(q);
+  for (const q of pool) {
+    let tur = 1;
+    if (seenIds.has(q.id)) {
+      const r = S.srs[q.id];
+      // Mezun olmuş ya da kutusu ilerlemiş ve vadesi gelmemiş soruyu tekrar sormayız.
+      if (r && r.box >= 2) continue;
+      tur = 2;
+    }
+    const key = tierOf(q) * 10 + tur;
+    if (!kova.has(key)) kova.set(key, []);
+    kova.get(key).push(q);
   }
   const out = [];
-  for (const t of [...kova.keys()].sort((a, b) => a - b)) out.push(...shuffle(kova.get(t)));
+  for (const key of [...kova.keys()].sort((a, b) => a - b)) out.push(...shuffle(kova.get(key)));
   return out;
 }
 
 /**
- * Bir dersin kotasını katmanlar arasında dağıt.
+ * Bir dersin kotasını katmanlar arasında KARMA_TIER_MIX'e göre dağıt.
  *
- * Yöntem: KÜRESEL AÇIK GİDERME. Her soru için, set genelinde hedef oranına
- * göre "en geride kalmış" katman seçilir. `want` 1-2 olsa bile doğru çalışır
+ * Yöntem: KÜRESEL AÇIK GİDERME. Her soru için, set genelinde hedef orana göre
+ * "en geride kalmış" katman seçilir. `want` 1-2 olsa bile doğru çalışır
  * (en büyük-kalan yöntemi küçük sayılarda sapıyordu: want=1 her zaman T1'e
  * gidiyordu ve ölçümde setin %65'i T1 oluyordu).
  *
- * @param {Array} list  o dersin adayları, katman sırasına göre dizili (T1→T3)
+ * Havuz yetmezse kendiliğinden kayar: o katmanda aday kalmazsa döngü bir
+ * sonraki en aç katmanı seçer. `vergi_usul`ün HMGS havuzu 5 soru olduğu için
+ * orada T3 devreye girer — istenen davranış.
+ *
+ * @param {Array} list  o dersin adayları, öncelik sırasına dizili (T1→T2→T3)
  * @param {number} want alınacak soru sayısı
  * @param {{hedef:Object, alindi:Object, toplam:number}} sayac set geneli sayaç
  */
@@ -603,10 +663,10 @@ function secByTier(list, want, sayac) {
   const out = [];
   while (out.length < want) {
     let en = null, enSkor = -Infinity;
-    for (const t of [1, 2, 3]) {
+    for (const t of TIER_PRIORITY) {
       const aday = (kova.get(t) || []).filter(q => !alinan.has(q.id));
       if (!aday.length) continue;
-      // Hedeflenen sayı - alınan sayı. En büyük açık kaz.. (eşitlikte T1 önce)
+      // Hedeflenen sayı - alınan sayı (eşitlikte T1 önce gelir).
       const skor = (sayac.hedef[t] || 0) * sayac.toplam - (sayac.alindi[t] || 0);
       if (skor > enSkor) { enSkor = skor; en = t; }
     }
@@ -616,7 +676,7 @@ function secByTier(list, want, sayac) {
     out.push(q); alinan.add(q.id);
     sayac.alindi[en] = (sayac.alindi[en] || 0) + 1;
   }
-  // Hiçbir katmanda aday kalmadıysa katman sırasını bozma, eldekini ver.
+  // Hiçbir katmanda aday kalmadıysa öncelik sırasını bozma, eldekini ver.
   if (out.length < want) {
     for (const q of list) {
       if (out.length >= want) break;
@@ -688,10 +748,18 @@ export function buildKarmaSet(count = 20, scope = 'core') {
   // Burada katman sırası BİLİNÇLİ olarak uygulanmaz. Yanlış yaptığın zor (T3)
   // soru, tam da tekrar edilmesi gereken sorudur; onu "sonra" demek hatayı
   // öteler. Seti T3'ün ele geçirmesine karşı koruma zaten var: bu blok setin
-  // en fazla %30'udur (KARMA_DUE_SHARE) ve dueQuestions "en çok takılınan, en
-  // eski vade" sırasıyla verir — inceleme için doğru sinyal budur.
+  // en fazla %30'udur (KARMA_DUE_SHARE) ve dueQuestions "en eski vade" sırasıyla
+  // verir — inceleme için doğru sinyal budur.
+  //
+  // LEECH: 3+ kez takılan soru bu bloğun önünden çıkarılır. Kuyruk 9 günde
+  // 36 → 200+ soruya çıkıyor, blok yalnız ~13 taşıyor; takılı soru öne çıkma
+  // ayrıcalığını korursa kuyruğun gerisi hiç görünmez (ölçüldü: aynı 36 soru
+  // 2,9 kez dönüyordu). Soru havuzdan çıkmaz — görülmemiş kısmında ve
+  // "Tekrarları çöz" seansında yine gelir.
   const dueCap = Math.floor(count * KARMA_DUE_SHARE);
-  const due = dueQuestions().slice(0, dueCap);
+  const due = dueQuestions()
+    .filter(d => (d.srs.lapses || 0) < SRS_LEECH)
+    .slice(0, dueCap);
   due.forEach(d => { used.add(d.q.id); });
   const dueGroups = due.map(d => ({ subjectId: d.q.subjectId, items: [d.q], block: false }));
 
@@ -704,7 +772,8 @@ export function buildKarmaSet(count = 20, scope = 'core') {
   let deficit = 0;
   let blocksLeft = KARMA_MAX_BLOCKS;
   // Katman payı SET GENELİNDE tutulur: her dersin kotası, set için hedeflenen
-  // orana göre "en geride kalmış" katmandan doldurulur (secByTier).
+  // T3 (hâkimlik) payı SET GENELİNDE tutulur: her dersin kotası, T1>T2>T3
+  // oranına göre "en geride kalmış" katmandan doldurulur (secByTier).
   const sayac = { hedef: KARMA_TIER_MIX, alindi: { 1: 0, 2: 0, 3: 0 }, toplam: Math.max(1, remaining) };
   // Ağırlığı yüksek ders önce seçilsin ki edinim bloğu en çok gereken derse gitsin.
   rows.sort((a, b) => b.weight - a.weight);
