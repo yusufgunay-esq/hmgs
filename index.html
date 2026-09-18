@@ -5530,6 +5530,67 @@ function convertPendingStudioSessions(pending) {
 }
 
 /**
+ * Stüdyo'daki 120 soruluk denemeleri `denemeler[]`e çevirir (18 Eylül 2026).
+ * Daha önce denemeler hiç otomatik senkronize edilmiyordu — kullanıcı Stüdyo'da
+ * "Takip Uygulamasına Aktar (Kopyala)" ile panoya kopyalayıp burada elle
+ * yapıştırmak zorundaydı (`importFromStudioClipboard` → `applyStudioImportData`,
+ * o da yalnız formu ÖN DOLDURUR, "Kaydet"e basmak hâlâ gerekirdi). Bu fonksiyon
+ * o adımı atlar: `convertPendingStudioSessions` ile AYNI desen — kuyruktaki her
+ * denemeyi doğrudan `denemeler[]`e yazar, `studioExamId` üzerinden idempotenttir
+ * (aynı deneme iki kez eklenmez).
+ * @returns {boolean} en az bir yeni deneme eklendiyse true
+ */
+function convertPendingStudioExams(pending) {
+    if (!Array.isArray(pending) || !pending.length) return false;
+    let changed = false;
+
+    pending.forEach(ex => {
+        if (!ex || !ex.id) return;
+        if (denemeler.some(d => d.studioExamId === ex.id)) return; // zaten aktarılmış
+
+        const wrongAnalysis = [];
+        if (ex.byTopic) {
+            Object.entries(ex.byTopic).forEach(([, b]) => {
+                const w = (Number(b.total) || 0) - (Number(b.correct) || 0) - (Number(b.blank) || 0);
+                if (w > 0) {
+                    wrongAnalysis.push({
+                        subject: normalizeStudioSubject(b.subjectId),
+                        topic: b.topicId || 'Genel Konu',
+                        wrongCount: w,
+                        note: ''
+                    });
+                }
+            });
+        }
+
+        const isoDate = ex.at ? ex.at.split('T')[0] : new Date().toISOString().slice(0, 10);
+
+        const denemeItem = {
+            id: Date.now() + Math.floor(Math.random() * 100000),
+            studioExamId: ex.id,
+            title: ex.label || 'HMGS Stüdyo Denemesi',
+            date: fmtDate(isoDate),
+            isoDate,
+            totalQ: Number(ex.total) || 120,
+            correct: Number(ex.correct) || 0,
+            wrong: Number(ex.wrong) || 0,
+            empty: Number(ex.blank) || 0,
+            net: Number(ex.net) || 0,
+            notes: "Stüdyo'dan otomatik aktarıldı.",
+            wrongAnalysis
+        };
+        denemeler.unshift(denemeItem);
+        changed = true;
+    });
+
+    if (changed) {
+        denemeler.sort((a, b) => (b.isoDate || '').localeCompare(a.isoDate || ''));
+        localStorage.setItem('hmgs_denemeler', JSON.stringify(denemeler));
+    }
+    return changed;
+}
+
+/**
  * Geçmişte parçalanmış olarak kaydedilmiş Karma Test girişlerini geriye dönük
  * olarak tek bir bütüncül Karma Test kartında birleştirir.
  */
@@ -5869,12 +5930,20 @@ async function pullStudioQueue() {
         if (!dl.ok) return false;
         const queue = await dl.json();
         const sessions = Array.isArray(queue?.sessions) ? queue.sessions : [];
-        if (!sessions.length) return false;
+        // 18 Eylül 2026: denemeler de aynı dosyada — kullanıcı artık bunları
+        // elle kopyala/yapıştır yapmak zorunda değil (bkz. convertPendingStudioExams).
+        const exams = Array.isArray(queue?.exams) ? queue.exams : [];
+        if (!sessions.length && !exams.length) return false;
 
-        const added = convertPendingStudioSessions(sessions);
+        const addedSessions = sessions.length ? convertPendingStudioSessions(sessions) : false;
+        const addedExams = exams.length ? convertPendingStudioExams(exams) : false;
+        const added = addedSessions || addedExams;
         if (added) {
             renderLogs(); renderSubjectCards();
-            showToast("Stüdyo kuyruğundan yeni seanslar çalışma kaydına eklendi ✓", 'emerald');
+            if (addedExams) { renderDenemeler(); renderWeaknessHeatmap(); }
+            const what = addedSessions && addedExams ? 'seans ve denemeler'
+                : addedExams ? 'denemeler' : 'seanslar';
+            showToast(`Stüdyo kuyruğundan yeni ${what} çalışma kaydına eklendi ✓`, 'emerald');
         }
         return added;
     } catch (e) {
@@ -8962,7 +9031,14 @@ async function importFromStudioClipboard() {
             try { text = await navigator.clipboard.readText(); } catch(e){}
         }
         
-        if (!text || !text.includes('HMGS_STUDIO_EXAM_EXPORT')) {
+        // 18 Eylül 2026: pano artık iki farklı Stüdyo türü taşıyabilir — deneme
+        // özeti (HMGS_STUDIO_EXAM_EXPORT) veya tek bir pratik/karma seansı
+        // (HMGS_STUDIO_SESSION_EXPORT, "Panoya kopyala" düğmesiyle eklendi çünkü
+        // yerel geliştirmede Stüdyo (8766) ve Takip (8000) farklı origin'de
+        // çalıştığından otomatik Drive/localStorage aktarımı sessizce geçemiyordu).
+        // İkisinden biri yoksa clipboard'ı yok say, elle yapıştırmaya düş.
+        const hasStudioMarker = text && (text.includes('HMGS_STUDIO_EXAM_EXPORT') || text.includes('HMGS_STUDIO_SESSION_EXPORT'));
+        if (!hasStudioMarker) {
             // Try fetching directly from local storage key 'hmgs_studio_v1'
             const studioStateRaw = localStorage.getItem('hmgs_studio_v1');
             if (studioStateRaw) {
@@ -8978,13 +9054,22 @@ async function importFromStudioClipboard() {
                 } catch(err){}
             }
 
-            const pasted = prompt("HMGS Stüdyo'dan kopyaladığınız istatistik metnini/JSON kodunu buraya yapıştırın:");
+            const pasted = prompt("HMGS Stüdyo'dan kopyaladığınız istatistik/seans metnini/JSON kodunu buraya yapıştırın:");
             if (!pasted) return;
             text = pasted;
         }
 
         const data = JSON.parse(text);
-        if (data.type === 'HMGS_STUDIO_EXAM_EXPORT' || data.source === 'HMGS_STUDIO') {
+        if (data.type === 'HMGS_STUDIO_SESSION_EXPORT') {
+            // Tek bir pratik/karma seansı — Drive kuyruğu ve localStorage kuyruğuyla
+            // AYNI, zaten test edilmiş dönüştürücüyü kullanır (studioSessionId
+            // üzerinden idempotent, mükerrer eklemez).
+            if (data.session && data.session.id) {
+                applyPendingStudioSessions([data.session]);
+            } else {
+                showToast("Geçersiz Stüdyo seans verisi", "rose");
+            }
+        } else if (data.type === 'HMGS_STUDIO_EXAM_EXPORT' || data.source === 'HMGS_STUDIO') {
             applyStudioImportData(data);
         } else {
             showToast("Geçersiz Stüdyo verisi", "rose");
