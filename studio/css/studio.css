@@ -660,9 +660,9 @@ body.in-session #view-akim.on {
 
 /* Soru Cevaplandığında: İki Sütun Yan Yana, Asla Taşmaz */
 .q-shell.answered {
-  max-width: 90rem;
-  grid-template-columns: minmax(0, 1.18fr) minmax(360px, 1fr);
-  gap: 1.5rem;
+  max-width: 92rem;
+  grid-template-columns: minmax(0, 1.05fr) minmax(380px, 1fr);
+  gap: 1.75rem;
   align-items: start;
   padding: 1rem 2rem;
 }
@@ -978,24 +978,31 @@ body.in-session #view-akim.on {
   border: 1px solid var(--line);
   background: var(--bg-raise);
   box-shadow: var(--shadow);
-  animation: fb-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: fb-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
 }
 @keyframes fb-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.feedback.ok { border-color: rgba(30,138,95,0.28); }
-.feedback.no { border-color: rgba(196,54,47,0.24); }
+.feedback.ok { border-color: rgba(30, 138, 95, 0.25); }
+.feedback.no { border-color: rgba(196, 54, 47, 0.22); }
 
 .fb-head {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.8rem 1.25rem;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.85rem 1.35rem;
   border-bottom: 1px solid var(--line);
   background: var(--bg-raise);
+}
+.fb-head-left {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
 }
 .fb-icon {
   flex: 0 0 auto;
@@ -1004,26 +1011,78 @@ body.in-session #view-akim.on {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 0.95rem;
-  font-weight: 700;
   background: var(--ok-soft);
   color: var(--ok);
+  transition: all 0.2s ease;
 }
-.feedback.no .fb-icon { background: var(--no-soft); color: var(--no); }
-.fb-head-text { flex: 1; min-width: 0; }
-.fb-verdict { font-size: 1.05rem; font-weight: 700; color: var(--ink); }
-.fb-correct { font-size: 0.88rem; color: var(--ink-2); margin-top: 0.1rem; }
-.fb-correct b { color: var(--accent); font-weight: 700; }
-.fb-time { flex: 0 0 auto; }
+.feedback.no .fb-icon {
+  background: var(--no-soft);
+  color: var(--no);
+}
+.fb-icon svg {
+  display: block;
+}
+.fb-head-info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.fb-verdict {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.feedback.ok .fb-verdict { color: var(--ok); }
+.feedback.no .fb-verdict { color: var(--no); }
+.fb-dot-sep {
+  color: var(--ink-3);
+  font-size: 0.9rem;
+  user-select: none;
+}
+.fb-correct {
+  font-size: 0.88rem;
+  color: var(--ink-2);
+}
+.fb-correct b {
+  color: var(--accent);
+  font-weight: 700;
+  font-family: var(--sans);
+}
+.fb-head-right {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+}
+.fb-time-pill {
+  font-family: var(--mono, monospace);
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 0.22rem 0.55rem;
+  border-radius: var(--r-s);
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  line-height: 1.2;
+}
+.fb-time-pill.slow {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: rgba(251, 191, 36, 0.28);
+}
 
 .fb-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 1.15rem 1.4rem;
-  font-size: 1.02rem;
-  line-height: 1.65;
+  padding: 1.25rem 1.45rem;
+  font-size: 0.98rem;
+  line-height: 1.7;
 }
 /* Zarif Apple tarzı kılcal kaydırma çubuğu */
 .fb-body::-webkit-scrollbar { width: 5px; }
@@ -1031,9 +1090,17 @@ body.in-session #view-akim.on {
 .fb-body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; }
 .fb-body::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
 
-.fb-body p { margin: 0 0 0.85rem; }
-.fb-body p:last-child { margin-bottom: 0; }
-.fb-body .fb-lead { color: var(--ink); }
+.fb-body p {
+  margin: 0 0 0.95rem;
+  color: var(--ink);
+}
+.fb-body p:last-child {
+  margin-bottom: 0;
+}
+.fb-body .fb-lead {
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
 
 .fb-list { list-style: none; margin: 0 0 0.85rem; padding: 0; }
 .fb-list:last-child { margin-bottom: 0; }
@@ -1064,6 +1131,41 @@ body.in-session #view-akim.on {
 .fb-line.is-correct .fb-letter { background: var(--ok-soft); color: var(--ok); }
 .fb-line.is-chosen-wrong .fb-letter { background: var(--no-soft); color: var(--no); }
 
+/* Metadata Şeridi (Mevzuat + Kaynak) */
+.fb-meta-strip {
+  margin-top: 1.25rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.fb-meta-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+}
+.fb-meta-label {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  padding: 0.1rem 0.4rem;
+  background: var(--bg-sunk);
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  line-height: 1.3;
+}
+.fb-meta-val {
+  color: var(--ink-2);
+  font-weight: 500;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
 .fb-basis-wrap {
   margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid var(--line);
   display: flex; align-items: center;
@@ -1074,14 +1176,108 @@ body.in-session #view-akim.on {
   padding: 0.25rem 0.6rem; border-radius: var(--r-s);
 }
 
-/* Pinned Alt Aksiyon Çubuğu: Daima görünür, sıfır kaydırma */
+/* Pinned Alt Aksiyon Çubuğu: İki Kademeli Hiyerarşi */
 .fb-actions {
   flex: 0 0 auto;
-  padding: 0.8rem 1.25rem 0.9rem;
+  padding: 0.95rem 1.35rem 0.95rem;
   border-top: 1px solid var(--line);
   background: var(--bg-raise);
-  display: flex; flex-direction: column; gap: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
+
+.fb-primary-action {
+  width: 100%;
+}
+.fb-primary-action .btn-next {
+  width: 100%;
+  height: 2.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: var(--r-m);
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+.fb-primary-action .btn-next:hover {
+  filter: brightness(1.08);
+}
+.fb-primary-action .btn-next:active {
+  transform: scale(0.995);
+}
+.fb-primary-action .kbd-pill {
+  font-family: var(--mono, monospace);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  line-height: 1.2;
+}
+
+.fb-secondary-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+  width: 100%;
+}
+.fb-secondary-actions .btn {
+  flex: 1;
+  height: 2.25rem;
+  padding: 0 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-radius: var(--r-s);
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.fb-secondary-actions .btn:hover {
+  background: var(--bg-hover, var(--line));
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.fb-secondary-actions .btn-logic {
+  color: var(--warn);
+  border-color: var(--warn-soft);
+}
+.fb-secondary-actions .btn-logic:hover {
+  background: var(--warn-soft);
+}
+.fb-secondary-actions .btn-kural.active {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.fb-secondary-actions .kbd,
+.fb-secondary-actions .kbd-hint {
+  font-family: var(--mono, monospace);
+  font-size: 0.68rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  background: var(--line);
+  color: var(--ink-3);
+  line-height: 1.1;
+}
+
+/* Geriye dönük .btn-row uyumu */
 .fb-actions .btn-row {
   display: flex; gap: 0.65rem; align-items: stretch;
   margin: 0 !important; width: 100%;
@@ -1091,7 +1287,6 @@ body.in-session #view-akim.on {
   height: 2.75rem; font-size: 0.94rem; font-weight: 600;
   border-radius: var(--r-m);
   background: var(--accent); color: #fff;
-  box-shadow: 0 2px 8px rgba(91, 91, 214, 0.25);
   transition: filter 0.15s ease, transform 0.1s ease;
 }
 .fb-actions .btn-row .btn:hover { filter: brightness(1.08); }
@@ -1101,15 +1296,16 @@ body.in-session #view-akim.on {
   padding: 0 1rem;
   background: var(--bg-sunk); color: var(--warn);
   border: 1px solid var(--warn-soft);
-  box-shadow: none;
 }
 .fb-actions .btn-row .btn-logic:hover { background: var(--warn-soft); }
+
 .fb-actions-meta {
   display: flex; justify-content: space-between; align-items: center;
-  font-size: 0.78rem; color: var(--ink-2); line-height: 1.4;
+  font-size: 0.77rem; color: var(--ink-3); line-height: 1.4;
+  padding-top: 0.1rem;
 }
 .fb-actions-meta .srs-note { color: var(--ink-2); font-weight: 500; }
-.fb-actions-meta .hint { margin: 0; color: var(--ink-3); font-size: 0.75rem; }
+.fb-actions-meta .hint { margin: 0; color: var(--ink-3); font-size: 0.74rem; }
 
 /* Kısa ekranlar (Dizüstü bilgisayar dikey çözünürlüğü <= 720px) için kompakt oranlar */
 @media (min-width: 768px) and (max-height: 720px) {
