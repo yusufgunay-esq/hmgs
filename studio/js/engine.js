@@ -160,18 +160,26 @@ function computeMastery(rows) {
   rows.forEach(r => lastByQ.set(r.qId, r)); // günlük kronolojik → son kazanır
   const last = [...lastByQ.values()];
 
-  const acc = last.filter(r => r.ok).length / last.length;
-  const medSec = median(last.map(r => r.ms / 1000).filter(s => s > 1 && s < 900));
+  // Mantıkla/cevaptan önce ipucu istenerek çözülen satır bağımsız bir "çözüm"
+  // değildir — SRS'te kutuyu ilerletmiyor (scheduleAfterAnswer, logicGuess),
+  // burada da doğruluk/hız ortalamasına girmez: yardım alınan yavaş bir satırı
+  // "otomatikleşme düştü" gibi okumak okuma süresini hız sanmak olur. Konu
+  // tamamen mantıkla geçildiyse "veri yok" deme, eldeki (kirli) veriyle ölç.
+  const clean = last.filter(r => !r.logicGuess);
+  const base = clean.length ? clean : last;
+
+  const acc = base.filter(r => r.ok).length / base.length;
+  const medSec = median(base.map(r => r.ms / 1000).filter(s => s > 1 && s < 900));
   const speed = medSec > 0 ? Math.min(1, TARGET_SEC / medSec) : 0;
   const score = acc * speed;
 
   let st;
-  if (last.length < 5) st = 'thin';                              // yeterli veri yok
+  if (base.length < 5) st = 'thin';                              // yeterli veri yok
   else if (acc >= 0.85 && medSec <= TARGET_SEC) st = 'auto';     // 🟢 otomatik
   else if (acc >= 0.70) st = 'aware';                            // 🟡 bilinçli
   else st = 'effort';                                            // 🔴 eforlu
 
-  return { state: st, score, acc, medianSec: medSec, n: last.length };
+  return { state: st, score, acc, medianSec: medSec, n: base.length };
 }
 
 export function subjectMastery(subjectId) {
@@ -430,11 +438,16 @@ export function nextAction() {
     why = gapLead + `Karışık set. Ders adı cevabı verene kadar gizli; sınavda da yazmıyor, hangi kuralın uygulanacağını kendin seçeceksin.`;
   }
 
+  // action şekli testlerle kilitli (kind:'karma', action.mode:'karma', action.count)
+  // — DEĞİŞTİRME. Sonsuz akışa geçiş main.js#runAction'da yapılıyor: aynı
+  // buildKarmaSet çıktısını akim.js'in kapanışsız kuyruğuna besliyor. Burada
+  // yalnız kullanıcının gördüğü metin sabit sayı değil "akış" çerçevesinde
+  // (18 Eylül 2026, kullanıcı talimatı: stüdyo kullanıcıyı flow'a atmalı).
   return {
     kind: 'karma',
-    title: `${count} soruluk karma set`,
+    title: 'Akışa gir',
     why,
-    cta: `Karma seti başlat (${count} soru)`,
+    cta: 'Akışı başlat',
     action: { view: 'practice', mode: 'karma', count },
     alts: buildAlts(['exam', 'review']).concat(
       gaps.length ? [{ label: `Kâğıtta kalan ${gaps.length} ders`, action: { view: 'progress' } }] : []
@@ -479,8 +492,16 @@ function buildAlts(kinds) {
 
 /** Setin en fazla bu kadarı vadesi gelen tekrar olur. */
 export const KARMA_DUE_SHARE = 0.30;
-/** Hiç açılmamış derste ilk temas kaç soruluk blok hâlinde verilir. */
-export const KARMA_ACQ_BLOCK = 4;
+/**
+ * Hiç açılmamış derste ilk temas kaç soruluk blok hâlinde verilir.
+ * KARMA_ACQ_THRESHOLD'a EŞİT olmalı (18 Eylül 2026, ölçüldü): 4 iken bir blok
+ * seen'i 4'e taşıyordu ama "fresh" sınırı 5'ti — blok dersi mezun ETMİYORDU,
+ * bir sonraki dolumda (akim.js refill, ~her 8-9 soruda bir) aynı ders yine
+ * "taze" sayılıp İKİNCİ bir blok alıyordu. 220 sorulu sıfırdan-başlangıç
+ * simülasyonunda (studio/test/_akim_sim.mjs) 10 ders 2-3 kez bloklandı.
+ * Blok = eşik olunca bir blok dersi tam mezun ediyor, ikinci blok gelmiyor.
+ */
+export const KARMA_ACQ_BLOCK = 5;
 /** Bu sayıdan az soru çözülmüş ders "henüz edinilmemiş" sayılır. */
 export const KARMA_ACQ_THRESHOLD = 5;
 /** Sınavdaki her soru için hedeflenen kapsam (kaç soru görülmeli). */
@@ -738,9 +759,24 @@ function interleave(groups) {
 
 /**
  * Karma set kur.
- * @returns {{questions:Array, plan:Array, due:number, gaps:Array}}
+ *
+ * @param {{blockedSubjects?:Set<string>}} opts  blockedSubjects: bu ID'lere
+ *   edinim bloğu VERİLMEZ (yine de ağırlıklı kotayla normal soru alırlar).
+ *   Neden gerekli: akim.js'in sonu olmayan kuyruğu her ~8 soruda bir bu
+ *   fonksiyonu YENİDEN çağırır (refill). "fresh" durumu S.answers'taki
+ *   CEVAPLANMIŞ sayıya bakar; bir bloğun 5 sorusu kuyrukta sıraya girip henüz
+ *   CEVAPLANMADIYSA ders hâlâ "taze" görünür ve bir sonraki dolumda İKİNCİ
+ *   bir blok alabilir — fonksiyon kendi başına buna kör. Ölçüldü (18 Eylül
+ *   2026, studio/test/_akim_sim.mjs, 220 soruluk akış): aynı ders 2-3 kez
+ *   bloklandı (borçlar, ceza, cmk, iş, vergi, milletlerarası, mohuk,
+ *   avukatlık, iyuk, hukuk felsefesi). Çağıran (akim.js) `blockedThisCall`
+ *   dönüşünü biriktirip bir sonraki çağrıya geri verir — oturum hafızası
+ *   burada değil çağıranda tutulur (motor durumsuz kalır, tek doğruluk
+ *   kaynağı ilkesi bozulmaz).
+ * @returns {{questions:Array, plan:Array, due:number, gaps:Array, blockedThisCall:string[]}}
  */
-export function buildKarmaSet(count = 20, scope = 'core') {
+export function buildKarmaSet(count = 20, scope = 'core', opts = {}) {
+  const alreadyBlocked = opts.blockedSubjects instanceof Set ? opts.blockedSubjects : new Set();
   const used = new Set();
   const picked = [];
 
@@ -771,6 +807,7 @@ export function buildKarmaSet(count = 20, scope = 'core') {
   const newGroups = [];
   let deficit = 0;
   let blocksLeft = KARMA_MAX_BLOCKS;
+  const blockedThisCall = [];
   // Katman payı SET GENELİNDE tutulur: her dersin kotası, set için hedeflenen
   // T3 (hâkimlik) payı SET GENELİNDE tutulur: her dersin kotası, T1>T2>T3
   // oranına göre "en geride kalmış" katmandan doldurulur (secByTier).
@@ -786,9 +823,10 @@ export function buildKarmaSet(count = 20, scope = 'core') {
     // Hiç açılmamış derste ilk temas blok hâlinde verilir; tek soru tahmine
     // döner. Ama set blok yığınına dönmesin diye set başına en fazla
     // KARMA_MAX_BLOCKS ders blok alır — yoksa "karma" adı altında yine
-    // ders ders çalışmış oluyoruz.
-    const block = r.fresh && !r.thin && blocksLeft > 0;
-    if (block) { want = Math.max(want, Math.min(KARMA_ACQ_BLOCK, r.pool)); blocksLeft--; }
+    // ders ders çalışmış oluyoruz. alreadyBlocked: bu dersin bloğu önceki bir
+    // dolumda ZATEN verildi (henüz cevaplanmamış olsa bile) — ikinci kez verme.
+    const block = r.fresh && !r.thin && !alreadyBlocked.has(r.id) && blocksLeft > 0;
+    if (block) { want = Math.max(want, Math.min(KARMA_ACQ_BLOCK, r.pool)); blocksLeft--; blockedThisCall.push(r.id); }
     const cands = secByTier(candidatesOf(r.id, used, scope), want, sayac);
     cands.forEach(q => used.add(q.id));
     if (cands.length < want) deficit += want - cands.length;
@@ -805,7 +843,7 @@ export function buildKarmaSet(count = 20, scope = 'core') {
     .map(([id, n]) => ({ id, name: (SUBJECTS.find(s => s.id === id) || {}).name || id, n }))
     .sort((a, b) => b.n - a.n);
 
-  return { questions: picked, plan, due: due.length, gaps: karmaGaps(), deficit };
+  return { questions: picked, plan, due: due.length, gaps: karmaGaps(), deficit, blockedThisCall };
 }
 
 /* ==========================================================================
@@ -851,8 +889,8 @@ export const FLOW_GAP_SEC = 8;
  * vadesi gelen SRS tekrarları önce, kalanı ölçülmüş sınav ağırlığına göre,
  * aynı ders yan yana gelmeden. Tek doğruluk kaynağı karma motorudur.
  */
-export function flowFeed(count = FLOW_BATCH, scope = 'core') {
-  return buildKarmaSet(count, scope);
+export function flowFeed(count = FLOW_BATCH, scope = 'core', opts = {}) {
+  return buildKarmaSet(count, scope, opts);
 }
 
 /**
