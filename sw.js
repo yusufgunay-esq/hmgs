@@ -4,7 +4,7 @@
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-const VERSION = 'hmgs-v46';
+const VERSION = 'hmgs-v47';
 const SHELL = VERSION + '-shell';
 
 // Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
@@ -31,9 +31,11 @@ const PRECACHE = [
   './studio/js/book-map.js',
   './studio/js/vault-client.js',
   './studio/js/kural.js',
+  './studio/js/legacy-adapt.js',
   './studio/js/pregel.js',
   './studio/js/kitap.js',
   './studio/js/kitaplar.js',
+  './studio/js/tuyolar.js',
   './studio/js/views/today.js',
   './studio/js/views/odevler.js',
   './studio/js/views/flow.js',
@@ -42,8 +44,10 @@ const PRECACHE = [
   './studio/js/views/akim.js',
   './studio/js/views/exam.js',
   './studio/js/views/progress.js',
+  './studio/js/gen/alacak_devri.js',
   './studio/js/gen/ciro.js',
   './studio/js/gen/ehliyet.js',
+  './studio/js/gen/gaiplik.js',
   './studio/js/gen/icra.js',
   './studio/js/gen/miras.js',
   'https://cdn.tailwindcss.com',
