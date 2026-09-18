@@ -6,7 +6,7 @@
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-import { esc, rich, richBlock, splitStem, fmtSec, emptyState, groupLegalRefs, $, toast } from '../ui.js';
+import { esc, rich, richBlock, stripEmoji, splitStem, fmtSec, emptyState, groupLegalRefs, $, toast } from '../ui.js';
 import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions, aiQuestions } from '../data.js';
 import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
 import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet, buildDeadlinesSet } from '../engine.js';
@@ -198,7 +198,6 @@ export function render() {
           </button>
           <span class="q-strip-subj" id="q-subj">${S.hideSubject ? '<span class="hint">ders gizli</span>' : esc(subjectName(q.subjectId))}</span>
           ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
-          ${q.sourceBadgeLabel ? `<span class="chip accent" style="font-size:0.75rem">${esc(q.sourceBadgeLabel)}</span>` : ''}
         </div>
         <div class="q-strip-center">
           <div class="q-progress-box">
@@ -316,7 +315,11 @@ function paintResult(q, chosen, row, sched, ms) {
 
   const slow = sec > TARGET_SEC;
   const verdict = row.ok ? 'Doğru' : (chosen === null ? 'Boş bıraktın' : 'Yanlış');
-  const icon = row.ok ? '✓' : (chosen === null ? '–' : '✕');
+  const svgCheck = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="4 10.5 8 14.5 16 5.5"></polyline></svg>`;
+  const svgCross = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><line x1="5" y1="5" x2="15" y2="15"></line><line x1="15" y1="5" x2="5" y2="15"></line></svg>`;
+  const svgDash = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><line x1="5" y1="10" x2="15" y2="10"></line></svg>`;
+  const icon = row.ok ? svgCheck : (chosen === null ? svgDash : svgCross);
+  const cleanSource = stripEmoji(q.sourceBadgeLabel);
 
   const logicBadgeHTML = row.ok ? `
     <button class="badge-logic" data-act="toggle-logic" id="badge-logic" title="Mantıkla çözdüm / Konu eksik (M)">
@@ -363,27 +366,42 @@ function paintResult(q, chosen, row, sched, ms) {
     fb.innerHTML = `
       <div class="feedback ${row.ok ? 'ok' : 'no'}">
         <div class="fb-head">
-          <span class="fb-icon">${icon}</span>
-          <div class="fb-head-text">
-            <div class="fb-verdict">${verdict}</div>
-            <div class="fb-correct">Doğru şık: <b>${esc(q.correct)}</b></div>
+          <div class="fb-head-left">
+            <span class="fb-icon">${icon}</span>
+            <div class="fb-head-info">
+              <span class="fb-verdict">${verdict}</span>
+              <span class="fb-dot-sep">·</span>
+              <span class="fb-correct">Doğru şık: <b>${esc(q.correct)}</b></span>
+            </div>
           </div>
-          ${logicBadgeHTML}${attentionBadgeHTML}
-          <span class="fb-time chip ${slow ? 'amber' : 'green'}">${fmtSec(sec)}${slow ? ` · hedef ${TARGET_SEC} sn` : ''}</span>
+          <div class="fb-head-right">
+            ${logicBadgeHTML}${attentionBadgeHTML}
+            <span class="fb-time-pill ${slow ? 'slow' : ''}" title="${slow ? `Hedef ${TARGET_SEC} sn aşıldı` : 'Zamanında cevaplandı'}">${fmtSec(sec)}</span>
+          </div>
         </div>
         <div class="fb-body">
           ${explanationHTML(q, chosen)}
           ${fastWrongHTML}
-          ${q.legalBasis ? `<div class="fb-basis-wrap"><span class="basis">${esc(q.legalBasis)}</span></div>` : ''}
+          ${(q.legalBasis || cleanSource) ? `
+          <div class="fb-meta-strip">
+            ${q.legalBasis ? `<div class="fb-meta-item"><span class="fb-meta-label">Mevzuat</span><span class="fb-meta-val">${esc(q.legalBasis)}</span></div>` : ''}
+            ${cleanSource ? `<div class="fb-meta-item"><span class="fb-meta-label">Kaynak</span><span class="fb-meta-val">${esc(cleanSource)}</span></div>` : ''}
+          </div>` : ''}
           <div class="kural-slot" id="kural-slot" hidden></div>
         </div>
         <div class="fb-actions">
-          <div class="btn-row">
-            <button class="btn" data-act="next">${isLast ? 'Seansı bitir' : 'Sonraki soru'}</button>
-            ${geminiBtnHTML}
-            ${logicBtnHTML}
-            ${kuralButtonHTML(q)}
+          <div class="fb-primary-action">
+            <button class="btn btn-primary btn-next" data-act="next">
+              <span>${isLast ? 'Seansı bitir' : 'Sonraki soru'}</span>
+              <span class="kbd-pill">Enter ↵</span>
+            </button>
           </div>
+          ${(geminiBtnHTML || logicBtnHTML || kuralButtonHTML(q)) ? `
+          <div class="fb-secondary-actions">
+            ${geminiBtnHTML}
+            ${kuralButtonHTML(q)}
+            ${logicBtnHTML}
+          </div>` : ''}
           <div class="fb-actions-meta">
             <span class="srs-note">${esc(sched.note)}</span>
             <span class="hint"><span class="kbd">Enter</span> devam${row.ok ? ' · <span class="kbd">M</span> mantık' : ''}${kuralButtonHTML(q) ? ' · <span class="kbd">K</span> kural' : ''} · <span class="kbd">G</span> Gemini</span>
@@ -435,10 +453,7 @@ function formatExplanationText(text) {
 function explanationHTML(q, chosen) {
   const text = q.explanation || 'Bu soru için gerekçeli açıklama henüz yazılmamış.';
   const formatted = formatExplanationText(text);
-  const badgeHTML = q.sourceBadgeLabel
-    ? `<div style="margin-bottom:0.6rem"><span class="chip accent" style="font-size:0.75rem">${esc(q.sourceBadgeLabel)}</span></div>`
-    : '';
-  return `${badgeHTML}<div class="fb-lead">${richBlock(formatted)}</div>`;
+  return `<div class="fb-lead">${richBlock(formatted)}</div>`;
 }
 
 function $$opts() { return [...document.querySelectorAll('#opts .opt')]; }
@@ -1017,7 +1032,7 @@ export function buildGeminiPrompt(q, stateArg = {}) {
   if (topic) L.push(`Konu: ${String(topic.title || '').replace(/^\s*\d+\.\s*/, '')}`);
   if (basis) L.push(`Konu dayanakları: ${basis}`);
   if (q.category === 'Çıkmış Sorular') {
-    L.push(`Kaynak: ${q.sourceBadgeLabel || 'çıkmış sınav sorusu'}`);
+    L.push(`Kaynak: ${stripEmoji(q.sourceBadgeLabel) || 'çıkmış sınav sorusu'}`);
   }
   L.push('');
   L.push('SORU');
