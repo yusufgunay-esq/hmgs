@@ -96,6 +96,62 @@ export function setActiveToken(token) {
   }
 }
 
+/**
+ * Onay ekranı AÇMADAN taze bir jeton ister (18 Eylül 2026).
+ *
+ * NEDEN GEREKLİ: paylaşılan jeton (`hmgs_gtoken`) ~1 saatte düşüyor.
+ * Kullanıcı GitHub Pages'te tek origin kullanıyor (Stüdyo ile Takip aynı
+ * adres) — yani paylaşım kendisi çalışıyor, sorun paylaşımda değil. Sorun:
+ * jeton düştüğünde Stüdyo'nun seans/deneme sonu otomatik gönderimi
+ * `getActiveToken()`in null dönmesiyle SESSİZCE pes ediyordu; hiçbir yerde
+ * yeniden istek denemiyordu (o adım sadece Takip'in kendi giriş ekranında
+ * vardı). Google Identity Services `prompt:''` ile çağrılırsa, kullanıcı bu
+ * origin'de daha önce Google'a bağlandıysa, POPUP AÇMADAN arka planda yeni
+ * jeton döner — tam da "otomatik gitmeli" için gereken şey.
+ *
+ * Kullanıcı hiç bağlanmamışsa ya da tarayıcı sessiz izni reddederse (ör.
+ * üçüncü taraf çerez engeli) `null` döner; bu durumda zorlanmaz, çağıran
+ * taraf normal "kuyrukta bekliyor" yoluna düşer. 5 sn'lik zaman aşımı var ki
+ * Google betiği yüklenmemişse ya da geri çağrı hiç tetiklenmezse arayan
+ * fonksiyon sonsuza dek asılı kalmasın.
+ */
+export function requestSilentToken() {
+  return new Promise(resolve => {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const finish = (token) => {
+      if (settled) return;
+      settled = true;
+      resolve(token);
+    };
+    const timer = setTimeout(() => finish(null), 5000);
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: resp => {
+          clearTimeout(timer);
+          if (resp && resp.access_token) {
+            setActiveToken(resp.access_token);
+            saveSharedToken(resp.access_token, resp.expires_in);
+            finish(resp.access_token);
+          } else {
+            finish(null);
+          }
+        },
+        error_callback: () => { clearTimeout(timer); finish(null); }
+      });
+      client.requestAccessToken({ prompt: '' });
+    } catch (e) {
+      clearTimeout(timer);
+      finish(null);
+    }
+  });
+}
+
 /** Drive kökündeki HMGS klasörünü bulur, yoksa oluşturur. */
 let hmgsFolderId = null;
 try { hmgsFolderId = localStorage.getItem(SHARED_FOLDER_KEY) || null; } catch (e) {}
@@ -356,13 +412,18 @@ const QUEUE_FILE_NAME = 'hmgs_studio_queue.json';
  * Takip tarafı `studioSessionId` üzerinden idempotent çevirdiği için aynı
  * seans iki kez çalışma kaydına dönmez.
  */
-export async function pushStudioQueueToDrive(token, sessions, answers = []) {
+export async function pushStudioQueueToDrive(token, sessions, answers = [], exams = []) {
   setActiveToken(token);
   try {
     const payload = JSON.stringify({
       generatedAt: new Date().toISOString(),
       sessions: Array.isArray(sessions) ? sessions : [],
-      answers: Array.isArray(answers) ? answers : []
+      answers: Array.isArray(answers) ? answers : [],
+      // 18 Eylül 2026: denemeler de aynı kuyruk dosyasına eklendi — daha önce
+      // Stüdyo'daki denemeler Drive'a hiç gitmiyordu, kullanıcı elle "panoya
+      // kopyala" yapmak zorundaydı. Takip tarafı `pullStudioQueue()` bu alanı
+      // okuyup `convertPendingStudioExams()` ile idempotent çeviriyor.
+      exams: Array.isArray(exams) ? exams : []
     }, null, 2);
 
     const found = await findSharedFile(QUEUE_FILE_NAME, token);
