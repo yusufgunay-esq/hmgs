@@ -7,7 +7,7 @@
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-import { esc, rich, richBlock, splitStem, fmtClock, emptyState, $, toast } from '../ui.js';
+import { esc, rich, richBlock, stripEmoji, splitStem, fmtClock, emptyState, $, toast } from '../ui.js';
 import { buildExamSet, buildAiExamSet, subjectName, SUBJECTS, topicById, pastExamList, pastExamQuestions } from '../data.js';
 import { recordAnswer, save, saveExam, state, EXAM_TOTAL, PASS_CORRECT } from '../store.js';
 import { scheduleAfterAnswer, scoreOf } from '../engine.js';
@@ -183,7 +183,6 @@ export function render() {
           <span>Soru ${E.i + 1} / ${E.questions.length}</span>
           <span>${esc(subjectName(q.subjectId))}</span>
           ${q.examTargetLabel ? `<span class="chip ${q.examTarget === 'hmgs_core' ? 'accent' : 'warn'}">${esc(q.examTargetLabel)}</span>` : ''}
-          ${q.sourceBadgeLabel ? `<span class="chip accent" style="font-size:0.75rem">${esc(q.sourceBadgeLabel)}</span>` : ''}
           ${q.difficulty && q.difficulty !== 'etiketsiz' ? `<span class="chip">${esc(q.difficulty)}</span>` : ''}
           <button class="btn btn-2 btn-s" data-act="exam-mark" style="margin-left:auto">
             ${E.marked.has(E.i) ? 'İşareti kaldır' : 'Sonra dön'}
@@ -460,7 +459,7 @@ function missesHTML(r) {
       <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.4rem">
         <span class="chip">${idx + 1}. ${esc(subjectName(m.subjectId))}</span>
         ${topic ? `<span class="chip" style="background:var(--accent-soft);color:var(--accent-ink);border:1px solid var(--line)">${esc(topic.title)}</span>` : ''}
-        ${m.sourceBadgeLabel ? `<span class="chip accent" style="font-size:0.75rem">${esc(m.sourceBadgeLabel)}</span>` : ''}
+        ${m.sourceBadgeLabel ? `<span class="chip" style="font-size:0.75rem;opacity:0.8">${esc(stripEmoji(m.sourceBadgeLabel))}</span>` : ''}
         <span class="chip ${m.chosen ? 'red' : 'amber'}">${m.chosen ? 'yanlış' : 'boş'}</span>
       </div>
       <div class="q-ask" style="font-size:0.92rem;font-weight:600">${rich(m.stem)}</div>
