@@ -17,6 +17,15 @@ export function esc(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/** Metindeki emojileri ve gereksiz boşlukları temizler (Anti-Emoji standardı). */
+export function stripEmoji(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** Kaynak metinlerdeki `backtick` ve **kalın** işaretlerini güvenle işaretlemeye çevirir. */
 export function rich(s) {
   const out = esc(s);
@@ -60,13 +69,21 @@ export function richBlock(s) {
   for (let l of rawLines) {
     l = l.trim();
     if (!l) continue;
-    // Eğer satır çok uzun (>200 karakter) ve bir şık/madde başlangıcı değilse, güvenli cümle sonlarından böl
-    if (l.length > 200 && !l.match(/^(?:[A-Ea-e]\)|\d+[.)]|[-•*]|(?:I{1,3}|IV|V|VI{0,3}|IX|X)\.)/)) {
-      const parts = l.replace(/(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ])/g, '\n\n').split(/\n/);
-      for (const p of parts) {
-        const pt = p.trim();
-        if (pt) lines.push(pt);
+    // Eğer satır aşırı uzunsa (> 420 karakter) ve bir şık/madde başlangıcı değilse, dengeli cümle bloklarına ayır
+    if (l.length > 420 && !l.match(/^(?:[A-Ea-e]\)|\d+[.)]|[-•*]|(?:I{1,3}|IV|V|VI{0,3}|IX|X)\.)/)) {
+      const sentences = l.split(/(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ])/);
+      let cur = '';
+      for (const s of sentences) {
+        const pt = s.trim();
+        if (!pt) continue;
+        if (cur && (cur.length + pt.length > 320)) {
+          lines.push(cur);
+          cur = pt;
+        } else {
+          cur = cur ? cur + ' ' + pt : pt;
+        }
       }
+      if (cur) lines.push(cur);
     } else {
       lines.push(l);
     }
