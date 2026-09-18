@@ -131,11 +131,15 @@ export function render() {
   const srs = srsSummary();
   const rep = integrity();
   const answers = S.answers;
+  // Doğruluk % ve medyan süre "net çözme" performansını ölçer; mantıkla/
+  // ipucuyla (cevaptan önce) çözülen satırlar bu ikisine karışmaz — toplam
+  // hacim (totalSolved) yine hepsini sayar, o bir aktivite ölçüsü.
+  const cleanAnswers = answers.filter(a => !a.logicGuess);
 
   const totalSolved = answers.length;
-  const totalCorrect = answers.filter(a => a.ok).length;
-  const acc = totalSolved ? Math.round((totalCorrect / totalSolved) * 100) : 0;
-  const times = answers.map(a => a.ms / 1000).filter(s => s > 1 && s < 900).sort((x, y) => x - y);
+  const totalCorrect = cleanAnswers.filter(a => a.ok).length;
+  const acc = cleanAnswers.length ? Math.round((totalCorrect / cleanAnswers.length) * 100) : 0;
+  const times = cleanAnswers.map(a => a.ms / 1000).filter(s => s > 1 && s < 900).sort((x, y) => x - y);
   const med = times.length ? times[Math.floor(times.length / 2)] : 0;
 
   host.innerHTML = `
