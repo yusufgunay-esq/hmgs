@@ -2211,3 +2211,137 @@ table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 }
 
+/* ==========================================================================
+   MOLA PERDESİ VE BLOK ŞERİDİ (seans.js)
+   Mola bir yazı değil, bir durak: perde açıkken soru saati durur ve o süre
+   seansın verimlilik oranına yazılmaz.
+   ========================================================================== */
+
+.blok-serit {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  z-index: 60;
+  background: var(--line);
+  pointer-events: none;
+}
+.blok-serit > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  opacity: 0.55;
+  transition: width 0.4s linear, background-color 0.3s, opacity 0.3s;
+}
+/* Boşta yakalandı: şerit ilerlemiyor, rengi soluyor. */
+.blok-serit.bosta > i { opacity: 0.2; }
+/* Blok doldu, sıradaki soruda mola başlayacak. */
+.blok-serit.dolu > i { background: var(--warn); opacity: 0.9; }
+
+.mola-perde {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: mola-gir 0.28s ease-out;
+}
+@keyframes mola-gir { from { opacity: 0; } to { opacity: 1; } }
+
+body.molada { overflow: hidden; }
+
+.mola-kart {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  padding: 2.5rem 1.75rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg-raise);
+  box-shadow: var(--shadow);
+}
+.mola-ikon {
+  font-size: 1.9rem;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 0.6rem;
+}
+.mola-baslik {
+  margin: 0 0 0.4rem;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.mola-alt {
+  margin: 0 auto 1.4rem;
+  max-width: 34ch;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.mola-saat {
+  font-variant-numeric: tabular-nums;
+  font-size: 3rem;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+.mola-kart.doldu .mola-saat { color: var(--ok); }
+.mola-not {
+  margin: 0 auto 1.6rem;
+  max-width: 32ch;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+.mola-dugmeler {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  align-items: stretch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mola-perde { animation: none; }
+  .blok-serit > i { transition: none; }
+}
+
+.mola-ayar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--line);
+}
+.mola-ayar-k {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-right: 0.3rem;
+}
+.mola-chip {
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.mola-chip:hover { background: var(--bg-hover); }
+.mola-chip.secili {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
