@@ -18,6 +18,7 @@
 import { esc, rich, richBlock, splitStem, fmtSec, $, toast } from '../ui.js';
 import { subjectName, topicById } from '../data.js';
 import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
+import * as seans from '../seans.js';
 import {
   scheduleAfterAnswer, reScheduleAsLogic, flowFeed, flowReinforce, flowScore, flowMilestone,
   FLOW_REFILL_AT, FLOW_REINFORCE_DELAY, FLOW_BATCH
@@ -68,6 +69,8 @@ export function start(opts = {}) {
     geminiAskedPreAnswer: false
   };
 
+  seans.begin({ mode: 'flow', label: A.label });
+
   for (const q of f.questions) {
     if (!A.usedIds.has(q.id)) { A.queue.push(q); A.usedIds.add(q.id); }
   }
@@ -107,6 +110,10 @@ export function render() {
   const { premise, ask } = splitStem(q.stem);
   const topic = q.topicId ? topicById.get(q.topicId) : null;
   const meter = flowScore();
+  // "Mola ver" bu dosyadan önce yalnız bir etiketti, hiçbir şeyi durdurmuyordu.
+  // Artık gerçek bir mola öneriyor: bayrak kalkar, mola sıradaki soru
+  // sınırında başlar (soru ortasında kesilmez).
+  if (meter.label === 'Mola ver' && meter.n >= 5) seans.suggestBreak('akis');
 
   host.innerHTML = `
     <div class="q-screen">
@@ -152,7 +159,7 @@ export function render() {
             <button class="btn btn-2 btn-s" data-act="akim-ask-gemini" title="Soruyu ve beş şıkkı ipucu istemi olarak kopyalar — doğru şık gönderilmez (G)">İpucu İste <span class="kbd">G</span></button>
             <button class="q-quit-link" data-act="akim-quit">Akışı bitir</button>
             <span class="hint">
-              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">G</span> Gemini · <span class="kbd">Enter</span> devam
+              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">G</span> yapay zeka · <span class="kbd">Enter</span> devam
             </span>
           </div>
           ${topic ? `<p class="hint q-topic-hint">Bağlı konu: ${esc(topic.title)}</p>` : ''}
@@ -163,6 +170,7 @@ export function render() {
 
   if (!A.answered) {
     A.qStart = performance.now();
+    seans.qBegin();
     startTick();
   } else {
     // Dönüşte (örn. başka görünüme gidip gelince) cevabı yeniden çiz, soruyu
@@ -244,7 +252,7 @@ function startTick() {
     if (!A || A.answered) return;
     const el = $('#q-timer');
     if (!el) return;
-    const sec = (performance.now() - A.qStart) / 1000;
+    const sec = seans.qElapsed() / 1000;
     el.textContent = fmtSec(sec);
     el.classList.toggle('slow', sec > TARGET_SEC);
   }, 250);
@@ -256,11 +264,12 @@ function stopTick() { if (tick) { clearInterval(tick); tick = null; } }
 export function pick(key) {
   if (!A || A.answered) return;
   const q = A.queue[0];
-  const ms = performance.now() - A.qStart;
+  const t = seans.qEnd();
+  const ms = t.ms;
   A.answered = true;
   stopTick();
 
-  const row = recordAnswer(q, key, ms, 'flow', { usedElim: A.elimUsed, askedGemini: A.geminiAsked });
+  const row = recordAnswer(q, key, ms, 'flow', { usedElim: A.elimUsed, askedGemini: A.geminiAsked, rawMs: t.rawMs, idleMs: t.idleMs });
   const sched = scheduleAfterAnswer(q.id, row.ok, A.geminiAskedPreAnswer);
   save();
   A.log.push({ ...row, sched, q });
@@ -270,11 +279,12 @@ export function pick(key) {
 export function dontKnow() {
   if (!A || A.answered) return;
   const q = A.queue[0];
-  const ms = performance.now() - A.qStart;
+  const t = seans.qEnd();
+  const ms = t.ms;
   A.answered = true;
   stopTick();
 
-  const row = recordAnswer(q, null, ms, 'flow', { usedElim: A.elimUsed, askedGemini: A.geminiAsked });
+  const row = recordAnswer(q, null, ms, 'flow', { usedElim: A.elimUsed, askedGemini: A.geminiAsked, rawMs: t.rawMs, idleMs: t.idleMs });
   const sched = scheduleAfterAnswer(q.id, false);
   save();
   A.log.push({ ...row, sched, q });
@@ -348,7 +358,7 @@ function paintResult(q, chosen, row, sched, ms) {
           </div>
           <div class="fb-actions-meta">
             <span class="srs-note">${esc(milestone || sched.note)}</span>
-            <span class="hint"><span class="kbd">Enter</span> devam${row.ok ? ' · <span class="kbd">M</span> mantık' : ''}${kuralButtonHTML(q) ? ' · <span class="kbd">K</span> kural' : ''} · <span class="kbd">G</span> Gemini</span>
+            <span class="hint"><span class="kbd">Enter</span> devam${row.ok ? ' · <span class="kbd">M</span> mantık' : ''}${kuralButtonHTML(q) ? ' · <span class="kbd">K</span> kural' : ''} · <span class="kbd">G</span> yapay zeka</span>
           </div>
         </div>
       </div>`;
@@ -358,7 +368,7 @@ function paintResult(q, chosen, row, sched, ms) {
   if (btnDontKnow) btnDontKnow.style.display = 'none';
   const qHint = document.querySelector('#q-actions .hint');
   if (qHint) {
-    qHint.innerHTML = `<span class="kbd">Enter</span> sonraki soru${row.ok ? ' · <span class="kbd">M</span> mantıkla geç' : ''} · <span class="kbd">G</span> Gemini`;
+    qHint.innerHTML = `<span class="kbd">Enter</span> sonraki soru${row.ok ? ' · <span class="kbd">M</span> mantıkla geç' : ''} · <span class="kbd">G</span> yapay zeka`;
   }
 
   $('#q-shell')?.classList.add('answered');
@@ -384,6 +394,8 @@ function $$opts() { return [...document.querySelectorAll('#opts .opt')]; }
 
 export function next() {
   if (!A || !A.answered) return;
+  // Mola soru ortasında başlamaz; blok dolduysa tam burada başlar.
+  if (seans.gate(() => next())) return;
   const done = A.queue.shift();
   const lastLog = A.log[A.log.length - 1];
 
@@ -486,6 +498,9 @@ function finalizeRun() {
   const done = A.log;
   const ok = done.filter(r => r.ok).length;
   const durationMs = done.reduce((a, b) => a + (b.ms || 0), 0);
+  // Akışın da duvar saati vardı ama hiç kaydedilmiyordu: startedAt alanı
+  // bile yoktu, seans "soru sürelerinin toplamı" kadar sanılıyordu.
+  const saat = seans.end() || {};
 
   const bySubject = {};
   done.forEach(r => {
@@ -496,11 +511,19 @@ function finalizeRun() {
 
   const result = {
     id: 'flow_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-    at: new Date().toISOString(),
+    at: saat.endedAt || new Date().toISOString(),
+    startedAt: saat.startedAt || new Date().toISOString(),
+    endedAt: saat.endedAt || new Date().toISOString(),
     isoDate: new Date().toISOString().slice(0, 10),
     mode: 'flow',
     label: 'Akış',
     durationMinutes: Math.round(durationMs / 60000),
+    wallMinutes: saat.wallMs != null ? Math.round(saat.wallMs / 60000) : null,
+    activeMinutes: saat.activeMs != null ? Math.round(saat.activeMs / 60000) : Math.round(durationMs / 60000),
+    breakMinutes: saat.breakMs != null ? Math.round(saat.breakMs / 60000) : 0,
+    idleMinutes: saat.idleMs != null ? Math.round(saat.idleMs / 60000) : null,
+    focusRatio: saat.focusRatio ?? null,
+    breaksTaken: saat.breaks ?? 0,
     total: done.length,
     correct: ok,
     wrong: done.length - ok,
