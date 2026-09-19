@@ -9,6 +9,7 @@
 import { esc, rich, richBlock, stripEmoji, splitStem, fmtSec, emptyState, groupLegalRefs, $, toast } from '../ui.js';
 import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions, aiQuestions, isCoreTarget } from '../data.js';
 import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
+import * as seans from '../seans.js';
 import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet, buildDeadlinesSet } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
 import { kuralButtonHTML } from '../kural.js';
@@ -122,6 +123,9 @@ export function startSession(opts = {}) {
     // Cevap VERİLMEDEN Gemini'ye sorulduysa ipucu alındı → SRS logicGuess gibi davranır
     geminiAskedPreAnswer: false
   };
+  // Seans saati burada başlar. Soru sürelerinin toplamı seansın süresi
+  // DEĞİLDİR; duvar saati, mola ve boşta geçen zaman ayrı tutulur (seans.js).
+  seans.begin({ mode, label });
   render();
   return true;
 }
@@ -133,6 +137,7 @@ function allQuestions() {
 export function hasSession() { return !!S && S.i < S.questions.length; }
 export function currentQuestion() { return S && S.questions ? S.questions[S.i] : null; }
 export function endSession() {
+  if (seans.active()) seans.end();
   S = null;
   stopTick();
   if (typeof document !== 'undefined' && document.body) {
@@ -238,7 +243,7 @@ export function render() {
             <button class="btn btn-2 btn-s" data-act="ask-gemini" title="Soruyu ve beş şıkkı ipucu istemi olarak kopyalar — doğru şık gönderilmez (G)">İpucu İste <span class="kbd">G</span></button>
             <button class="q-quit-link" data-act="quit">Seansı bitir</button>
             <span class="hint">
-              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">G</span> Gemini · <span class="kbd">Enter</span> devam
+              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">G</span> yapay zeka · <span class="kbd">Enter</span> devam
             </span>
           </div>
           ${topic ? `<p class="hint q-topic-hint">Bağlı konu: ${esc(topic.title)}</p>` : ''}
@@ -249,6 +254,7 @@ export function render() {
 
   S.answered = false;
   S.qStart = performance.now();
+  seans.qBegin();
   startTick();
 }
 
@@ -258,7 +264,7 @@ function startTick() {
     if (!S || S.answered) return;
     const el = $('#q-timer');
     if (!el) return;
-    const sec = (performance.now() - S.qStart) / 1000;
+    const sec = seans.qElapsed() / 1000;
     el.textContent = fmtSec(sec);
     el.classList.toggle('slow', sec > TARGET_SEC);
   }, 250);
@@ -270,7 +276,8 @@ function stopTick() { if (tick) { clearInterval(tick); tick = null; } }
 export function pick(key) {
   if (!S || S.answered) return;
   const q = S.questions[S.i];
-  const ms = performance.now() - S.qStart;
+  const t = seans.qEnd();
+  const ms = t.ms;
   S.answered = true;
   stopTick();
 
@@ -280,7 +287,9 @@ export function pick(key) {
   const row = recordAnswer(q, key, ms, S.mode === 'review' ? 'review' : 'practice', {
     usedElim: S.elimUsed,
     askedGemini: S.geminiAsked,
-    logicGuess: treatAsLogic
+    logicGuess: treatAsLogic,
+    rawMs: t.rawMs,
+    idleMs: t.idleMs
   });
   const sched = scheduleAfterAnswer(q.id, row.ok, treatAsLogic);
   save();
@@ -293,7 +302,8 @@ export function pick(key) {
 export function dontKnow() {
   if (!S || S.answered) return;
   const q = S.questions[S.i];
-  const ms = performance.now() - S.qStart;
+  const t = seans.qEnd();
+  const ms = t.ms;
   S.answered = true;
   stopTick();
 
@@ -302,7 +312,9 @@ export function dontKnow() {
     askedGemini: S.geminiAsked,
     // Boş bırakılan soru zaten yanlış sayılıp kutu 0'a dönüyor; logicGuess
     // burada süreyi (ipucu okuma dahil) hız ortalamasından çıkarmak için var.
-    logicGuess: S.geminiAskedPreAnswer
+    logicGuess: S.geminiAskedPreAnswer,
+    rawMs: t.rawMs,
+    idleMs: t.idleMs
   });
   const sched = scheduleAfterAnswer(q.id, false);
   save();
@@ -416,7 +428,7 @@ function paintResult(q, chosen, row, sched, ms) {
           </div>` : ''}
           <div class="fb-actions-meta">
             <span class="srs-note">${esc(sched.note)}</span>
-            <span class="hint"><span class="kbd">Enter</span> devam${row.ok ? ' · <span class="kbd">M</span> mantık' : ''}${kuralButtonHTML(q) ? ' · <span class="kbd">K</span> kural' : ''} · <span class="kbd">G</span> Gemini</span>
+            <span class="hint"><span class="kbd">Enter</span> devam${row.ok ? ' · <span class="kbd">M</span> mantık' : ''}${kuralButtonHTML(q) ? ' · <span class="kbd">K</span> kural' : ''} · <span class="kbd">G</span> yapay zeka</span>
           </div>
         </div>
       </div>`;
@@ -427,7 +439,7 @@ function paintResult(q, chosen, row, sched, ms) {
   if (btnDontKnow) btnDontKnow.style.display = 'none';
   const qHint = document.querySelector('#q-actions .hint');
   if (qHint) {
-    qHint.innerHTML = `<span class="kbd">Enter</span> sonraki soru${row.ok ? ' · <span class="kbd">M</span> mantıkla geç' : ''} · <span class="kbd">G</span> Gemini`;
+    qHint.innerHTML = `<span class="kbd">Enter</span> sonraki soru${row.ok ? ' · <span class="kbd">M</span> mantıkla geç' : ''} · <span class="kbd">G</span> yapay zeka`;
   }
 
   // Gizlenen ders adı cevaptan sonra açılır
@@ -487,6 +499,9 @@ export function eliminatePremise(numeral) {
 export function next() {
   if (!S) return;
   if (!S.answered) return;
+  // Mola soru ortasında başlamaz: blok dolduysa bayrak kalkmıştır, mola tam
+  // burada, cevap verilmişken başlar. Mola bitince next() geri çağrılır.
+  if (seans.gate(() => next())) return;
   S.i += 1;
   // Yeni soru için soru bazlı sinyalleri sıfırla
   S.elimUsed = false;
@@ -551,6 +566,40 @@ export function quit() {
   render();
 }
 
+/**
+ * Seansın saat şeridi. Üç sayı ayrı ayrı gösterilir çünkü biri diğerinin
+ * yerine geçmez: masada geçen süre, soru çözmekle geçen süre ve mola.
+ * Odak oranı düşükse seans uzun görünür ama çalışma değildir; sayının
+ * işi bunu söylemek.
+ */
+function seansSeridiHTML(c) {
+  if (!c || c.wallMinutes == null) return '';
+  const dk = n => (n == null ? '—' : `${n} dk`);
+  const oran = c.focusRatio == null ? null : Math.round(c.focusRatio * 100);
+  const dusuk = oran != null && oran < 55 && c.wallMinutes >= 5;
+  const baslangic = c.startedAt ? new Date(c.startedAt) : null;
+  const bitis = c.endedAt ? new Date(c.endedAt) : null;
+  const saat = d => d ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : '—';
+
+  return `
+    <div class="card" style="margin-bottom:1.5rem">
+      <div class="section-label" style="margin-top:0">Seans saati</div>
+      <p class="hint" style="margin:0 0 0.75rem">
+        ${saat(baslangic)} – ${saat(bitis)} · masada ${dk(c.wallMinutes)}
+      </p>
+      <div class="chip-row">
+        <span class="chip">Soru çözmek: ${dk(c.activeMinutes)}</span>
+        ${c.breakMinutes ? `<span class="chip">Mola: ${dk(c.breakMinutes)}</span>` : ''}
+        ${c.idleMinutes ? `<span class="chip${dusuk ? ' amber' : ''}">Boşta: ${dk(c.idleMinutes)}</span>` : ''}
+        ${oran != null ? `<span class="chip${dusuk ? ' amber' : ''}">Odak: %${oran}</span>` : ''}
+      </div>
+      ${dusuk ? `<p class="hint" style="margin:0.75rem 0 0">
+        Ekranda geçen her 10 dakikanın ${Math.max(1, Math.round(oran / 10))}'inde soru çözülmüş.
+        ${c.total} soru ${dk(c.wallMinutes)}'ya yayılmış; süreler doğru olsa da bu seans
+        kayıtta göründüğü kadar çalışma değil.</p>` : ''}
+    </div>`;
+}
+
 /* ---------- seans özeti ---------- */
 
 function renderSummary(host) {
@@ -607,6 +656,8 @@ function renderSummary(host) {
           <div class="metric-n">${wrongs.length} yanlış${logics.length ? `, ${logics.length} mantık` : ''}</div>
         </div>
       </div>
+
+      ${seansSeridiHTML(S.clock)}
 
       ${avg > TARGET_SEC ? `<div class="trap"><div class="lbl">Hız notu</div><p>Ortalaman hedefin üstünde. Sınavda 120 soru için soru başına ortalama 75 saniyen var; doğruluk yerleştiyse bundan sonraki iş hızı düşürmek.</p></div>` : ''}
       ${slowest && slowest.ms / 1000 > TARGET_SEC * 2 ? `<p class="hint">En uzun süren soru: ${esc(slowest.qId)} · ${fmtSec(slowest.ms / 1000)}</p>` : ''}
@@ -934,23 +985,44 @@ function finalizeSession() {
     };
   });
 
+  // ── Seans saati ────────────────────────────────────────────────────────
+  // Soru sürelerinin toplamı seansın süresi değildir. seans.js üç ayrı süre
+  // tutar: aktif (gerçekten soru çözülen), mola (açıkça verilen) ve duvar
+  // (baştan sona geçen gerçek zaman). Bir saatte beş soru çözülen oturum
+  // burada 2 dakika değil, 60 dakika duvar / 2 dakika aktif olarak görünür.
+  const saat = seans.end() || {};
+
   const result = {
     id: 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-    at: new Date().toISOString(),
-    startedAt: S.startedAt
+    at: saat.endedAt || new Date().toISOString(),
+    startedAt: saat.startedAt || (S.startedAt
       ? new Date(Date.now() - (performance.now() - S.startedAt)).toISOString()
-      : new Date().toISOString(),
+      : new Date().toISOString()),
+    endedAt: saat.endedAt || new Date().toISOString(),
     isoDate: new Date().toISOString().slice(0, 10),
     mode: S.mode,
     label: S.label,
     topicName,
+    // durationMinutes anlamı DEĞİŞMEDİ (aktif süre): Takip aktarımının
+    // sözleşmesi bozulmasın. Gerçek oturum uzunluğu wallMinutes'tedir.
     durationMinutes: Math.round(durationMs / 60000),
+    wallMinutes: saat.wallMs != null ? Math.round(saat.wallMs / 60000) : null,
+    activeMinutes: saat.activeMs != null ? Math.round(saat.activeMs / 60000) : Math.round(durationMs / 60000),
+    breakMinutes: saat.breakMs != null ? Math.round(saat.breakMs / 60000) : 0,
+    idleMinutes: saat.idleMs != null ? Math.round(saat.idleMs / 60000) : null,
+    /** aktif / (duvar - mola). Seansın verimlilik oranı: 0,2 ise ekranda
+        geçen her 10 dakikanın 2'sinde soru çözülmüş demektir. */
+    focusRatio: saat.focusRatio ?? null,
+    breaksTaken: saat.breaks ?? 0,
     total: done.length,
     correct: ok,
     wrong,
     subjects,
     answerLog   // ham kayıt — her şey burada, dışarıdan seçmeye gerek yok
   };
+
+  // Özet ekranı saat şeridini bundan okur.
+  S.clock = result;
 
   saveSession(result);
   save();
@@ -1133,7 +1205,7 @@ export function buildGeminiPrompt(q, stateArg = {}) {
   const chosen = stateArg.chosen || null;
 
   // Dayanaklar künye olarak gider: ham chunk başlıkları
-  // ("1136 sk m. 5/a — Avukatlığa Kabulü Engelleyen Mutlak ve Süresiz Suçlar…")
+  // ("1136 sk m. 5/a; Avukatlığa Kabulü Engelleyen Mutlak ve Süresiz Suçlar…")
   // istemi 4 satır şişirip bilgi eklemiyordu. groupLegalRefs kanunu bir kez
   // yazar, maddeleri toplar: "1136 sk m. 3, 5/a · 1136 sk m. 3 & m. 4".
   const topic = q.topicId ? topicById.get(q.topicId) : null;
@@ -1175,7 +1247,7 @@ export function buildGeminiPrompt(q, stateArg = {}) {
     mode = 'hint';
     L.push('Henüz şık işaretlemedim. Doğru şıkkı söyleme, hiçbir şıkka "doğru" veya "yanlış" etiketi koyma.');
     L.push('Şunları yaz:');
-    L.push('1. Soru hangi hükmü yokluyor — tek cümle.');
+    L.push('1. Soru hangi hükmü yokluyor; tek cümle.');
     L.push('2. Karar hangi iki şık arasında veriliyor, ayrım hangi kanun maddesine ve hangi şarta dayanıyor.');
     L.push('3. Bu ayrımı kendim sınayabilmem için tek cümlelik bir kontrol sorusu yaz.');
     L.push('Kısa yaz. Akademik paragraf, örnek vaka anlatımı ve genel sınav tavsiyesi istemiyorum.');
@@ -1185,21 +1257,27 @@ export function buildGeminiPrompt(q, stateArg = {}) {
     L.push(`Doğru şık: ${q.correct}) ${textOf(q.correct)}`);
     L.push(`Uygulamanın kendi açıklaması: ${String(q.explanation || '').trim()}`);
     L.push('Açıklamanın tamamını tekrar yazma; üstüne ekle.');
-    L.push('Şunları yaz:');
-    L.push(`1. Benim seçtiğim ${chosen} şıkkı neden yanlış — hangi kavramı ya da şartı karıştırmışım.`);
-    L.push(`2. ${q.correct} ile ${chosen} arasındaki ayrım hangi kanun maddesine ve hangi şarta dayanıyor.`);
-    L.push('3. Uygulamanın açıklamasında eksik veya yanlış bir bilgi varsa söyle; yoksa "açıklama doğru" de.');
-    L.push('4. Aynı konudan, şıkları birbirine benzeyen bir HMGS sorusu yaz; doğru cevabı gerekçesiyle ver.');
+    L.push('Şunları bu sırayla yaz:');
+    L.push('1. KURAL: sorunun döndüğü kuralı, konuyu hiç bilmediğimi varsayarak gündelik dille anlat. Hukuk terimini ilk kullandığında parantez içinde günlük karşılığını ver.');
+    L.push('2. ÖRNEK: kuralın işlediği somut bir olay kur; sonra olayın tek bir unsurunu değiştirip sonucun nasıl tersine döndüğünü göster.');
+    L.push(`3. HATAM: seçtiğim ${chosen} şıkkı neden yanlış; hangi kavramı ya da şartı karıştırmışım.`);
+    L.push(`4. AYRIM: ${q.correct} ile ${chosen} arasındaki sınır hangi kanun maddesindeki hangi şarta dayanıyor.`);
+    L.push('5. Uygulamanın açıklamasında eksik veya yanlış bir bilgi varsa söyle; yoksa "açıklama doğru" de.');
+    L.push('6. Aynı ayrımı yoklayan, şıkları birbirine benzeyen bir HMGS sorusu yaz; doğru cevabı gerekçesiyle ver.');
+    L.push('Sade cümle kur, maddeler halinde yaz. 1 ve 2 birlikte 150 kelimeyi geçmesin. Akademik paragraf ve genel sınav tavsiyesi istemiyorum.');
   } else if (!chosen) {
     mode = 'blank';
     L.push('Bu soruyu bilmiyordum, boş bıraktım.');
     L.push(`Doğru şık: ${q.correct}) ${textOf(q.correct)}`);
     L.push(`Uygulamanın kendi açıklaması: ${String(q.explanation || '').trim()}`);
     L.push('Açıklamanın tamamını tekrar yazma; üstüne ekle.');
-    L.push('Şunları yaz:');
-    L.push('1. Doğru şıkkı doğru yapan şart ne — kanun maddesiyle.');
-    L.push('2. Diğer dört şık neden yanlış — her biri tek satır, hangi kavramla karıştırılmak isteniyor.');
-    L.push('3. Bu konudan, şıkları birbirine benzeyen bir HMGS sorusu yaz; doğru cevabı gerekçesiyle ver.');
+    L.push('Bu konuyu bilmiyorum; sıfırdan anlat. Şunları bu sırayla yaz:');
+    L.push('1. KURAL: sorunun döndüğü kuralı gündelik dille anlat. Hukuk terimini ilk kullandığında parantez içinde günlük karşılığını ver.');
+    L.push('2. ÖRNEK: kuralın işlediği somut bir olay kur; sonra olayın tek bir unsurunu değiştirip sonucun nasıl tersine döndüğünü göster.');
+    L.push('3. Doğru şıkkı doğru yapan şart ne; kanun maddesiyle.');
+    L.push('4. Diğer dört şık neden yanlış; her biri tek satır, hangi kavramla karıştırılmak isteniyor.');
+    L.push('5. Bu konudan, şıkları birbirine benzeyen bir HMGS sorusu yaz; doğru cevabı gerekçesiyle ver.');
+    L.push('Sade cümle kur, maddeler halinde yaz. 1 ve 2 birlikte 150 kelimeyi geçmesin. Akademik paragraf ve genel sınav tavsiyesi istemiyorum.');
   } else {
     mode = 'correct';
     L.push(`Doğru işaretledim (${q.correct}) ama sağlamasını yapmak istiyorum.`);
@@ -1207,9 +1285,14 @@ export function buildGeminiPrompt(q, stateArg = {}) {
     L.push('Açıklamanın tamamını tekrar yazma; üstüne ekle.');
     L.push('Şunları yaz:');
     L.push('1. Bu şıkkı doğru yapan şart ne, hangi maddeden geliyor.');
-    L.push('2. Diğer şıklar nerede tuzak — her biri tek satır, hangi kavramla karıştırılmak isteniyor.');
-    L.push('3. Aynı kuralın istisnası varsa yaz; yoksa "istisna yok" de.');
+    L.push('2. Kuralın sınırını gösteren tek cümlelik bir örnek ver: bir unsuru değiştir, sonuç değişsin.');
+    L.push('3. Diğer şıklar nerede tuzak; her biri tek satır, hangi kavramla karıştırılmak isteniyor.');
+    L.push('4. Aynı kuralın istisnası varsa yaz; yoksa "istisna yok" de.');
+    L.push('Kısa yaz.');
   }
+
+  L.push('');
+  L.push('Türkçe yaz. Madde numarasından emin değilsen numara uydurma; "madde numarası teyit edilmeli" yaz.');
 
   return { mode, text: L.join('\n') };
 }
@@ -1219,10 +1302,10 @@ function pasteHint() {
   try {
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       && window.matchMedia('(pointer: coarse)').matches) {
-      return 'Gemini uygulamasına yapıştır (metne dokunup Yapıştır).';
+      return 'Yapay zekaya yapıştır (metne dokunup Yapıştır).';
     }
   } catch (_) {}
-  return "Gemini'ye yapıştır (Ctrl+V).";
+  return 'Yapay zekaya yapıştır (Ctrl+V).';
 }
 
 /**
