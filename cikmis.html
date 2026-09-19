@@ -1,645 +1,852 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!-- © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
      Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
      veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. -->
-
-<html lang="tr" class="bg-slate-950 text-slate-100 antialiased">
+<html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <!-- AI / veri madenciligi rezervi: bu icerik model egitimi icin lisansli DEGILDIR. -->
-  <meta name="robots" content="noai, noimageai" />
-  <meta name="tdm-reservation" content="1" />
-  <title>HMGS 240 Çıkmış Soru & ÖSYM Odak Röntgeni</title>
-  <meta name="description" content="27 Eylül 2026 HMGS Sınavı Odaklı 240 Çıkmış Soru, Çekirdek Kural, ÖSYM Tuzağı ve İkiz Sınav Tahmini İstasyonu" />
-  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png" />
-  <link rel="shortcut icon" href="favicon.ico" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <!-- Google Identity Services (kasa: 240 çıkmış soru yalnız girişten sonra) -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <meta name="robots" content="noai, noimageai">
+  <meta name="tdm-reservation" content="1">
+  <title>HMGS Çıkmış Röntgeni</title>
+  <meta name="description" content="Son iki HMGS sınavının 240 sorusu, on dokuz günlük okuma planıyla.">
+  <meta name="theme-color" content="#FAF9F6">
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+  <!-- Tema: Stüdyo ile aynı ayarı okur (hmgs_studio_v1), böylece iki ekran birlikte açılıp kapanır. -->
   <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          }
+    (function () {
+      try {
+        var raw = localStorage.getItem('hmgs_studio_v1');
+        var theme = 'system', fontSize = 'normal';
+        if (raw) {
+          var s = (JSON.parse(raw) || {}).settings;
+          if (s) { theme = s.theme || 'system'; fontSize = s.fontSize || 'normal'; }
         }
-      }
-    }
+        var dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        if (fontSize === 'large') document.documentElement.setAttribute('data-font-size', 'large');
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', dark ? '#0B0E14' : '#FAF9F6');
+      } catch (e) {}
+    })();
   </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <style>
+    /* Renkler, yazı tipleri ve yarıçaplar studio/css/studio.css ile birebir aynı değerler.
+       Bu sayfa Tailwind kullanmaz: tarayıcıda derleme yok, dış stil bağımlılığı yok. */
+    :root {
+      --bg: #FAF9F6; --bg-raise: #FFFFFF; --bg-sunk: #F2F1EC; --bg-hover: rgba(24,24,27,.04);
+      --topbar-bg: rgba(250,249,246,.88);
+      --ink: #18181B; --ink-2: #52525B; --ink-3: #A1A1AA;
+      --accent: #5B5BD6; --accent-ink: #4642B4; --accent-soft: rgba(91,91,214,.09);
+      --ok: #1E8A5F; --ok-soft: rgba(30,138,95,.10);
+      --no: #C4362F; --no-soft: rgba(196,54,47,.09);
+      --line: rgba(24,24,27,.10); --line-strong: rgba(24,24,27,.18);
+      --shadow: 0 1px 2px rgba(24,24,27,.04), 0 8px 24px rgba(24,24,27,.05);
+      --scrim: rgba(24,24,27,.38);
+      --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --serif: 'Newsreader', Georgia, serif;
+      --r-s: 8px; --r-m: 12px; --r-l: 18px;
+      --read-size: 1.11rem; --read-lh: 1.75;
+      --ease: cubic-bezier(.2,.8,.2,1);
+    }
+    [data-theme="dark"] {
+      --bg: #0B0E14; --bg-raise: #121722; --bg-sunk: #181F2E; --bg-hover: rgba(255,255,255,.05);
+      --topbar-bg: rgba(11,14,20,.88);
+      --ink: #F4F4F5; --ink-2: #A1A1AA; --ink-3: #71717A;
+      --accent: #6F7CE6; --accent-ink: #A7B1FB; --accent-soft: rgba(111,124,230,.14);
+      --ok: #34D399; --ok-soft: rgba(52,211,153,.14);
+      --no: #F87171; --no-soft: rgba(248,113,113,.14);
+      --line: rgba(255,255,255,.08); --line-strong: rgba(255,255,255,.16);
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.5);
+      --scrim: rgba(0,0,0,.6);
+    }
+    [data-font-size="large"] { --read-size: 1.25rem; --read-lh: 1.82; }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { -webkit-text-size-adjust: 100%; }
+    html.lock { overflow: hidden; }
     body {
-      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-      -webkit-font-smoothing: antialiased;
+      margin: 0; min-height: 100dvh; background: var(--bg); color: var(--ink);
+      font: 400 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased;
     }
-    .roentgen-card {
-      background: #0f172a;
-      border: 1px solid #1e293b;
-      transition: all 0.2s ease;
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; background: none; border: 0; padding: 0; text-align: inherit; }
+    a { color: inherit; text-decoration: none; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    svg { display: block; flex: none; }
+
+    /* ---------- Üst çubuk ---------- */
+    /* Stüdyo'nun üst çubuğuyla aynı: yarı saydam zemin + bulanıklık, altındaki içerik sızmasın. */
+    .top {
+      position: sticky; top: 0; z-index: 20; background: var(--topbar-bg);
+      -webkit-backdrop-filter: saturate(180%) blur(16px); backdrop-filter: saturate(180%) blur(16px);
+      border-bottom: 1px solid var(--line);
     }
-    .roentgen-card:hover {
-      border-color: #334155;
+    @supports not (backdrop-filter: blur(1px)) { .top { background: var(--bg); } }
+    .top-in { max-width: 72rem; margin: 0 auto; padding: .7rem 1.25rem; display: flex; align-items: center; gap: .75rem; }
+    .icon-btn { width: 2.25rem; height: 2.25rem; border-radius: var(--r-s); display: grid; place-items: center; color: var(--ink-2); transition: background .15s, color .15s; }
+    .icon-btn:hover { background: var(--bg-hover); color: var(--ink); }
+    .brand { font-weight: 600; letter-spacing: -.01em; transition: opacity .2s ease, transform .25s var(--ease); }
+    /* Büyük başlık ekrandayken üstteki ad gizli; başlık kayınca belirir (yalnız JS varsa). */
+    .top.tt .brand { opacity: 0; transform: translateY(4px); }
+    .top.tt.scrolled .brand { opacity: 1; transform: none; }
+    .top-right { margin-left: auto; display: flex; align-items: center; gap: 1.25rem; }
+    .prog { display: flex; align-items: center; gap: .7rem; font-size: .8125rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    .bar { width: 7rem; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s var(--ease); }
+    .text-link { font-size: .875rem; font-weight: 500; color: var(--ink-2); padding: .35rem .2rem; }
+    .text-link:hover { color: var(--ink); }
+
+    /* ---------- Sayfa ---------- */
+    .wrap { max-width: 72rem; margin: 0 auto; padding: 0 1.25rem; }
+    .intro { padding: 2.25rem 0 1.5rem; }
+    .intro h1 { margin: 0 0 .55rem; font: 500 clamp(1.75rem, 3.2vw, 2.15rem)/1.12 var(--serif); letter-spacing: -.015em; }
+    .intro p { margin: 0; max-width: 38rem; color: var(--ink-2); font-size: 1rem; line-height: 1.6; }
+
+    .filters { display: grid; gap: .8rem; padding-bottom: 1.4rem; }
+    .search { position: relative; display: block; }
+    .search svg { position: absolute; left: .95rem; top: 50%; margin-top: -8px; color: var(--ink-3); pointer-events: none; }
+    .search input {
+      width: 100%; height: 2.75rem; padding: 0 1rem 0 2.6rem; border: 1px solid var(--line); border-radius: var(--r-m);
+      background: var(--bg-raise); outline: none; transition: border-color .15s;
     }
-    .roentgen-card.completed {
-      border-color: #065f46;
-      background: #061e18;
+    .search input::placeholder { color: var(--ink-3); }
+    .search input:focus { border-color: var(--accent); }
+
+    .days { display: flex; align-items: center; gap: .4rem; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; }
+    .days::-webkit-scrollbar { display: none; }
+    .days-label { flex: none; font-size: .8125rem; color: var(--ink-3); margin-right: .25rem; }
+    .chip {
+      position: relative; flex: none; height: 2.25rem; min-width: 2.5rem; padding: 0 .85rem; border-radius: 999px;
+      border: 1px solid var(--line); color: var(--ink-2); font-size: .8125rem; font-weight: 500;
+      font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap;
+      transition: background .15s, color .15s, border-color .15s;
     }
-    .roentgen-card.starred {
-      border-color: #854d0e;
+    .chip:hover { background: var(--bg-hover); }
+    .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+    .chip.today::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--accent); }
+    .chip.today[aria-pressed="true"]::after { background: var(--bg); }
+    .chip b { font-weight: 600; margin-left: .35rem; opacity: .7; }
+    .day-note { margin: 0; min-height: 1.3em; font-size: .8125rem; color: var(--ink-2); }
+
+    /* Süzgeçler içeriği kadar yer kaplar; sayaç aynı satırın sağ ucunda durur. */
+    .selects { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+    select {
+      appearance: none; -webkit-appearance: none; max-width: 100%; height: 2.25rem; padding: 0 2rem 0 .85rem;
+      border: 1px solid var(--line); border-radius: var(--r-m); background-color: var(--bg-raise); outline: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A93' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right .85rem center; text-overflow: ellipsis; cursor: pointer;
+      font-size: .875rem; transition: border-color .15s;
     }
-    .badge-tier1 { background: #1e1b4b; color: #a5b4fc; border: 1px solid #312e81; }
-    .badge-tier2 { background: #0c4a6e; color: #7dd3fc; border: 1px solid #075985; }
-    .badge-tier3 { background: #1f2937; color: #9ca3af; border: 1px solid #374151; }
-    .tab-btn.active {
-      background: #334155;
-      color: #f8fafc;
-      font-weight: 600;
+    select:hover { background-color: var(--bg-hover); }
+    select:focus { border-color: var(--accent); }
+    .count { margin-left: auto; font-size: .8125rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+    /* ---------- Kartlar ---------- */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1rem; }
+    .group { grid-column: 1 / -1; margin: 1.4rem 0 -.2rem; font-size: .9rem; font-weight: 500; color: var(--ink-2); }
+    .group:first-child { margin-top: 0; }
+    .group span { color: var(--ink-3); font-weight: 400; margin-left: .5rem; }
+    .card {
+      position: relative; display: flex; flex-direction: column; gap: .5rem; padding: 1.1rem 1.25rem 1.2rem;
+      background: var(--bg-raise); border: 1px solid var(--line); border-radius: var(--r-l);
+      content-visibility: auto; contain-intrinsic-size: auto 14rem;   /* ölçülen: 13,3-14,7rem */
+      transition: border-color .18s, box-shadow .18s, transform .18s var(--ease), background .18s;
+    }
+    @media (hover: hover) { .card:hover { border-color: var(--line-strong); box-shadow: var(--shadow); } }
+    .card:active { transform: scale(.992); }
+    .c-meta { display: block; font-size: .75rem; color: var(--ink-3); padding-right: 2.6rem; }
+    .c-title {
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+      font-size: .975rem; font-weight: 600; line-height: 1.35; letter-spacing: -.005em; padding-right: 1.8rem;
+    }
+    .c-law { display: block; font-size: .78rem; color: var(--accent-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .c-rule {
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden;
+      font: 400 .92rem/1.58 var(--serif); color: var(--ink-2);
+    }
+    .marks { position: absolute; top: 1.05rem; right: 1.1rem; display: flex; gap: .35rem; }
+    .marks .m-ok, .marks .m-star { display: none; }
+    .card.done .m-ok { display: block; color: var(--ok); }
+    .card.star .m-star { display: block; color: var(--accent); }
+    .card.star .m-star svg { fill: currentColor; }
+    .card.done { background: var(--bg-sunk); }
+    .card.done .c-title { color: var(--ink-2); }
+
+    .empty { padding: 4rem 0; text-align: center; color: var(--ink-2); }
+    .empty p { margin: 0 0 .8rem; }
+    .btn-quiet { font-size: .8125rem; color: var(--ink-2); padding: .4rem .6rem; border-radius: var(--r-s); }
+    .btn-quiet:hover { background: var(--bg-hover); color: var(--ink); }
+    .reset { padding: 2.5rem 0 3.5rem; text-align: center; }
+
+    /* ---------- Giriş ---------- */
+    .login { max-width: 27rem; margin: 1rem auto 4rem; padding: 2rem 1.75rem; text-align: center; background: var(--bg-raise); border: 1px solid var(--line); border-radius: var(--r-l); }
+    .login h2 { margin: 0 0 .5rem; font: 500 1.35rem/1.25 var(--serif); }
+    .login p { margin: 0 0 1.25rem; color: var(--ink-2); font-size: .9rem; line-height: 1.6; }
+    .login .err { margin: 1rem 0 0; color: var(--no); font-size: .8125rem; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; height: 2.6rem; padding: 0 1.3rem; border-radius: 999px; background: var(--ink); color: var(--bg); font-weight: 600; font-size: .875rem; transition: opacity .15s, transform .15s var(--ease); }
+    .btn:hover { opacity: .88; }
+    .btn:active { transform: scale(.98); }
+    .btn:disabled { opacity: .5; cursor: default; }
+
+    /* ---------- Okuma sayfası ---------- */
+    dialog.sheet {
+      width: min(46rem, calc(100vw - 2rem)); max-height: min(92dvh, 58rem); margin: auto; padding: 0;
+      border: 1px solid var(--line); border-radius: var(--r-l); background: var(--bg-raise); color: var(--ink);
+      box-shadow: 0 30px 90px rgba(0,0,0,.22); overflow: hidden;
+    }
+    dialog.sheet[open] { display: flex; flex-direction: column; animation: sheet-in .26s var(--ease); }
+    dialog.sheet::backdrop { background: var(--scrim); animation: fade-in .2s ease; }
+    @keyframes sheet-in { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    .sheet-head { display: flex; align-items: center; gap: .75rem; padding: .8rem .9rem .8rem 1.5rem; border-bottom: 1px solid var(--line); }
+    .kicker { flex: 1; min-width: 0; font-size: .8125rem; line-height: 1.35; color: var(--ink-3); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    .pos { font-size: .8125rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    .sheet-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 1.6rem 1.75rem 2rem; }
+    .tags { display: flex; gap: .4rem; margin-bottom: .8rem; }
+    .tag { font-size: .72rem; font-weight: 500; padding: .18rem .55rem; border-radius: 999px; background: var(--bg-sunk); color: var(--ink-2); }
+    .s-title { margin: 0 0 .25rem; font: 500 1.5rem/1.25 var(--serif); letter-spacing: -.01em; }
+    .s-law { margin: 0 0 1.4rem; font-size: .8125rem; color: var(--accent-ink); }
+    .s-stem { margin: 0 0 1.4rem; font: 400 var(--read-size)/var(--read-lh) var(--serif); white-space: pre-line; }
+    .opts { display: grid; gap: .5rem; }
+    .opt {
+      display: flex; gap: .85rem; align-items: flex-start; width: 100%; padding: .8rem .95rem;
+      border: 1px solid var(--line); border-radius: var(--r-m); font-size: .95rem; line-height: 1.5;
+      transition: background .15s, border-color .15s, opacity .2s;
+    }
+    .opt .k { flex: none; width: 1.55rem; height: 1.55rem; border-radius: 50%; border: 1px solid var(--line-strong); display: grid; place-items: center; font-size: .75rem; font-weight: 600; color: var(--ink-2); }
+    .opts:not(.revealed) .opt:hover { background: var(--bg-hover); border-color: var(--line-strong); }
+    .opts.revealed .opt { cursor: default; }
+    .opts.revealed .opt:not(.is-correct):not(.is-wrong) { opacity: .55; }
+    .opt.is-correct { border-color: var(--ok); background: var(--ok-soft); }
+    .opt.is-correct .k { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .opt.is-wrong { border-color: var(--no); background: var(--no-soft); }
+    .opt.is-wrong .k { background: var(--no); border-color: var(--no); color: #fff; }
+    .reveal-row { margin-top: 1.25rem; }
+    .answer { margin-top: 1.6rem; padding-top: 1.35rem; border-top: 1px solid var(--line); }
+    .ans-label { margin: 0 0 .55rem; font-size: .8125rem; font-weight: 600; color: var(--ok); }
+    .neg-note { margin: 0 0 .7rem; font-size: .8125rem; color: var(--ink-2); }
+    .expl { margin: 0; font: 400 1.03rem/1.78 var(--serif); }
+    .sheet-foot { display: flex; align-items: center; gap: .5rem; padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+    .foot-mid { flex: 1; display: flex; justify-content: center; gap: .5rem; }
+    .pill { display: inline-flex; align-items: center; gap: .45rem; height: 2.4rem; padding: 0 .95rem; border-radius: 999px; border: 1px solid var(--line); font-size: .8125rem; font-weight: 500; color: var(--ink-2); transition: background .15s, color .15s, border-color .15s; }
+    .pill:hover { background: var(--bg-hover); color: var(--ink); }
+    .pill:disabled { opacity: .35; cursor: default; pointer-events: none; }
+    .pill[aria-pressed="true"].p-done { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+    .pill[aria-pressed="true"].p-star { color: var(--accent); border-color: transparent; background: var(--accent-soft); }
+    .pill[aria-pressed="true"].p-star svg { fill: currentColor; }
+
+    @media (max-width: 40rem) {
+      .top-in, .wrap { padding-left: 1rem; padding-right: 1rem; }
+      .bar { display: none; }
+      .intro { padding: 1.5rem 0 1.15rem; }
+      .intro p { font-size: 1rem; line-height: 1.6; }
+      .selects { grid-template-columns: 1fr 1fr; }
+      .selects select:first-child { grid-column: 1 / -1; }
+      dialog.sheet { width: 100vw; max-width: none; height: 100dvh; max-height: none; border: 0; border-radius: 0; }
+      .sheet-body { padding: 1.25rem 1.1rem 1.5rem; }
+      .sheet-head { padding-left: 1.1rem; }
+      .pill span.lbl-long { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
     }
   </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-indigo-900 selection:text-indigo-200">
+<body>
 
-  <!-- Üst Bar -->
-  <header class="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md px-4 sm:px-6 py-3.5">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <a href="index.html" class="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-colors text-slate-400 hover:text-white" title="Ana Portala Dön">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-          </a>
-          <div>
-            <h1 class="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
-              <span>HMGS 240 Odak Röntgeni</span>
-              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">27 Eylül Sınavı</span>
-            </h1>
-            <p class="text-[11px] text-slate-400 font-medium">Eylül 2025 (120) &middot; Nisan 2026 (120) &middot; Çekirdek Kural &middot; ÖSYM Tuzağı &middot; İkiz Tahmin</p>
-          </div>
-        </div>
-
-        <!-- Sayaç -->
-        <div class="flex items-center gap-2 md:hidden">
-          <span id="mobileProgressText" class="text-xs font-mono font-semibold text-emerald-400">0/240</span>
-        </div>
-      </div>
-
-      <!-- İlerleme Özeti ve Kontroller -->
-      <div class="flex items-center gap-3">
-        <div class="hidden md:flex flex-col items-end">
-          <div class="text-xs font-mono font-semibold text-slate-300 flex items-center gap-2">
-            <span>Pekiştirilen Odak:</span>
-            <span id="progressStats" class="text-emerald-400 font-bold">0 / 240 (%0)</span>
-          </div>
-          <div class="w-44 h-1.5 bg-slate-800 rounded-full mt-1 overflow-hidden">
-            <div id="progressBar" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%;"></div>
-          </div>
-        </div>
-        
-        <div class="flex items-center gap-1.5">
-          <button id="resetProgressBtn" class="px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 text-[11px] text-slate-400 hover:text-slate-200 transition-colors" title="İlerlemeyi Sıfırla">
-            Sıfırla
-          </button>
-        </div>
+  <header class="top">
+    <div class="top-in">
+      <a class="icon-btn" href="index.html" aria-label="Ana sayfaya dön">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </a>
+      <span class="brand">Çıkmış Röntgeni</span>
+      <div class="top-right">
+        <span class="prog"><span id="pText">0 / 0</span><span class="bar"><i id="pBar"></i></span></span>
+        <a class="text-link" href="studio.html">Stüdyo</a>
       </div>
     </div>
   </header>
 
-  <!-- Filtre ve Kontrol Paneli -->
-  <section class="border-b border-slate-800/80 bg-slate-900/50 px-4 sm:px-6 py-3">
-    <div class="max-w-7xl mx-auto space-y-2.5">
-      
-      <!-- Satır 1: 19 Günlük Doz Seçici & Hızlı Butonlar -->
-      <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
-        <span class="text-slate-500 font-mono text-[11px] whitespace-nowrap">Doz:</span>
-        <button data-day="all" class="day-filter-btn px-2.5 py-1 rounded bg-slate-800 text-white font-semibold border border-slate-700 whitespace-nowrap active">Tümü (240)</button>
-        <button data-day="1" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G1: Medeni Kişiler (10)</button>
-        <button data-day="2" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G2: Medeni Aile (10)</button>
-        <button data-day="3" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G3: Miras & Eşya (9)</button>
-        <button data-day="4" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G4: Borçlar Genel (14)</button>
-        <button data-day="5" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G5: Borçlar Özel (13)</button>
-        <button data-day="6" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G6: HMK Görev/Yetki (12)</button>
-        <button data-day="7" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G7: HMK İspat/Kanun (12)</button>
-        <button data-day="8" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G8: Ticaret İşletme (11)</button>
-        <button data-day="9" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G9: Kıymetli Evrak (10)</button>
-        <button data-day="10" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G10: Ceza Genel (10)</button>
-        <button data-day="11" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G11: Ceza Özel (8)</button>
-        <button data-day="12" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G12: CMK (12)</button>
-        <button data-day="13" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G13: İcra-İflas (12)</button>
-        <button data-day="14" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G14: İdare (12)</button>
-        <button data-day="15" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G15: İYUK + Anayasa 1 (12)</button>
-        <button data-day="16" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G16: Anayasa 2 + AYM (12)</button>
-        <button data-day="17" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G17: İş Hukuku + VUK (14)</button>
-        <button data-day="18" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G18: Vergi + Avukatlık (17)</button>
-        <button data-day="19" class="day-filter-btn px-2.5 py-1 rounded bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800 whitespace-nowrap">G19: Uluslararası & Kültür (37)</button>
-      </div>
+  <main class="wrap">
+    <section class="intro">
+      <h1>Çıkmış Röntgeni</h1>
+      <p>Son iki sınavın 240 sorusu, gün gün. Cevabı önce kendin düşün, sonra açıklamayı oku. Çözüp tekrar etmek için Stüdyo.</p>
+    </section>
 
-      <!-- Satır 2: Ders, Tier, Sınav, Durum Filtresi ve Arama -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
-        
-        <!-- Arama -->
-        <div class="col-span-2 sm:col-span-1 md:col-span-2">
-          <input type="text" id="searchInput" placeholder="Madde no, kural veya kavram ara..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono" />
-        </div>
+    <section id="login" class="login" hidden>
+      <h2>Sorular bu cihazda yok</h2>
+      <p>Telifli oldukları için bu sorular herkese açık yerde durmuyor. Hesabınla giriş yaptığında yedeğinden yüklenir ve bu cihazda kalır.</p>
+      <button id="loginBtn" class="btn" type="button">Giriş yap</button>
+      <p id="loginErr" class="err" hidden></p>
+    </section>
 
-        <!-- Ders Filtresi -->
-        <div>
-          <select id="subjectFilter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-slate-600">
-            <option value="all">Tüm Dersler (20)</option>
-            <option value="medeni_hukuk">Medeni Hukuk (29)</option>
-            <option value="borclar_hukuku">Borçlar Hukuku (27)</option>
-            <option value="hmk">HMK (24)</option>
-            <option value="ticaret_hukuku">Ticaret Hukuku (21)</option>
-            <option value="ceza_hukuku">Ceza Hukuku (18)</option>
-            <option value="cmk">CMK (12)</option>
-            <option value="icra_iflas">İcra ve İflas (12)</option>
-            <option value="idare_hukuku">İdare Hukuku (12)</option>
-            <option value="iyuk">İYUK (6)</option>
-            <option value="anayasa_hukuku">Anayasa Hukuku (12)</option>
-            <option value="anayasa_yargisi">Anayasa Yargısı (6)</option>
-            <option value="is_hukuku">İş Hukuku (12)</option>
-            <option value="vergi_hukuku">Vergi Hukuku (10)</option>
-            <option value="vergi_usul">Vergi Usul (2)</option>
-            <option value="avukatlik">Avukatlık Hukuku (7)</option>
-            <option value="milletlerarasi_hukuk">Milletlerarası Hukuk (10)</option>
-            <option value="mohuk">MÖHUK (3)</option>
-            <option value="hukuk_felsefesi">Hukuk Felsefesi (6)</option>
-            <option value="hukuk_tarihi">Türk Hukuk Tarihi (6)</option>
-            <option value="genel_kamu">Genel Kamu Hukuku (5)</option>
+    <section id="app" hidden>
+      <div class="filters">
+        <label class="search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" type="search" placeholder="Madde, kural veya kavram ara" autocomplete="off" enterkeyhint="search" aria-label="Ara">
+        </label>
+        <div class="days" id="days" role="group" aria-label="Gün seç"></div>
+        <p class="day-note" id="dayNote"></p>
+        <div class="selects">
+          <select id="fSubject" aria-label="Ders"></select>
+          <select id="fExam" aria-label="Sınav"></select>
+          <select id="fStatus" aria-label="Durum">
+            <option value="all">Tüm durumlar</option>
+            <option value="todo">Kalanlar</option>
+            <option value="done">Pekiştirilenler</option>
+            <option value="star">Yıldızlılar</option>
           </select>
+          <span class="count" id="count" aria-live="polite"></span>
         </div>
-
-        <!-- Tier Filtresi -->
-        <div>
-          <select id="tierFilter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-slate-600">
-            <option value="all">Tüm Öncelikler</option>
-            <option value="1">Tier 1: Büyük 5 Ders (119 Soru)</option>
-            <option value="2">Tier 2: İkinci Omurga (84 Soru)</option>
-            <option value="3">Tier 3: Usul & Kültür (37 Soru)</option>
-          </select>
-        </div>
-
-        <!-- Sınav Filtresi -->
-        <div>
-          <select id="examFilter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-slate-600">
-            <option value="all">Tüm Sınavlar (240)</option>
-            <option value="HMGS Nisan 2026">Nisan 2026 (120)</option>
-            <option value="HMGS Eylul 2025">Eylül 2025 (120)</option>
-          </select>
-        </div>
-
-        <!-- Durum Filtresi -->
-        <div>
-          <select id="statusFilter" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-slate-600">
-            <option value="all">Tüm Durumlar</option>
-            <option value="pending">Henüz Bakılmayanlar</option>
-            <option value="completed">Pekiştirilenler</option>
-            <option value="starred">Yıldızlı Odaklar</option>
-          </select>
-        </div>
-
       </div>
-
-    </div>
-  </section>
-
-  <!-- Kart Listesi Alanı (Yan Yana Izgara) -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
-
-    <!-- Kasa Girişi: 240 çıkmış soru public'te yok, Google kasasından gelir -->
-    <div id="roentgenLogin" class="hidden max-w-lg mx-auto mb-6">
-      <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-center">
-        <div class="mx-auto mb-3 w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-        </div>
-        <h3 class="text-sm font-bold text-white mb-1">Çıkmış Röntgeni Kasada</h3>
-        <p class="text-xs text-slate-400 leading-relaxed mb-4">
-          240 çıkmış soru, doğru cevap ve ÖSYM tuzağı analizi telifli veri sınıfındadır;
-          bu yüzden public depoda tutulmaz. Kendi Google hesabınızla giriş yaptığınızda
-          kişisel kasanızdan yüklenir.
-        </p>
-        <button id="roentgenLoginBtn" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors">
-          Google ile Giriş Yap
-        </button>
-        <p id="roentgenLoginErr" class="hidden mt-3 text-[11px] text-rose-400 leading-relaxed"></p>
+      <div class="grid" id="grid"></div>
+      <div class="empty" id="empty" hidden>
+        <p>Bu filtreye uyan soru yok.</p>
+        <button id="clear" class="btn-quiet" type="button">Filtreleri temizle</button>
       </div>
-    </div>
-
-    <div class="flex items-center justify-between mb-4">
-      <div class="text-xs text-slate-400 font-mono">
-        <span id="filteredCount">240</span> odak noktası listeleniyor
-      </div>
-      <div class="text-[11px] text-slate-500 font-mono hidden sm:block">
-        Her kart: Çekirdek Hüküm + ÖSYM Tuzağı + 27 Eylül İkiz Tahmini + Aktif Test
-      </div>
-    </div>
-
-    <!-- Modüler Izgara -->
-    <div id="cardsGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-      <!-- JavaScript tarafından dinamik oluşturulur -->
-    </div>
-
-    <!-- Boş Durum -->
-    <div id="emptyState" class="hidden py-16 text-center">
-      <p class="text-sm font-semibold text-slate-300 mb-1">Arama kriterlerine uygun odak bulunamadı.</p>
-      <p class="text-xs text-slate-500">Lütfen filtrelerinizi temizleyin veya farklı bir arama terimi girin.</p>
-    </div>
+      <div class="reset"><button id="reset" class="btn-quiet" type="button">İlerlemeyi sıfırla</button></div>
+    </section>
   </main>
 
-  <!-- Alt Bilgi -->
-  <footer class="border-t border-slate-900 bg-slate-950 px-4 sm:px-6 py-4 text-center text-xs text-slate-500">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-      <span>HMGS 240 Çıkmış Soru & ÖSYM Odak Röntgeni &middot; 27 Eylül 2026 Hedefli</span>
-      <span class="font-mono text-[11px] text-slate-600">İlerleme LocalStorage'da · Soru verisi Google kasanızda</span>
+  <dialog class="sheet" id="sheet" aria-labelledby="sTitle">
+    <div class="sheet-head">
+      <div class="kicker" id="sKicker"></div>
+      <span class="pos" id="sPos"></span>
+      <button class="icon-btn" id="sClose" type="button" aria-label="Kapat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
     </div>
-  </footer>
+    <div class="sheet-body" id="sBody"></div>
+    <div class="sheet-foot">
+      <button class="pill" id="bPrev" type="button" aria-label="Önceki soru">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        <span class="lbl-long">Önceki</span>
+      </button>
+      <div class="foot-mid">
+        <button class="pill p-star" id="bStar" type="button" aria-pressed="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>
+          <span class="lbl-long">Sonra bak</span>
+        </button>
+        <button class="pill p-done" id="bDone" type="button" aria-pressed="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span id="bDoneLbl">Pekiştirdim</span>
+        </button>
+      </div>
+      <button class="pill" id="bNext" type="button" aria-label="Sonraki soru">
+        <span class="lbl-long">Sonraki</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+  </dialog>
 
-  <!-- Soru & Veri Yükleme -->
   <!-- cikmis_roentgen_data.js: yalnız YEREL geliştirmede var (window.HMGS_ROENTGEN_DATA).
-       Prod'da yoktur, 404 sessizce yutulur — veri Google kasasından (vault.roentgen) gelir. -->
+       Prod'da yoktur, 404 sessizce yutulur; veri kişisel yedekten (vault.roentgen) gelir. -->
   <script src="cikmis_roentgen_data.js"></script>
   <script>
-    // LocalStorage Yönetimi
-    const STORAGE_KEY_COMPLETED = 'hmgs_roentgen_completed';
-    const STORAGE_KEY_STARRED = 'hmgs_roentgen_starred';
-    const STORAGE_KEY_DRILL_ANSWERS = 'hmgs_roentgen_drills';
+  (function () {
+    'use strict';
 
-    let completedIds = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_COMPLETED) || '[]'));
-    let starredIds = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY_STARRED) || '[]'));
-    let drillAnswers = JSON.parse(localStorage.getItem(STORAGE_KEY_DRILL_ANSWERS) || '{}');
+    var K_DONE = 'hmgs_roentgen_completed';   // eski anahtarlar korundu: mevcut ilerleme kaybolmaz
+    var K_STAR = 'hmgs_roentgen_starred';
+    var PLAN_START = new Date(2026, 8, 8);    // Gün 1 = 8 Eylül 2026 (veri 8 Eylül'de üretildi, sınav 27 Eylül)
+    var PLAN_DAYS = 19;
+    var MONTHS = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    var MONTH_KEY = { ocak: 1, subat: 2, mart: 3, nisan: 4, mayis: 5, haziran: 6, temmuz: 7, agustos: 8, eylul: 9, ekim: 10, kasim: 11, aralik: 12 };
 
-    function saveState() {
-      localStorage.setItem(STORAGE_KEY_COMPLETED, JSON.stringify([...completedIds]));
-      localStorage.setItem(STORAGE_KEY_STARRED, JSON.stringify([...starredIds]));
-      localStorage.setItem(STORAGE_KEY_DRILL_ANSWERS, JSON.stringify(drillAnswers));
-      updateProgressUI();
-    }
-
-    function updateProgressUI() {
-      const total = window.HMGS_ROENTGEN_DATA ? window.HMGS_ROENTGEN_DATA.length : 240;
-      const done = completedIds.size;
-      const pct = Math.round((done / total) * 100);
-
-      const statsEl = document.getElementById('progressStats');
-      const barEl = document.getElementById('progressBar');
-      const mobText = document.getElementById('mobileProgressText');
-
-      if (statsEl) statsEl.textContent = `${done} / ${total} (%${pct})`;
-      if (barEl) barEl.style.width = `${pct}%`;
-      if (mobText) mobText.textContent = `${done}/${total}`;
-    }
-
-    // Filtreleme Durumu
-    let currentFilters = {
-      day: 'all',
-      subject: 'all',
-      tier: 'all',
-      exam: 'all',
-      status: 'all',
-      search: ''
-    };
-
-    function renderCards() {
-      const grid = document.getElementById('cardsGrid');
-      const emptyState = document.getElementById('emptyState');
-      const countEl = document.getElementById('filteredCount');
-
-      if (!window.HMGS_ROENTGEN_DATA) return;
-
-      const filtered = window.HMGS_ROENTGEN_DATA.filter(item => {
-        // Day filter
-        if (currentFilters.day !== 'all' && item.gun !== parseInt(currentFilters.day)) return false;
-        // Subject filter
-        if (currentFilters.subject !== 'all' && item.dersSlug !== currentFilters.subject) return false;
-        // Tier filter
-        if (currentFilters.tier !== 'all' && item.tier !== parseInt(currentFilters.tier)) return false;
-        // Exam filter
-        if (currentFilters.exam !== 'all' && item.sinav !== currentFilters.exam) return false;
-        // Status filter
-        if (currentFilters.status === 'completed' && !completedIds.has(item.id)) return false;
-        if (currentFilters.status === 'starred' && !starredIds.has(item.id)) return false;
-        if (currentFilters.status === 'pending' && completedIds.has(item.id)) return false;
-        // Search
-        if (currentFilters.search) {
-          const q = currentFilters.search.toLowerCase();
-          const match = item.konu.toLowerCase().includes(q) ||
-                        item.cekirdekKural.toLowerCase().includes(q) ||
-                        item.mevzuatRef.toLowerCase().includes(q) ||
-                        item.soruKoku.toLowerCase().includes(q) ||
-                        item.dersAdi.toLowerCase().includes(q);
-          if (!match) return false;
-        }
-        return true;
+    var $ = function (id) { return document.getElementById(id); };
+    var esc = function (s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
       });
+    };
+    function loadSet(k) { try { return new Set(JSON.parse(localStorage.getItem(k) || '[]')); } catch (e) { return new Set(); } }
+    function saveSet(k, s) { try { localStorage.setItem(k, JSON.stringify(Array.from(s))); } catch (e) {} }
 
-      countEl.textContent = filtered.length;
+    var done = loadSet(K_DONE), star = loadSet(K_STAR);
+    var items = [], view = [], srcRef = null, today = 0, openAt = -1, dirty = false, revealed = false;
+    var F = { day: 'all', subject: 'all', exam: 'all', status: 'all', q: '' };
 
-      if (filtered.length === 0) {
-        grid.innerHTML = '';
-        emptyState.classList.remove('hidden');
-        return;
+    // ---------- Veri hazırlığı ----------
+    var PRE = /(^|\n)\s*I\.\s/;
+    var NEG = /(yanlış(tır)?|değildir|söylenemez|yapılamaz|bulunmaz|bulunmamaktadır|geçerli olmaz|aykırı olmayan|uygun düşmez|savunulamaz|kabul edilemez|sayılamaz|uygulanamaz|gerekmez|yoktur|olamaz|içermez|kapsamaz)\b/i;
+    var ASK = /(hangisi|hangileri|hangi)/i;
+
+    function lastQuestionLine(s) {
+      var lines = String(s || '').trim().split('\n').map(function (x) { return x.trim(); })
+        .filter(function (l) { return l && !/^[IVX]+\.\s/.test(l); });
+      return lines.length ? lines[lines.length - 1] : String(s || '');
+    }
+    function examInfo(name) {
+      var y = (String(name).match(/\d{4}/) || ['0'])[0];
+      var words = String(name).toLowerCase().match(/[a-zçğıöşü]+/g) || [];
+      var m = 0;
+      for (var i = 0; i < words.length; i++) { if (MONTH_KEY[words[i]]) { m = MONTH_KEY[words[i]]; break; } }
+      var label = m ? MONTHS[m] + ' ' + y : String(name).replace(/^HMGS\s*/, '');
+      return { rank: (+y) * 100 + m, label: label, short: m ? MONTHS[m].slice(0, 3) + ' ' + y : label };
+    }
+
+    // --- Kart başlığı ve künyesi -------------------------------------------------
+    // `mevzuatRef` üç ayrı biçimde geliyor: "<künye> - <konu>", "<konu> (<künye>)" ve
+    // künye ya da genel etiketin tek başına durduğu hâl. Başlık her zaman konu olmalı,
+    // künye altta durmalı; aksi hâlde kartların yarısı "TBK m. 9" diye adlanıyor.
+    var ARTICLE = /^(.{3,90}?\bm\.\s?\d+(?:\/\d+)?(?:-\d+)?(?:\s+vd\.)?)\s+(?:uyarınca|gereğince|hükmüne göre|göre)\s+/;
+    var PAREN_CITE = /\s*\(([^)]*\bm\.\s?\d[^)]*)\)\s*$/;
+    var CITEY = /(\bm\.\s?\d|\bmadde\s?\d|\d{3,5}\s*sayılı|^[A-ZÇĞİÖŞÜ]{2,6}$|İç ?Tüzüğ|İçtüzüğ)/;
+    var SHORT = [[/Türk Medeni Kanunu/g, 'TMK'], [/Türk Borçlar Kanunu/g, 'TBK'], [/Türk Ceza Kanunu/g, 'TCK'],
+      [/Ceza Muhakemesi Kanunu/g, 'CMK'], [/Hukuk Muhakemeleri Kanunu/g, 'HMK'], [/Türk Ticaret Kanunu/g, 'TTK'],
+      [/İcra ve İflas Kanunu/g, 'İİK'], [/Vergi Usul Kanunu/g, 'VUK'], [/İdari Yargılama Usulü Kanunu/g, 'İYUK'],
+      [/Devlet Memurları Kanunu/g, 'DMK'], [/Avrupa İnsan Hakları Sözleşmesi/g, 'AİHS'],
+      [/1982 Anayasası|T\.C\. Anayasası/g, 'Anayasa']];
+
+    function cap(s) { return s.charAt(0).toLocaleUpperCase('tr') + s.slice(1); }
+
+    // Yalnız gürültü atılır ("6098 sayılı", açıklama parantezleri), metin yeniden kurulmaz:
+    // kanun künyesi hukuki bilgi, yeniden yazmak hata riski. Tam hâli okuma sayfasında durur.
+    function shortLaw(s) {
+      var had = /\d{3,5}\s*sayılı/.test(s), x = ' ' + s + ' ';
+      x = x.replace(/\s\d{3,5}\s*sayılı\s*/g, ' ');
+      for (var i = 0; i < SHORT.length; i++) x = x.replace(SHORT[i][0], SHORT[i][1]);
+      x = x.replace(/\s*\(([^)]{5,})\)\s*/g, ' ');       // açıklama parantezi; (I), (IV) korunur
+      x = x.replace(/\s+/g, ' ').replace(/^[\s,;]+|[\s,;]+$/g, '');
+      if (had && /^Kanun\b/.test(x)) {                    // "6701 sayılı Kanun" çıplak kalmasın
+        var m = s.match(/(\d{3,5}\s*sayılı)/); if (m) x = m[1] + ' ' + x;
       }
+      return x;
+    }
+    function articleList(s) {
+      var out = [], re = /\bm\.\s?\d+(?:\/\d+)?(?:-\d+)?/g, m;
+      while ((m = re.exec(s))) out.push(m[0].replace(/^m\.\s?/, ''));
+      return out;
+    }
+    function cutTitle(t) {
+      return t.replace(/\s*[;:]\s.*$/, '')            // "Yasama Dokunulmazlığı; m. 101 - ..."
+        .replace(/[\s,]+(?:ve\s+)?m\.\s?\d.*$/, '')   // "... ve m. 43 - ...", "..., m. 94-96"
+        .replace(/\s+-\s+.*$/, '')
+        .replace(/[\s,;.]+$/, '').trim();
+    }
+    function pickTag(tags, ref, ders) {
+      // `mevzuatRef` ilk etiketin aynısıysa etiketler taksonomiden gelen bölüm kovaları
+      // demektir ve soruyla tutmuyor (ölçüldü: "Satış Sözleşmesi ve Ayıp" etiketli kayıt
+      // TBK m. 117/2 temerrüdü anlatıyor). Yanlış başlık yerine madde numarası kullanılır.
+      if (tags.length && String(tags[0]).trim() === ref) return '';
+      for (var i = 0; i < tags.length; i++) {
+        var t = String(tags[i]).replace(PAREN_CITE, '').trim();
+        if (t && t !== ref && t !== ders && !CITEY.test(t) && t.indexOf('…') < 0 && t.length <= 64) return t;
+      }
+      return '';
+    }
+    function titleOf(r, body) {
+      var ref = String(r.mevzuatRef || '').trim(), tags = r.etiketler || [], ders = r.dersAdi || '';
+      var title = '', law = '', k = ref.indexOf(' - ');
+      if (k > 0) {
+        var head = ref.slice(0, k), tail = ref.slice(k + 3);
+        if (CITEY.test(tail) && !CITEY.test(head)) { var s = head; head = tail; tail = s; }  // ters yazılmış
+        var ex = articleList(tail);
+        law = shortLaw(head) + (ex.length ? ', ' + ex.join(', ') : '');
+        title = cutTitle(tail);
+      } else if (PAREN_CITE.test(ref)) {
+        law = shortLaw(ref.match(PAREN_CITE)[1]);
+        title = cutTitle(ref.replace(PAREN_CITE, ''));
+      } else if (/\d/.test(ref)) {
+        var c = pickTag(tags, ref, ders);
+        if (c) { title = c; law = shortLaw(ref); } else { title = shortLaw(ref); }
+      } else {
+        var c2 = pickTag(tags, ref, ders), am = body.match(ARTICLE), art = am ? shortLaw(am[1]) : '';
+        if (c2) { title = c2; law = art; } else { title = art || ref; }
+      }
+      var p = title.match(PAREN_CITE);
+      if (p) { if (!law) law = shortLaw(p[1]); title = cutTitle(title.replace(PAREN_CITE, '')); }
+      if (!title) { title = shortLaw(ref) || ref; law = ''; }
+      return { title: title, law: law };
+    }
 
-      emptyState.classList.add('hidden');
+    function prepare(data) {
+      var dersOrder = {}, n = 0;
+      data.forEach(function (r) { if (!(r.dersSlug in dersOrder)) dersOrder[r.dersSlug] = n++; });
+      items = data.map(function (r) {
+        var ref = r.mevzuatRef || '';
+        var ex = examInfo(r.sinav || '');
+        var last = lastQuestionLine(r.soruKoku);
+        var body = r.otopsi || r.cekirdekKural || '';   // kart özeti = açıklamanın ilk satırları (CSS keser)
+        var t = titleOf(r, body), summary = body;
+        // Özet, başlığı oluşturan madde cümleciğiyle başlıyorsa onu tekrarlamasın.
+        var am = body.match(ARTICLE);
+        if (am && body.length - am[0].length > 20) summary = cap(body.slice(am[0].length));
+        var it = {
+          id: r.id, gun: r.gun, ders: r.dersAdi || '', slug: r.dersSlug || '', sinav: r.sinav || '',
+          exLabel: ex.label, exShort: ex.short, exRank: ex.rank, no: r.soruNo, dOrder: dersOrder[r.dersSlug],
+          title: t.title, law: t.law, refFull: ref, rule: summary, stem: r.soruKoku || '',
+          opts: r.secenekler || {}, ans: r.dogruCevap,
+          expl: body, pre: PRE.test(r.soruKoku || ''), neg: NEG.test(last) && ASK.test(last)
+        };
+        it.hay = [it.ders, ref, body, it.stem, (r.etiketler || []).join(' ')].join(' ').toLocaleLowerCase('tr');
+        return it;
+      });
+      items.sort(function (a, b) { return a.gun - b.gun || a.dOrder - b.dOrder || a.exRank - b.exRank || a.no - b.no; });
+    }
 
-      grid.innerHTML = filtered.map(item => {
-        const isDone = completedIds.has(item.id);
-        const isStar = starredIds.has(item.id);
-        const drillAns = drillAnswers[item.id]; // undefined, true, false
-        const tierBadgeClass = item.tier === 1 ? 'badge-tier1' : (item.tier === 2 ? 'badge-tier2' : 'badge-tier3');
+    function planDayToday() {
+      var t = new Date(), t0 = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+      var n = Math.round((t0 - PLAN_START) / 864e5) + 1;
+      return n >= 1 && n <= PLAN_DAYS ? n : 0;
+    }
 
-        return `
-          <div class="roentgen-card rounded-xl p-5 flex flex-col justify-between ${isDone ? 'completed' : ''} ${isStar ? 'starred' : ''}" id="card-${item.id}">
-            <div>
-              <!-- Üst Meta Bilgileri -->
-              <div class="flex items-center justify-between gap-2 mb-3">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                    ${item.sinav.replace('HMGS ', '')} &middot; S${item.soruNo}
-                  </span>
-                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded ${tierBadgeClass}">
-                    ${item.dersAdi}
-                  </span>
-                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
-                    G${item.gun}
-                  </span>
-                </div>
+    // ---------- Süzgeç arayüzü ----------
+    function buildFilters() {
+      var days = [], seen = {};
+      items.forEach(function (it) { if (!seen[it.gun]) { seen[it.gun] = 1; days.push(it.gun); } });
+      var h = '<span class="days-label">Gün</span>';
+      if (today) h += '<button class="chip" type="button" data-day="late" aria-pressed="false">Geride<b id="lateN"></b></button>';
+      h += '<button class="chip" type="button" data-day="all" aria-pressed="false">Tümü</button>';
+      days.forEach(function (d) {
+        h += '<button class="chip' + (d === today ? ' today' : '') + '" type="button" data-day="' + d + '" aria-pressed="false" aria-label="Gün ' + d + (d === today ? ', bugün' : '') + '">' + d + '</button>';
+      });
+      $('days').innerHTML = h;
 
-                <div class="flex items-center gap-1">
-                  <!-- Yıldız Butonu -->
-                  <button onclick="toggleStar('${item.id}')" class="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors" title="${isStar ? 'Yıldızı Kaldır' : 'Yıldızla'}">
-                    <svg class="w-4 h-4 ${isStar ? 'text-amber-400 fill-amber-400' : 'fill-none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
-                  </button>
+      var subj = [], sSeen = {};
+      items.forEach(function (it) { if (!sSeen[it.slug]) { sSeen[it.slug] = { name: it.ders, n: 0 }; subj.push(it.slug); } sSeen[it.slug].n++; });
+      $('fSubject').innerHTML = '<option value="all">Tüm dersler</option>' + subj.map(function (s) {
+        return '<option value="' + esc(s) + '">' + esc(sSeen[s].name) + ' (' + sSeen[s].n + ')</option>';
+      }).join('');
 
-                  <!-- Tamamlandı Butonu -->
-                  <button onclick="toggleDone('${item.id}')" class="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-emerald-400 transition-colors" title="${isDone ? 'İşareti Kaldır' : 'Pekiştirildi Olarak İşaretle'}">
-                    <svg class="w-4 h-4 ${isDone ? 'text-emerald-400 fill-emerald-500/20' : 'fill-none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Konu ve Kanun Referansı -->
-              <div class="mb-3">
-                <h3 class="text-sm font-bold text-white tracking-tight">${item.konu}</h3>
-                <p class="text-[11px] font-mono text-indigo-400 mt-0.5">${item.mevzuatRef}</p>
-              </div>
-
-              <!-- Çekirdek Hüküm (Kural) -->
-              <div class="bg-slate-900/90 border border-slate-800 rounded-lg p-3 mb-3">
-                <div class="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider mb-1">
-                  Çekirdek Pozitif Hukuk Kuralı
-                </div>
-                <p class="text-xs text-slate-200 leading-relaxed font-medium">
-                  ${item.cekirdekKural}
-                </p>
-              </div>
-
-              <!-- ÖSYM Tuzağı -->
-              <div class="bg-slate-900/60 border border-slate-800/80 rounded-lg p-2.5 mb-3">
-                <div class="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-wider mb-1">
-                  ÖSYM Çeldirici Mekanizması & Tuzağı
-                </div>
-                <p class="text-[11px] text-slate-300 leading-normal">
-                  ${item.osymTuzagi}
-                </p>
-              </div>
-
-              <!-- 27 Eylül İkiz Tahmin -->
-              <div class="bg-indigo-950/40 border border-indigo-900/40 rounded-lg p-2.5 mb-3">
-                <div class="text-[10px] font-mono font-bold text-indigo-300 uppercase tracking-wider mb-1">
-                  27 Eylül 2026 Sınav Projeksiyonu
-                </div>
-                <p class="text-[11px] text-indigo-100 leading-normal">
-                  ${item.ikizTahmin2026}
-                </p>
-              </div>
-
-              <!-- Orijinal Soru Akordeonu (Aç/Kapa) -->
-              <div class="mb-3">
-                <button onclick="toggleStem('${item.id}')" class="text-[11px] font-mono text-slate-400 hover:text-slate-200 flex items-center gap-1.5 focus:outline-none">
-                  <span id="stem-arrow-${item.id}">›</span>
-                  <span>Orijinal Sınav Sorusu ve Şıkları Göster</span>
-                </button>
-                <div id="stem-content-${item.id}" class="hidden mt-2 p-3 rounded-lg bg-slate-950 border border-slate-900 text-xs text-slate-300 space-y-2">
-                  <p class="font-medium text-slate-200 leading-relaxed whitespace-pre-line">${item.soruKoku}</p>
-                  <div class="space-y-1 pt-2 border-t border-slate-800 text-[11px]">
-                    <div class="${item.dogruCevap === 'A' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">A) ${item.secenekler.A}</div>
-                    <div class="${item.dogruCevap === 'B' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">B) ${item.secenekler.B}</div>
-                    <div class="${item.dogruCevap === 'C' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">C) ${item.secenekler.C}</div>
-                    <div class="${item.dogruCevap === 'D' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">D) ${item.secenekler.D}</div>
-                    <div class="${item.dogruCevap === 'E' ? 'text-emerald-400 font-bold' : 'text-slate-400'}">E) ${item.secenekler.E}</div>
-                  </div>
-                  <div class="pt-2 text-[11px] text-slate-400 border-t border-slate-800">
-                    <span class="text-emerald-400 font-bold">Doğru Şık: ${item.dogruCevap}</span> &middot; ${item.otopsi}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Hızlı Aktif Hatırlama Testi (Flash-Check) -->
-              <div class="border-t border-slate-800/80 pt-3">
-                <div class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span>Hızlı Pekiştirme Testi</span>
-                  ${drillAns !== undefined ? `<span class="text-[10px] ${drillAns ? 'text-emerald-400' : 'text-red-400'}">${drillAns ? '✓ Doğru Bildin' : '✕ Hatalı Seçim'}</span>` : ''}
-                </div>
-                <p class="text-xs text-slate-300 mb-2 font-medium">${item.hizliTest.soru}</p>
-                <div class="space-y-1.5" id="drill-options-${item.id}">
-                  ${item.hizliTest.secenekler.map((opt, oIdx) => {
-                    const isCorrectChoice = oIdx === item.hizliTest.dogruIndex;
-                    let btnClass = 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700';
-                    if (drillAns !== undefined) {
-                      if (isCorrectChoice) {
-                        btnClass = 'bg-emerald-950/60 border-emerald-700 text-emerald-300 font-semibold';
-                      } else {
-                        btnClass = 'bg-slate-950 border-slate-900 text-slate-500 opacity-60';
-                      }
-                    }
-                    return `
-                      <button onclick="answerDrill('${item.id}', ${oIdx})" ${drillAns !== undefined ? 'disabled' : ''} class="w-full text-left p-2 rounded text-[11px] border transition-colors flex items-start gap-2 ${btnClass}">
-                        <span class="font-mono text-slate-500 shrink-0">${['A', 'B', 'C'][oIdx]})</span>
-                        <span class="leading-tight">${opt}</span>
-                      </button>
-                    `;
-                  }).join('')}
-                </div>
-                <div id="drill-feedback-${item.id}" class="${drillAns !== undefined ? '' : 'hidden'} mt-2 text-[10px] font-mono text-slate-400 bg-slate-950/80 p-2 rounded border border-slate-900">
-                  ${item.hizliTest.gerekce}
-                </div>
-              </div>
-
-            </div>
-
-            <!-- Kart Altı Butonları -->
-            <div class="pt-3 mt-3 border-t border-slate-800/60 flex items-center justify-between text-xs">
-              <button onclick="toggleDone('${item.id}')" class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${isDone ? 'bg-emerald-900/40 border-emerald-700 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'}">
-                ${isDone ? '✓ Pekiştirildi' : 'Pekiştirildi Olarak İşaretle'}
-              </button>
-              <button onclick="toggleStar('${item.id}')" class="text-xs text-slate-400 hover:text-amber-400 transition-colors">
-                ${isStar ? 'Yıldızı Kaldır' : 'Tekrar Bakmak İçin Yıldızla'}
-              </button>
-            </div>
-          </div>
-        `;
+      var ex = [], eSeen = {};
+      items.forEach(function (it) { if (!eSeen[it.sinav]) { eSeen[it.sinav] = it; ex.push(it); } });
+      ex.sort(function (a, b) { return a.exRank - b.exRank; });
+      $('fExam').innerHTML = '<option value="all">Tüm sınavlar</option>' + ex.map(function (e) {
+        return '<option value="' + esc(e.sinav) + '">' + esc(e.exLabel) + '</option>';
       }).join('');
     }
 
-    // Kart Etkileşim Fonksiyonları
-    window.toggleDone = function(id) {
-      if (completedIds.has(id)) {
-        completedIds.delete(id);
-      } else {
-        completedIds.add(id);
+    function syncChips(scrollTo) {
+      var box = $('days'), chips = box.querySelectorAll('.chip'), active = null;
+      for (var i = 0; i < chips.length; i++) {
+        var on = chips[i].dataset.day === String(activeDay());
+        chips[i].setAttribute('aria-pressed', String(on));
+        if (on) active = chips[i];
       }
-      saveState();
-      renderCards();
-    };
-
-    window.toggleStar = function(id) {
-      if (starredIds.has(id)) {
-        starredIds.delete(id);
-      } else {
-        starredIds.add(id);
+      // Şerit dar ekranda yatay kayıyor; seçili gün ekran dışında kalmasın.
+      if (scrollTo && active && box.scrollWidth > box.clientWidth) {
+        box.scrollTo({ left: active.offsetLeft - (box.clientWidth - active.offsetWidth) / 2, behavior: 'smooth' });
       }
-      saveState();
-      renderCards();
-    };
+    }
 
-    window.toggleStem = function(id) {
-      const content = document.getElementById(`stem-content-${id}`);
-      const arrow = document.getElementById(`stem-arrow-${id}`);
-      if (!content) return;
-      if (content.classList.contains('hidden')) {
-        content.classList.remove('hidden');
-        if (arrow) arrow.textContent = '▼';
-      } else {
-        content.classList.add('hidden');
-        if (arrow) arrow.textContent = '›';
-      }
-    };
+    function dayNote() {
+      var el = $('dayNote'), day = activeDay();
+      if (F.q) { el.textContent = 'Tüm günlerde aranıyor.'; return; }
+      if (day === 'all') { el.textContent = ''; return; }
+      if (day === 'late') { el.textContent = 'Bugünden önceki günlerde henüz pekiştirmediğin sorular.'; return; }
+      var names = [], s = {};
+      items.forEach(function (it) { if (it.gun === +day && !s[it.ders]) { s[it.ders] = 1; names.push(it.ders); } });
+      el.textContent = 'Gün ' + day + ': ' + names.join(', ') + (+day === today ? ' · plana göre bugün' : '');
+    }
 
-    window.answerDrill = function(id, choiceIdx) {
-      const item = window.HMGS_ROENTGEN_DATA.find(x => x.id === id);
-      if (!item) return;
-      const isCorrect = choiceIdx === item.hizliTest.dogruIndex;
-      drillAnswers[id] = isCorrect;
-      if (isCorrect) {
-        completedIds.add(id);
-      }
-      saveState();
-      renderCards();
-    };
-
-    // Event Listener Bağlantıları
-    document.addEventListener('DOMContentLoaded', () => {
-      updateProgressUI();
-      renderCards();
-
-      // Doz butonları
-      document.querySelectorAll('.day-filter-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          document.querySelectorAll('.day-filter-btn').forEach(b => {
-            b.classList.remove('active', 'bg-slate-800', 'text-white');
-            b.classList.add('bg-slate-900', 'text-slate-400');
-          });
-          btn.classList.add('active', 'bg-slate-800', 'text-white');
-          btn.classList.remove('bg-slate-900', 'text-slate-400');
-          currentFilters.day = btn.getAttribute('data-day');
-          renderCards();
-        });
+    function updateChrome() {
+      var d = 0, late = 0;
+      items.forEach(function (it) {
+        var isDone = done.has(it.id);
+        if (isDone) d++;
+        if (today && it.gun < today && !isDone) late++;
       });
+      $('pText').textContent = d + ' / ' + items.length;
+      $('pBar').style.width = (items.length ? d / items.length * 100 : 0) + '%';
+      var ln = $('lateN'); if (ln) ln.textContent = late;
+    }
 
-      // Ders filtresi
-      document.getElementById('subjectFilter').addEventListener('change', (e) => {
-        currentFilters.subject = e.target.value;
-        renderCards();
+    // ---------- Liste ----------
+    // Arama yapılırken gün seçimi devre dışı kalır: aranan soru başka bir günde olabilir ve
+    // "arama çalışmıyor" izlenimi vermemeli. Arama silinince gün seçimi geri gelir.
+    function activeDay() { return F.q ? 'all' : F.day; }
+
+    function applyFilters() {
+      var day = activeDay();
+      view = items.filter(function (it) {
+        if (day === 'late') { if (!(it.gun < today) || done.has(it.id)) return false; }
+        else if (day !== 'all' && it.gun !== +day) return false;
+        if (F.subject !== 'all' && it.slug !== F.subject) return false;
+        if (F.exam !== 'all' && it.sinav !== F.exam) return false;
+        if (F.status === 'todo' && done.has(it.id)) return false;
+        if (F.status === 'done' && !done.has(it.id)) return false;
+        if (F.status === 'star' && !star.has(it.id)) return false;
+        if (F.q && it.hay.indexOf(F.q) === -1) return false;
+        return true;
       });
+    }
 
-      // Tier filtresi
-      document.getElementById('tierFilter').addEventListener('change', (e) => {
-        currentFilters.tier = e.target.value;
-        renderCards();
-      });
+    var ICON_OK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+    var ICON_STAR = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>';
 
-      // Sınav filtresi
-      document.getElementById('examFilter').addEventListener('change', (e) => {
-        currentFilters.exam = e.target.value;
-        renderCards();
-      });
+    function renderGrid() {
+      applyFilters();
+      dayNote(); syncChips(); updateChrome();
+      var n = view.length;
+      $('count').textContent = n + ' soru';
+      $('empty').hidden = n > 0;
+      if (!n) { $('grid').innerHTML = ''; return; }
 
-      // Durum filtresi
-      document.getElementById('statusFilter').addEventListener('change', (e) => {
-        currentFilters.status = e.target.value;
-        renderCards();
-      });
-
-      // Arama filtresi
-      let searchTimeout;
-      document.getElementById('searchInput').addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-          currentFilters.search = e.target.value.trim();
-          renderCards();
-        }, 150);
-      });
-
-      // Sıfırla butonu
-      document.getElementById('resetProgressBtn').addEventListener('click', () => {
-        if (confirm('Tüm pekiştirme ve test ilerlemenizi sıfırlamak istediğinize emin misiniz?')) {
-          completedIds.clear();
-          starredIds.clear();
-          drillAnswers = {};
-          saveState();
-          renderCards();
+      // Ders adı grup başlığında duruyor; kartta tekrar etmez. Kartta kalan meta,
+      // o sorunun kimliği: hangi sınav, kaçıncı soru.
+      var groupCount = {};
+      view.forEach(function (it) { var k = it.gun + '|' + it.slug; groupCount[k] = (groupCount[k] || 0) + 1; });
+      var single = activeDay() !== 'all' && activeDay() !== 'late';
+      var html = '', prev = '';
+      for (var i = 0; i < n; i++) {
+        var it = view[i], key = it.gun + '|' + it.slug;
+        if (key !== prev) {
+          html += '<h2 class="group">' + (single ? '' : 'Gün ' + it.gun + ' · ') + esc(it.ders) + '<span>' + groupCount[key] + ' soru</span></h2>';
+          prev = key;
         }
-      });
+        html += '<button class="card' + (done.has(it.id) ? ' done' : '') + (star.has(it.id) ? ' star' : '') + '" type="button" data-vi="' + i + '" data-id="' + esc(it.id) + '">' +
+          '<span class="marks"><span class="m-ok">' + ICON_OK + '</span><span class="m-star">' + ICON_STAR + '</span></span>' +
+          '<span class="c-meta">' + esc(it.exShort) + ' · Soru ' + it.no + '</span>' +
+          '<span class="c-title">' + esc(it.title) + '</span>' +
+          (it.law ? '<span class="c-law">' + esc(it.law) + '</span>' : '') +
+          '<span class="c-rule">' + esc(it.rule) + '</span></button>';
+      }
+      $('grid').innerHTML = html;
+    }
+
+    function syncCard(it) {
+      var el = $('grid').querySelector('[data-id="' + it.id.replace(/"/g, '') + '"]');
+      if (!el) return;
+      el.classList.toggle('done', done.has(it.id));
+      el.classList.toggle('star', star.has(it.id));
+    }
+
+    // ---------- Okuma sayfası ----------
+    var dlg = $('sheet');
+
+    // Okuma sayfasında künyenin tam hâli durur (kartta kısaltılmışı). Başlık zaten üstte
+    // yazdığı için künyenin içinde tekrar ediyorsa o tekrar atılır.
+    function sheetLaw(it) {
+      var s = it.refFull || '';
+      if (it.title && s.indexOf(it.title) >= 0) s = s.replace(it.title, '');
+      s = s.replace(/\(\s*\)/g, '').replace(/\s+-\s+/g, ' ')   // başlık çıkınca ortada kalan ayraç
+        .replace(/\s{2,}/g, ' ').replace(/^[\s,;-]+|[\s,;-]+$/g, '').trim();
+      var w = s.match(/^\((.*)\)$/); if (w) s = w[1].trim();
+      return s || it.law || '';
+    }
+
+    function renderSheet() {
+      var it = view[openAt]; if (!it) return;
+      revealed = false;
+      $('sKicker').textContent = it.ders + ' · ' + it.exLabel + ' · Soru ' + it.no + ' · Gün ' + it.gun;
+      $('sPos').textContent = (openAt + 1) + ' / ' + view.length;
+      var tags = '';
+      if (it.pre) tags += '<span class="tag">Öncüllü</span>';
+      if (it.neg) tags += '<span class="tag">Olumsuz kök</span>';
+      var opts = ['A', 'B', 'C', 'D', 'E'].map(function (k) {
+        return it.opts[k] ? '<button class="opt" type="button" data-k="' + k + '"><span class="k">' + k + '</span><span>' + esc(it.opts[k]) + '</span></button>' : '';
+      }).join('');
+      $('sBody').innerHTML =
+        (tags ? '<div class="tags">' + tags + '</div>' : '') +
+        '<h2 class="s-title" id="sTitle">' + esc(it.title) + '</h2>' +
+        (sheetLaw(it) ? '<p class="s-law">' + esc(sheetLaw(it)) + '</p>' : '') +
+        '<div class="s-stem">' + esc(it.stem) + '</div>' +
+        '<div class="opts" id="opts">' + opts + '</div>' +
+        '<div class="reveal-row" id="revealRow"><button class="btn" id="revealBtn" type="button">Cevabı göster</button></div>' +
+        '<div class="answer" id="answer" hidden></div>';
+      $('sBody').scrollTop = 0;
+      syncFoot();
+    }
+
+    function reveal(chosen) {
+      var it = view[openAt]; if (!it || revealed) return;
+      revealed = true;
+      var box = $('opts'); box.classList.add('revealed');
+      var okBtn = box.querySelector('[data-k="' + it.ans + '"]'); if (okBtn) okBtn.classList.add('is-correct');
+      if (chosen && chosen !== it.ans) { var w = box.querySelector('[data-k="' + chosen + '"]'); if (w) w.classList.add('is-wrong'); }
+      $('revealRow').hidden = true;
+      var a = $('answer');
+      a.innerHTML = '<p class="ans-label">Doğru cevap: ' + esc(it.ans) + '</p>' +
+        (it.neg ? '<p class="neg-note">Kök olumsuz: aranan şık, kuralın dışında kalandır.</p>' : '') +
+        '<p class="expl">' + esc(it.expl) + '</p>';
+      a.hidden = false;
+      a.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    function syncFoot() {
+      var it = view[openAt]; if (!it) return;
+      $('bPrev').disabled = openAt <= 0;
+      $('bNext').disabled = openAt >= view.length - 1;
+      var d = done.has(it.id), s = star.has(it.id);
+      $('bDone').setAttribute('aria-pressed', String(d));
+      $('bDoneLbl').textContent = d ? 'Pekiştirildi' : 'Pekiştirdim';
+      $('bStar').setAttribute('aria-pressed', String(s));
+    }
+
+    function openSheet(vi) {
+      openAt = vi; renderSheet();
+      if (!dlg.open) { dlg.showModal(); document.documentElement.classList.add('lock'); }
+    }
+    function go(step) {
+      var n = openAt + step;
+      if (n < 0 || n >= view.length) return;
+      openAt = n; renderSheet();
+    }
+    function toggleMark(kind) {
+      var it = view[openAt]; if (!it) return;
+      var set = kind === 'done' ? done : star, key = kind === 'done' ? K_DONE : K_STAR;
+      if (set.has(it.id)) set.delete(it.id); else set.add(it.id);
+      saveSet(key, set); dirty = true;
+      syncCard(it); syncFoot(); updateChrome();
+    }
+
+    dlg.addEventListener('close', function () {
+      document.documentElement.classList.remove('lock');
+      if (dirty && (F.status !== 'all' || activeDay() === 'late')) renderGrid();
+      dirty = false;
     });
+    dlg.addEventListener('click', function (e) {
+      // Yalnız perdeye (backdrop) tıklamak kapatır. Klavye/ekran okuyucu ile basılan düğmelerin
+      // tıklaması (0,0 koordinatlı) ve sayfa içindeki tıklamalar buraya "dışarı" olarak düşmemeli.
+      if (e.target !== dlg) return;
+      var r = dlg.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dlg.close();
+    });
+    dlg.addEventListener('keydown', function (e) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      var k = e.key;
+      if (k === 'ArrowRight') { e.preventDefault(); go(1); }
+      else if (k === 'ArrowLeft') { e.preventDefault(); go(-1); }
+      else if (k === 'r' || k === 'R') { reveal(null); }
+      else if (k === 'd' || k === 'D') { toggleMark('done'); }
+      else if (k === 's' || k === 'S') { toggleMark('star'); }
+    });
+    $('sBody').addEventListener('click', function (e) {
+      var opt = e.target.closest('.opt');
+      if (opt) { reveal(opt.dataset.k); return; }
+      if (e.target.closest('#revealBtn')) reveal(null);
+    });
+    $('sClose').addEventListener('click', function () { dlg.close(); });
+    $('bPrev').addEventListener('click', function () { go(-1); });
+    $('bNext').addEventListener('click', function () { go(1); });
+    $('bDone').addEventListener('click', function () { toggleMark('done'); });
+    $('bStar').addEventListener('click', function () { toggleMark('star'); });
+
+    // ---------- Süzgeç olayları ----------
+    $('grid').addEventListener('click', function (e) {
+      var c = e.target.closest('.card');
+      if (c) openSheet(+c.dataset.vi);
+    });
+    $('days').addEventListener('click', function (e) {
+      var b = e.target.closest('.chip'); if (!b) return;
+      F.day = b.dataset.day; renderGrid();
+    });
+    $('fSubject').addEventListener('change', function (e) { F.subject = e.target.value; renderGrid(); });
+    $('fExam').addEventListener('change', function (e) { F.exam = e.target.value; renderGrid(); });
+    $('fStatus').addEventListener('change', function (e) { F.status = e.target.value; renderGrid(); });
+    var qTimer;
+    $('q').addEventListener('input', function (e) {
+      clearTimeout(qTimer);
+      var v = e.target.value;
+      qTimer = setTimeout(function () { F.q = v.trim().toLocaleLowerCase('tr'); renderGrid(); }, 120);
+    });
+    $('clear').addEventListener('click', function () {
+      F = { day: 'all', subject: 'all', exam: 'all', status: 'all', q: '' };
+      $('q').value = ''; $('fSubject').value = 'all'; $('fExam').value = 'all'; $('fStatus').value = 'all';
+      renderGrid();
+    });
+    var resetTimer;
+    $('reset').addEventListener('click', function () {
+      var b = $('reset');
+      if (b.dataset.armed) {
+        clearTimeout(resetTimer); delete b.dataset.armed; b.textContent = 'İlerlemeyi sıfırla';
+        done.clear(); star.clear(); saveSet(K_DONE, done); saveSet(K_STAR, star); renderGrid();
+      } else {
+        b.dataset.armed = '1'; b.textContent = 'Emin misin? Bir kez daha dokun';
+        resetTimer = setTimeout(function () { delete b.dataset.armed; b.textContent = 'İlerlemeyi sıfırla'; }, 4000);
+      }
+    });
+
+    // ---------- Dışarıya açılan kapı (kasa yükleyicisi burayı çağırır) ----------
+    window.HMGSRoentgen = {
+      hasData: function () { return items.length > 0; },
+      setData: function (data) {
+        if (!Array.isArray(data) || !data.length || data === srcRef) return;
+        srcRef = data;
+        window.HMGS_ROENTGEN_DATA = data;
+        prepare(data);
+        today = planDayToday();
+        buildFilters();
+        F = { day: today || 'all', subject: 'all', exam: 'all', status: 'all', q: '' };
+        $('login').hidden = true; $('loginErr').hidden = true;
+        $('app').hidden = false;
+        renderGrid();
+        syncChips(true);
+      },
+      showLogin: function (msg) {
+        $('login').hidden = false;
+        var e = $('loginErr');
+        if (msg) { e.textContent = msg; e.hidden = false; }
+      }
+    };
+
+    if ('IntersectionObserver' in window) {
+      var topBar = document.querySelector('.top');
+      topBar.classList.add('tt');
+      new IntersectionObserver(function (en) { topBar.classList.toggle('scrolled', !en[0].isIntersecting); },
+        { rootMargin: '-56px 0px 0px 0px' }).observe(document.querySelector('.intro h1'));
+    }
+
+    if (window.HMGS_ROENTGEN_DATA && window.HMGS_ROENTGEN_DATA.length) window.HMGSRoentgen.setData(window.HMGS_ROENTGEN_DATA);
+  })();
   </script>
 
-  <!-- Kasa Bootstrap: veriyi pasif çeker (yerel global → IndexedDB); yoksa giriş ister.
-       Verinin kendisi bu sayfada DEĞİL — public repoya soru/cevap girmesi yasak. -->
+  <!-- Kasa: veriyi önce bu cihazdan, yoksa yedekten çeker. Soru verisi bu sayfada DEĞİL;
+       herkese açık depoya soru/cevap girmesi yasak. -->
   <script type="module">
-    import { loadRoentgen, requestRoentgenFromDrive } from './studio/js/vault-client.js';
+    const app = window.HMGSRoentgen;
+    const btn = document.getElementById('loginBtn');
 
-    const loginEl = document.getElementById('roentgenLogin');
-    const btn = document.getElementById('roentgenLoginBtn');
-    const errEl = document.getElementById('roentgenLoginErr');
-
-    function apply(data) {
-      window.HMGS_ROENTGEN_DATA = data;
-      loginEl.classList.add('hidden');
-      errEl.classList.add('hidden');
-      if (typeof updateProgressUI === 'function') updateProgressUI();
-      if (typeof renderCards === 'function') renderCards();
-    }
-
-    function showLogin(msg) {
-      loginEl.classList.remove('hidden');
-      if (msg) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
-    }
-
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      btn.textContent = 'Bağlanılıyor...';
-      try {
-        apply(await requestRoentgenFromDrive());
-      } catch (e) {
-        showLogin(e && e.message ? e.message : 'Kasa verisine ulaşılamadı.');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Google ile Giriş Yap';
-      }
-    });
-
-    // İlk açılışta pasif dene; veri yoksa giriş ekranı kalır.
+    // Dinamik içe aktarma: modül yüklenemezse (bağlantı kopması vb.) sayfa sessizce boş kalmaz.
+    let vault = null;
     try {
-      const data = await loadRoentgen();
-      if (data && data.length) apply(data);
-      else if (!window.HMGS_ROENTGEN_DATA || !window.HMGS_ROENTGEN_DATA.length) showLogin();
+      vault = await import('./studio/js/vault-client.js');
     } catch (e) {
-      showLogin();
+      console.warn('[cikmis] kasa modülü yüklenemedi:', e);
+      if (!app.hasData()) {
+        btn.textContent = 'Yenile';
+        btn.addEventListener('click', () => location.reload());
+        app.showLogin('Sorular yüklenemedi. Bağlantını kontrol edip yeniden dene.');
+      }
+    }
+
+    if (vault) {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Bağlanıyor…';
+        try {
+          app.setData(await vault.requestRoentgenFromDrive());
+        } catch (e) {
+          console.warn('[cikmis] giriş/yükleme hatası:', e);
+          app.showLogin('Giriş tamamlanamadı. Bağlantını kontrol edip yeniden dene.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Giriş yap';
+        }
+      });
+
+      try {
+        const data = await vault.loadRoentgen();
+        if (data && data.length) app.setData(data);
+        else if (!app.hasData()) app.showLogin();
+      } catch (e) {
+        console.warn('[cikmis] yerel yükleme hatası:', e);
+        if (!app.hasData()) app.showLogin();
+      }
     }
   </script>
 </body>
