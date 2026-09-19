@@ -133,7 +133,9 @@ export function exportJSON() {
 /**
  * @param {object} q          soru nesnesi
  * @param {string|null} chosen seçilen şık ('A'..'E') veya null = boş
- * @param {number} ms         soruya harcanan süre (ms)
+ * @param {number} ms         soruya harcanan AKTİF süre (ms). seans.js'in
+ *   duraksatmalı saatinden gelir: sekme gizliyken ve kullanıcı boştayken
+ *   geçen zaman bu sayıya girmez. Ham (duvar) süre flags.rawMs'tedir.
  * @param {string} mode       'practice' | 'exam' | 'review' | 'flow'
  * @param {object} [flags]    davranış sinyalleri { usedElim, askedGemini, logicGuess }
  *   logicGuess: cevaptan ÖNCE ipucu istendiyse true — bu satır SRS'te olduğu gibi
@@ -153,10 +155,17 @@ export function recordAnswer(q, chosen, ms, mode, flags = {}) {
     usedElim: !!flags.usedElim,
     askedGemini: !!flags.askedGemini,
     ms: Math.max(0, Math.round(ms)),
+    // rawMs: soru ekranda kaldığı toplam süre. idleMs: bunun boşa geçen
+    // kısmı; ms + idleMs = rawMs. Eski kayıtlarda bu iki alan yoktur,
+    // okuyan taraf yokluğunu ms ile doldurur.
+    rawMs: Number.isFinite(flags.rawMs) ? Math.max(0, Math.round(flags.rawMs)) : undefined,
+    idleMs: Number.isFinite(flags.idleMs) ? Math.max(0, Math.round(flags.idleMs)) : undefined,
     attempt: prior + 1,
     mode,
     at: new Date().toISOString()
   };
+  if (row.rawMs === undefined) delete row.rawMs;
+  if (row.idleMs === undefined) delete row.idleMs;
   S.answers.push(row);
   return row;
 }
