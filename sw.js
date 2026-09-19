@@ -4,7 +4,7 @@
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-const VERSION = 'hmgs-v47';
+const VERSION = 'hmgs-v48';
 const SHELL = VERSION + '-shell';
 
 // Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
@@ -27,6 +27,7 @@ const PRECACHE = [
   './studio/js/engine.js',
   './studio/js/elim.js',
   './studio/js/store.js',
+  './studio/js/seans.js',
   './studio/js/ui.js',
   './studio/js/book-map.js',
   './studio/js/vault-client.js',
