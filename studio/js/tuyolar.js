@@ -11,6 +11,7 @@
    ========================================================================== */
 
 import { esc } from './ui.js';
+import { isPastExam, questionById } from './data.js';
 
 const ROM = /^(Yalnız\s+)?(I{1,3}|IV)(\s*,\s*(I{1,3}|IV))*(\s+ve\s+(I{1,3}|IV))?$/i;
 
@@ -283,7 +284,10 @@ function kokTaktigi(t, sec) {
  * Geri bildirim alanında görüntülenecek zengin Çıkmış Sınav Radarı HTML bloğu.
  * Yan yana iki modüler kart (CSS Grid) içeren, mat, dingin ve Apple standardında yapı.
  */
-export function kurtarmaRadariHTML({ q, chosen, ok, sec = 0, isReview = false, isMarked = false }) {
+export function kurtarmaRadariHTML({ q, chosen, ok, sec = 0, isReview = false, isMarked = false, isElimTrap = false }) {
+  if (!q) return '';
+  const fullQ = questionById.get(q.qId || q.id) || q;
+  if (!isPastExam(fullQ)) return '';
   if (ok && !isMarked && !isReview) return '';
 
   const t = soruTipleri(q);
@@ -299,40 +303,42 @@ export function kurtarmaRadariHTML({ q, chosen, ok, sec = 0, isReview = false, i
   };
 
   const fastWrong = !ok && sec > 0 && sec < 40 && chosen !== null;
-  const badgeText = fastWrong
-    ? `Hızlı Çözüldü (${Math.round(sec)} sn)`
-    : isMarked
-      ? 'Kuşkulu İşaretlenen Soru'
-      : chosen === null
-        ? 'Boş Bırakılan Soru'
-        : 'Yanlış Çözülen Soru';
+  const badgeText = isElimTrap
+    ? 'Çeldirici Tuzağı (Doğru Şıkkı Eledin)'
+    : fastWrong
+      ? `Hızlı Çözüldü (${Math.round(sec)} sn)`
+      : isMarked
+        ? 'Kuşkulu İşaretlenen Soru'
+        : chosen === null
+          ? 'Boş Bırakılan Soru'
+          : 'Yanlış Çözülen Soru';
 
   return `
-    <div class="radar-wrap" style="margin:0.85rem 0;padding:0.9rem 1rem;background:var(--bg-raise, #f7f6f2);border:1px solid var(--line, rgba(0,0,0,0.08));border-radius:8px;">
-      <div class="radar-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;padding-bottom:0.45rem;border-bottom:1px solid var(--line, rgba(0,0,0,0.06));">
-        <div style="display:flex;align-items:center;gap:0.5rem">
-          <span style="font-size:0.75rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-3, #71717a)">Çıkmış Sınav Radarı</span>
-          <span style="font-size:0.68rem;padding:0.15rem 0.45rem;background:var(--card, #fff);border:1px solid var(--line, rgba(0,0,0,0.08));border-radius:4px;color:var(--ink-2, #3f3f46)">4 Sınav · 460 Soru Verisi</span>
+    <div class="radar-wrap">
+      <div class="radar-head">
+        <div class="radar-title-group">
+          <span class="radar-title">Çıkmış Sınav Radarı</span>
+          <span class="radar-badge">4 Sınav · 460 Soru Verisi</span>
         </div>
-        <span style="font-size:0.72rem;font-weight:600;color:var(--ink-2, #52525b)">${esc(badgeText)}</span>
+        <span class="radar-status ${fastWrong ? 'fast' : isMarked ? 'marked' : ''}">${esc(badgeText)}</span>
       </div>
 
-      <div class="radar-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:0.85rem;">
-        <div class="radar-card" style="padding:0.75rem;background:var(--card, #fff);border:1px solid var(--line, rgba(0,0,0,0.06));border-radius:6px;">
-          <div style="font-size:0.75rem;font-weight:700;color:var(--ink, #18181b);margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;">
-            <span>${esc(kt.etiket)}</span>
-            <span style="font-size:0.68rem;color:var(--ink-3, #71717a);font-weight:500">Biçim Tuzağı</span>
+      <div class="radar-grid">
+        <div class="radar-card">
+          <div class="radar-card-head">
+            <span class="radar-card-title">${esc(kt.etiket)}</span>
+            <span class="radar-card-meta">Biçim Tuzağı</span>
           </div>
-          <p style="margin:0;font-size:0.82rem;line-height:1.45;color:var(--ink-2, #3f3f46)">${esc(kt.taktik)}</p>
+          <p class="radar-card-desc">${esc(kt.taktik)}</p>
         </div>
 
-        <div class="radar-card" style="padding:0.75rem;background:var(--card, #fff);border:1px solid var(--line, rgba(0,0,0,0.06));border-radius:6px;">
-          <div style="font-size:0.75rem;font-weight:700;color:var(--ink, #18181b);margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;">
-            <span>${esc(dr.ad)}</span>
-            <span style="font-size:0.68rem;color:var(--ink-3, #71717a);font-weight:500">Lider: <b>${esc(dr.enGuclu)}</b> · Zayıf: <b>${esc(dr.enZayif)}</b></span>
+        <div class="radar-card">
+          <div class="radar-card-head">
+            <span class="radar-card-title">${esc(dr.ad)}</span>
+            <span class="radar-card-meta">Lider: <b>${esc(dr.enGuclu)}</b> · Zayıf: <b>${esc(dr.enZayif)}</b></span>
           </div>
-          <p style="margin:0 0 0.4rem 0;font-size:0.78rem;color:var(--ink-3, #71717a);font-family:monospace">${esc(dr.siklar)}</p>
-          <p style="margin:0;font-size:0.82rem;line-height:1.45;color:var(--ink-2, #3f3f46)">${esc(dr.taktik)}</p>
+          <div class="radar-stats">${esc(dr.siklar)}</div>
+          <p class="radar-card-desc">${esc(dr.taktik)}</p>
         </div>
       </div>
     </div>
@@ -341,8 +347,10 @@ export function kurtarmaRadariHTML({ q, chosen, ok, sec = 0, isReview = false, i
 
 /** Geriye dönük uyumluluk: eski tuyoSec çağrıları için köprü */
 export function tuyoSec(q, { ok, hizli }) {
-  if (ok) return null;
-  const t = soruTipleri(q);
+  if (ok || !q) return null;
+  const fullQ = questionById.get(q.qId || q.id) || q;
+  if (!isPastExam(fullQ)) return null;
+  const t = soruTipleri(fullQ);
   const kt = kokTaktigi(t, 0);
   return { baslik: kt.etiket, metin: kt.taktik, tip: 'radar' };
 }
