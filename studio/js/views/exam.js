@@ -1,4 +1,7 @@
-/* ==========================================================================
+/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+   بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+   رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
+   ==========================================================================
    views/exam.js — 120 SORULUK SINAV SİMÜLASYONU
    Gerçek ders dağılımı · geri sayım · boş bırakma · soru haritası
    Kural: HMGS'de yanlış cezası yoktur → net = doğru. Asla boş bırakma.
@@ -93,6 +96,7 @@ export function startDenemeSet(sourceId) {
 export const startYekti = startDenemeSet;
 
 function beginExam(questions, { shortfall, label, real, stats }) {
+  /* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ · بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ · رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ */
   if (questions.length < 20) {
     toast('Deneme için havuz çok küçük.');
     return false;
@@ -229,6 +233,7 @@ export function render() {
 
   if (E.finished) { host.innerHTML = `<div class="wrap">${resultBlock(lastResult, false)}</div>`; return; }
 
+  /* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ · بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ · رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ */
   const q = E.questions[E.i];
   const { premise, ask } = splitStem(q.stem);
   const chosen = E.answers[E.i];
