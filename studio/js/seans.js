@@ -118,6 +118,7 @@ export function ayarla(patch) {
  * @param {object} meta { mode, label }
  */
 export function begin(meta = {}) {
+  /* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ · بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ · رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ */
   const a = ayar();
   SS = {
     mode: meta.mode || null,
@@ -246,6 +247,7 @@ export function snapshot() {
 
 /** Soru ekrana geldi. */
 export function qBegin() {
+  /* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ · بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ · رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ */
   if (!SS) return;
   SS.qAccum = 0;
   SS.qT0 = now();
