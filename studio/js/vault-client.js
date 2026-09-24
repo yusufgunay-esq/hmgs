@@ -501,8 +501,14 @@ export function mergeStudioStates(local, remote) {
   // Eski alan adları geriye dönük uyum için yedek olarak duruyor.
   const keyOf = a => `${a.at || a.ts || 0}_${a.qId || ''}_${a.chosen ?? a.opt ?? ''}_${a.mode || ''}`;
   const answersMap = new Map();
-  (local.answers || []).forEach(a => answersMap.set(keyOf(a), a));
   (remote.answers || []).forEach(a => answersMap.set(keyOf(a), a));
+  (local.answers || []).forEach(a => {
+    const k = keyOf(a);
+    const rem = answersMap.get(k);
+    if (!rem || a.ok) {
+      answersMap.set(k, a);
+    }
+  });
   const tOf = a => (a.at ? new Date(a.at).getTime() : (a.ts || 0));
   const mergedAnswers = Array.from(answersMap.values()).sort((a, b) => tOf(a) - tOf(b));
 
@@ -521,11 +527,17 @@ export function mergeStudioStates(local, remote) {
     }
   }
 
-  // 3. Exams
+  // 3. Exams (Yerel düzeltilmiş sınavları ve yüksek neti koru)
   const examsMap = new Map();
-  (local.exams || []).forEach(e => examsMap.set(e.id || e.startedAt, e));
   (remote.exams || []).forEach(e => examsMap.set(e.id || e.startedAt, e));
-  const mergedExams = Array.from(examsMap.values()).sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
+  (local.exams || []).forEach(e => {
+    const key = e.id || e.startedAt;
+    const rem = examsMap.get(key);
+    if (!rem || (Number(e.net) || 0) >= (Number(rem.net) || 0)) {
+      examsMap.set(key, e);
+    }
+  });
+  const mergedExams = Array.from(examsMap.values()).sort((a, b) => new Date(a.startedAt || a.at || 0).getTime() - new Date(b.startedAt || b.at || 0).getTime());
 
   // 4. Practice Sessions
   const sessionsMap = new Map();
