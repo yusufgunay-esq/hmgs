@@ -1,0 +1,87 @@
+﻿Copyright (c) 2026 Yusuf GÜNAY. Tüm Hakları Saklıdır / All Rights Reserved.
+
+PROPRIETARY & CONFIDENTIAL — UNLICENSED
+TESCİLLİ VE GİZLİ — LİSANS VERİLMEMİŞTİR
+
+HMGS projesinin kaynak kodları, arayüz ve görselleştirme tasarımları, simülasyon
+motorları, algoritmaları, veri şemaları ve bunlara ilişkin tüm fikri hakları
+münhasıran Yusuf GÜNAY'a aittir.
+
+Bu haklar 5846 sayılı Fikir ve Sanat Eserleri Kanunu (FSEK) m. 1/B ve m. 13 ile
+Bern Sözleşmesi m. 5/2 uyarınca, eserin yaratılmasıyla birlikte ve herhangi bir
+tescil veya bildirim şartı aranmaksızın doğar. İşbu dosyanın bulunmaması hâlinde
+dahi haklar saklıdır.
+
+Yazılı izin olmaksızın bu eserin tamamının veya bir parçasının:
+  · kopyalanması, çoğaltılması veya başka bir depoya/projeye aktarılması,
+  · değiştirilmesi veya türev eser üretilmesi,
+  · üçüncü kişilerle paylaşılması, dağıtılması veya satılması,
+  · ticari veya ticari olmayan herhangi bir ortamda yayınlanması veya barındırılması,
+  · tersine mühendisliğe tabi tutulması
+KESİNLİKLE YASAKTIR.
+
+--------------------------------------------------------------------------------
+AÇIK HÜKÜM — ÇATALLAMA (FORK) İSTİSNASI
+--------------------------------------------------------------------------------
+Bu depo, GitHub Hizmet Şartları'nın her kullanıcıya tanıdığı görüntüleme ve
+çatallama (fork) hakkı kapsamında herkese açıktır; bu hak işbu lisans ile
+sınırlandırılamaz. Buna göre:
+
+  (a) GitHub arayüzü kullanılarak oluşturulan bir çatal bu lisansı İHLAL ETMEZ;
+
+  (b) ancak bu depodan veya bir çataldan alınan kodun kopyalanıp bağımsız bir
+      depo, proje veya ürün olarak yeniden yayınlanması, dağıtılması ya da hak
+      sahibine atıf yapılmaksızın sahiplenilmesi bu lisansı İHLAL EDER ve hak
+      sahibine hukuki yollara başvurma hakkı verir.
+
+Bu istisna, deponun açık olmasının zorunlu bir sonucudur; kod üzerinde hiçbir
+kullanım, kopyalama veya türetme hakkı tanımaz.
+
+--------------------------------------------------------------------------------
+MAKİNE ÖĞRENMESİ VE VERİ MADENCİLİĞİ (TDM) REZERVİ
+--------------------------------------------------------------------------------
+Bu eser üzerinde metin ve veri madenciliği (TDM) dâhil olmak üzere tüm çoğaltma
+ve çıkarım hakları, (AB) 2019/790 sayılı Direktif m. 4/3, 2001/29/AT sayılı
+Direktif ve 5846 sayılı FSEK uyarınca AÇIKÇA SAKLI TUTULMUŞTUR.
+
+Bu depodaki kaynak kod, arayüz, tasarım, şema ve tüm içeriğin makine öğrenmesi
+veya büyük dil modellerinin eğitimi, ince ayarı, damıtılması, değerlendirilmesi
+ya da çıktı üretimi amacıyla çoğaltılması veya kullanılması
+KESİNLİKLE YASAKTIR.
+
+Bu rezerv, yayınlanan her sayfanın <head> bölümündeki
+<meta name="tdm-reservation" content="1"> ve
+<meta name="robots" content="noai, noimageai"> işaretleriyle makine tarafından
+okunabilir biçimde bildirilmiştir.
+
+Rezervin ihlali hâlinde; tecavüzün ref'i, tazminat ve ihtiyati tedbir talepleri
+dâhil FSEK ve ilgili mevzuattan doğan TÜM hukuki yollara başvurulacaktır.
+
+--------------------------------------------------------------------------------
+İHLAL BİLDİRİMİ VE İZİN TALEBİ
+--------------------------------------------------------------------------------
+İhlal şüphesini bildirmek veya kullanım izni talep etmek için:
+  https://github.com/yusufgunay-esq
+
+--------------------------------------------------------------------------------
+ENGLISH
+--------------------------------------------------------------------------------
+Strictly no permission is granted for copying, reproducing, distributing,
+modifying, sublicensing, or hosting any part of this software repository, in
+whole or in part and in any medium, whether for commercial or non-commercial
+purposes.
+
+Exception: forking through the GitHub interface is permitted under GitHub's
+Terms of Service and does not breach this license. Republishing code taken from
+this repository, or from any fork of it, as an independent repository, project
+or product is prohibited.
+
+Reservation of rights for text and data mining (TDM): all rights of reproduction
+and extraction for TDM purposes — including the training, fine-tuning,
+distillation, evaluation or output generation of machine-learning or large
+language models — are expressly reserved under Art. 4(3) of Directive (EU)
+2019/790 and are not licensed. This reservation is declared in machine-readable
+form through the "tdm-reservation" and "noai"/"noimageai" directives in the
+<head> of every published page, and in robots.txt.
+
+Contact for permission or infringement notice: https://github.com/yusufgunay-esq
