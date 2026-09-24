@@ -12,7 +12,7 @@
 
 import { $, $$, toast } from './ui.js';
 import { initData, initDataAsync, populateData, topicById, questionById } from './data.js';
-import { load, save, daysLeft, state, getSettings, updateSettings, importTakipExams } from './store.js';
+import { load, save, daysLeft, state, getSettings, updateSettings, importTakipExams, reconcilePastData } from './store.js';
 import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress, requestSilentToken, fetchVaultFromDrive } from './vault-client.js';
 import { applySrsPolicy } from './engine.js';
 import { kuralToggle } from './kural.js';
@@ -377,20 +377,33 @@ document.addEventListener('click', async e => {
     case 'exam-finish': exam.finish(false); break;
     case 'exam-export-stats': exam.exportStats(); break;
     case 'exam-filter': exam.setFilter(el.dataset.f); break;
-    case 'exam-open-review': exam.openReview(); break;
+    case 'exam-open-review': {
+      const examId = el.dataset.examId;
+      exam.openReview(examId);
+      show('exam');
+      break;
+    }
     case 'exam-back': exam.backToList(); break;
     case 'rv-goto': exam.rvGoto(Number(el.dataset.no)); break;
     case 'rv-prev': exam.rvPrev(); break;
     case 'rv-next': exam.rvNext(); break;
     case 'rv-analyze': exam.rvAnalyze(); break;
     case 'exam-review-wrong': {
-      // Tekrar havuzu yalnız yanlış ve boşlar değil: kuşkuluyken bulunan
-      // doğrular da buraya girer (net gerçek değil, soru oturmamış).
-      const ids = exam.repeatIdsOfLast();
-      const qs = ids.map(id => questionById.get(id)).filter(Boolean);
-      if (!qs.length) { toast('Son denemede tekrar edilecek soru yok.'); break; }
-      const ok = practice.startSession({ questions: qs, customLabel: `Deneme tekrarı · ${qs.length} soru` });
-      if (ok) { show('practice'); break; }
+      const examId = el.dataset.examId;
+      const qs = exam.getRepeatQuestionsForExam(examId);
+      if (!qs.length) {
+        toast('Bu denemede tekrar edilecek soru bulunamadı.');
+        break;
+      }
+      const ex = examId ? exam.getExamById(examId) : exam.activeResult();
+      const examTitle = ex ? (ex.label || 'Deneme') : 'Deneme';
+      const dateStr = ex && ex.at ? new Date(ex.at).toLocaleDateString('tr-TR') : '';
+      const customLabel = `Deneme Tekrarı · ${examTitle}${dateStr ? ' (' + dateStr + ')' : ''} · ${qs.length} soru`;
+      const ok = practice.startSession({ questions: qs, customLabel });
+      if (ok) {
+        show('practice');
+        break;
+      }
       toast('Tekrar seansı kurulamadı.');
       break;
     }
@@ -686,6 +699,13 @@ async function boot() {
 
     const rep = await initDataAsync();
 
+    // Veritabanindaki soru ve cevap anahtari duzeltmelerini gecmis verilere geriye donuk uygula
+    try {
+      reconcilePastData(questionById);
+    } catch (e) {
+      console.warn('[reconcile]', e);
+    }
+
     const d = daysLeft();
     const cd = $('#countdown');
     if (cd) cd.innerHTML = d > 0 ? `Sınava <b>${d} gün</b>` : '<b>Sınav günü</b>';
@@ -706,8 +726,12 @@ async function boot() {
 
     // Arka planda Drive'daki güncel ilerlemeyi sessizce birleştir
     syncStudioProgress(false).then(res => {
-      if (res) { try { if (applySrsPolicy() > 0) save(); } catch (e) {} }
+      if (res) {
+        try { reconcilePastData(questionById); } catch (e) {}
+        try { if (applySrsPolicy() > 0) save(); } catch (e) {}
+      }
       if (res && currentView === 'progress') progress.render($('#view-progress'));
+      if (res && currentView === 'exam') exam.render();
     }).catch(() => {});
 
     // Oturum açıksa kütüphaneyi de arka planda sessizce kontrol et ve güncelle
@@ -716,6 +740,7 @@ async function boot() {
         fetchVaultFromDrive(token).then(v => {
           if (v && Array.isArray(v.questions) && v.questions.length >= (questionById.size || 0)) {
             populateData(v);
+            try { reconcilePastData(questionById); } catch (e) {}
             if (currentView === 'exam') exam.render();
           }
         }).catch(() => {});
