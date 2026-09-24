@@ -19,14 +19,20 @@
    olay bağlama, projenin kuralı gereği (main.js: "inline onclick yok")
    data-act üzerinden merkezî dinleyiciye taşındı.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, $ } from '../ui.js';
 import { SUBJECTS, SUBJECT_BY_ID, subjectName, topicById, topicsOf, questionsOfTopic, questionsOfTopics, questionsOf } from '../data.js';
+import { getDailyPlan, setDailyPlan } from '../store.js';
 import { GENERATORS } from './pratik.js';
+import * as todayView from './today.js';
 
 let tasksCache = null;
 let tasksLoading = false;
 let tasksErr = null;
+let planSource = '';
 
 /* --------------------------------------------------------------------------
    ŞEMA ÇÖZÜMLEME
@@ -129,10 +135,52 @@ function resolveType(t) {
 function resolveGeneratorId(t) {
   const raw = String(t.generatorId || '').trim();
   if (!raw) return null;
-  if (raw === 'notes') return 'notes';              // pratik ekranı: Notlarından Tekrar
   if (GENERATORS.some(g => g.id === raw)) return raw;
-  console.warn('[odevler] Stüdyo\'da kayıtlı olmayan generatorId:', raw);
+  if (raw !== 'notes') console.warn('[odevler] Stüdyo\'da kayıtlı olmayan generatorId:', raw);
   return null;
+}
+
+/* --------------------------------------------------------------------------
+   GÜNLÜK HEDEF — KOÇ PLANINDAN
+   -------------------------------------------------------------------------- */
+
+/**
+ * Görev başlığı koç tarafından "... (s.7-10 · 5 soru)" biçiminde yazılır.
+ * Stüdyo'da çözülecek toplam soru bu sayıların toplamıdır; okuma görevlerinde
+ * ("· okuma") soru yoktur, yalnız fiziki kitapta okunur.
+ * Başlıkta sayı yoksa görev Stüdyo soru yükü sayılmaz — tahmin edilmez.
+ */
+function plannedQuestions(tasks) {
+  let questions = 0, quizTasks = 0, readingTasks = 0, counted = 0;
+
+  for (const t of tasks) {
+    const type = resolveType(t);
+    const m = String(t.title || '').match(/·\s*(\d+)\s*soru\b/);
+
+    if (type === 'review') { readingTasks++; continue; }
+    if (!m) { readingTasks++; continue; }
+    const n = Number(m[1]);
+    if (!Number.isFinite(n) || n <= 0) { readingTasks++; continue; }
+    questions += n;
+    quizTasks++;
+    counted++;
+  }
+
+  return { questions, quizTasks, readingTasks, totalTasks: tasks.length, counted };
+}
+
+/** Çekilen görevlerden bugünün planını yazar; hedef böylece tek kaynağa bağlanır. */
+function publishPlan(tasks, source) {
+  const p = plannedQuestions(tasks);
+  if (!p.questions) return;   // okuma günü: Stüdyo soru hedefi yok, taban geçerli
+  const before = getDailyPlan();
+  setDailyPlan({ ...p, source });
+  // Hedef değiştiyse Bugün ekranı eski sayıyla kalmasın.
+  if (!before || before.questions !== p.questions) renderToday();
+}
+
+function renderToday() {
+  try { todayView.render(); } catch (e) { console.warn('[odevler] today.render hatası:', e.message); }
 }
 
 /* --------------------------------------------------------------------------
@@ -167,6 +215,7 @@ export async function fetchTasks(force) {
         if (data && Array.isArray(data.tasks)) {
           tasksCache = data.tasks;
           loaded = true;
+          planSource = url;
           break;
         }
       }
@@ -178,6 +227,8 @@ export async function fetchTasks(force) {
   if (!loaded) {
     tasksErr = lastErr || 'Ödev dosyasına ulaşılamadı';
     console.warn('[odevler] claude-tasks yüklenemedi:', tasksErr);
+  } else {
+    publishPlan(tasksCache, planSource);
   }
 
   tasksLoading = false;
@@ -283,9 +334,8 @@ function butonlarHTML(type, subjectId, genId, topInfo) {
     `<button class="btn ${cls}" data-act="odev-quiz" data-subj="${esc(subjectId || '')}" data-count="15" style="font-size:0.8rem;padding:0.4rem 0.8rem">${etiket}</button>`;
 
   if (type === 'practice') {
-    const gen = genId && genId !== 'notes' ? GENERATORS.find(g => g.id === genId) : null;
-    const etiket = gen ? esc(gen.title)
-      : (genId === 'notes' ? 'Notlarından Tekrar' : 'Pratik Alanını Aç');
+    const gen = genId ? GENERATORS.find(g => g.id === genId) : null;
+    const etiket = gen ? esc(gen.title) : 'Pratik Alanını Aç';
     return `
       <button class="btn" data-act="odev-pratik" data-gen="${esc(genId || '')}" style="font-size:0.8rem;padding:0.4rem 0.8rem">${etiket}</button>
       ${(topicId || topicIds.length) ? topicTestBtn('btn-2', `Bu Konudan Test Çöz (${poolCount ? `${poolCount} soru` : 'Test'})`) : generalTestBtn('btn-2', subjectId ? 'Bu dersten test çöz' : 'Karma test çöz')}`;

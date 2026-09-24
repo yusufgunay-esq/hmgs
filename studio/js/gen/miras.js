@@ -27,6 +27,9 @@
              TAMAMI, diğer hâllerde 3/4'ü.
              Kardeşlerin saklı payı YOKTUR (2019'da m. 506'dan çıkarıldı).
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 /* ---------- kesir aritmetiği (kayan nokta kullanılmaz) ---------- */
 

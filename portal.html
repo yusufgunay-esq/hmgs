@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="tr" class="bg-slate-950 text-slate-100 antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>HMGS 2026 — Çalışma & Soru Portalı</title>
+  <meta name="description" content="HMGS 2026 Hukuk Mesleklerine Giriş Sınavı Takip, Çıkmış Röntgeni ve Soru Stüdyosu" />
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png" />
+  <link rel="shortcut icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html {
+      overflow-x: clip;
+    }
+    body {
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      overflow-x: clip;
+      -webkit-overflow-scrolling: touch;
+    }
+    .glass-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      transition: all 0.2s ease;
+    }
+    .glass-card:hover {
+      border-color: #334155;
+      transform: translateY(-2px);
+    }
+    .glass-card-featured {
+      background: #0f172a;
+      border: 1px solid #334155;
+      position: relative;
+    }
+    .glass-card-featured:hover {
+      border-color: #475569;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="min-h-screen min-h-[100dvh] flex flex-col justify-between selection:bg-indigo-900 selection:text-indigo-200 overflow-y-auto">
+
+  <!-- Üst Başlık & Durum Çubuğu -->
+  <header class="relative z-10 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md px-6 py-4">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300">
+          <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+        </div>
+        <div>
+          <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+            HMGS 2026 <span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-indigo-400 border border-slate-700">Mobil Portal</span>
+          </h1>
+          <p class="text-xs text-slate-400 font-medium">Hukuk Mesleklerine Giriş Sınavı Çalışma Sistemi</p>
+        </div>
+      </div>
+
+      <!-- Sınav Sayacı / Rozet -->
+      <div id="countdownBadge" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="countdownText">27 Eylül 2026</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Ana İçerik: Modüler Kart Izgarası -->
+  <main class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex-1 w-full flex flex-col justify-start">
+    <div class="text-center max-w-2xl mx-auto mb-8 sm:mb-10">
+      <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
+        HMGS Çalışma & Soru İstasyonu
+      </h2>
+      <p class="text-xs sm:text-sm text-slate-400 leading-relaxed">
+        Sınava kalan kritik günlerde nokta atışı çıkmış odakları, eksiksiz takip ve soru çözüm stüdyosu.
+      </p>
+    </div>
+
+    <!-- Öne Çıkan Modül: Çıkmış Röntgeni -->
+    <div class="max-w-4xl mx-auto w-full mb-6">
+      <a href="cikmis.html" class="glass-card-featured rounded-2xl p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all duration-300 group">
+        <div class="flex-1">
+          <div class="flex items-center gap-2.5 mb-2.5 flex-wrap">
+            <span class="text-xs font-mono font-semibold px-2.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+              27 Eylül Odaklı
+            </span>
+            <span class="text-xs font-mono text-slate-400">
+              19 Günlük Okuma Planı
+            </span>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors">
+            Çıkmış Röntgeni
+          </h3>
+          <p class="text-xs sm:text-sm text-slate-300 mb-4 leading-relaxed">
+            Son iki sınavın 240 sorusu, gün gün okuma planıyla. Cevabı önce kendin düşün, sonra açıklamayı ve ilgili kanun maddesini oku.
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-400 font-mono">
+            <div class="flex items-center gap-1.5">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>240 çıkmış soru</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>Kanun maddesi ve açıklama</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>Günün planı hazır</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="shrink-0 flex md:flex-col items-center justify-between md:justify-center border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-6">
+          <span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold text-xs shadow-sm hover:bg-emerald-500 transition-colors">
+            Röntgeni Aç &rarr;
+          </span>
+          <span class="text-[11px] font-mono text-slate-500 mt-2">Eylül 2025 &middot; Nisan 2026</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Yan Yana 2 Modüler Kart Izgarası (Takip + Stüdyo) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto w-full mb-8">
+      
+      <!-- Modül 1: HMGS Takip Uygulaması -->
+      <a href="HMGS_Takip_App/index.html" class="glass-card rounded-2xl p-6 flex flex-col justify-between transition-all duration-300 group">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 text-blue-400 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            </div>
+            <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-slate-900 text-blue-400 border border-slate-800">
+              Çalışma Takibi
+            </span>
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2 group-hover:text-blue-400 transition-colors">
+            HMGS Takip & Planlama
+          </h3>
+          <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+            Günlük/haftalık çalışma programı, kronometre, soru sayıları, zayıf konu analizleri ve Google Drive bulut senkronizasyonu.
+          </p>
+        </div>
+        
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-between">
+          <span class="text-xs font-semibold text-blue-400 flex items-center gap-1 group-hover:underline">
+            Takip Uygulamasını Aç &rarr;
+          </span>
+          <span class="text-[11px] font-mono text-slate-500">v2.0 PWA</span>
+        </div>
+      </a>
+
+      <!-- Modül 2: HMGS Stüdyo & Soru Çözme -->
+      <a href="studio.html" class="glass-card rounded-2xl p-6 flex flex-col justify-between transition-all duration-300 group">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 text-violet-400 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            </div>
+            <span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-slate-900 text-violet-400 border border-slate-800">
+              Soru Bankası & Konu
+            </span>
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2 group-hover:text-violet-400 transition-colors">
+            HMGS Stüdyo
+          </h3>
+          <p class="text-xs text-slate-400 mb-4 leading-relaxed">
+            3000+ güncel HMGS sorusu, resmi sınav formatında tam deneme modu, görsel konu kartları ve karar simülatörleri.
+          </p>
+        </div>
+        
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-between">
+          <span class="text-xs font-semibold text-violet-400 flex items-center gap-1 group-hover:underline">
+            Stüdyo'yu Başlat &rarr;
+          </span>
+          <span class="text-[11px] font-mono text-slate-500">Offline Hazır</span>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- Bilgi Çubuğu (Grid) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-4xl mx-auto w-full">
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5">
+        <h4 class="text-xs font-bold text-slate-200 mb-1">Ana Ekrana Ekle (PWA)</h4>
+        <p class="text-[11px] text-slate-400 leading-snug">Safari'de Paylaş &rarr; Ana Ekrana Ekle; Chrome'da Menü &rarr; Uygulamayı Yükle ile tam ekran kullanın.</p>
+      </div>
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5">
+        <h4 class="text-xs font-bold text-slate-200 mb-1">Google Drive Eşitleme</h4>
+        <p class="text-[11px] text-slate-400 leading-snug">Takip uygulamasında 'Drive'a Bağlan' butonuna tıklayarak PC ve telefon verilerinizi anında eşitleyin.</p>
+      </div>
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5">
+        <h4 class="text-xs font-bold text-slate-200 mb-1">GitHub Güncellemeleri</h4>
+        <p class="text-[11px] text-slate-400 leading-snug">PC'de yapılan tüm soru ve konu güncellemeleri anında cep telefonunuza yansır.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Alt Bilgi -->
+  <footer class="relative z-10 border-t border-slate-800/80 bg-slate-950 px-6 py-4 text-center text-xs text-slate-500">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>HMGS 2026 Hazırlık & Yönetim Ekosistemi</span>
+      <span class="font-mono text-[11px] text-slate-600">GitHub Pages + Google Cloud Synced</span>
+    </div>
+  </footer>
+
+  <script>
+    try {
+      const examDate = new Date('2026-09-27T10:15:00');
+      const now = new Date();
+      const diffTime = examDate - now;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 0) {
+        document.getElementById('countdownText').textContent = `HMGS: ${diffDays} gün kaldı (27 Eylül 2026)`;
+      }
+    } catch(e) {}
+  </script>
+</body>
+</html>

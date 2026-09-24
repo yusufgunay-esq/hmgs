@@ -2,13 +2,13 @@
   "name": "HMGS Stüdyo — Çalışma Koçu",
   "short_name": "Stüdyo",
   "description": "HMGS 2026 soru çözme, konu akışı ve deneme stüdyosu",
-  "start_url": "./studio.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
-  "background_color": "#FAF9F6",
-  "theme_color": "#FAF9F6",
+  "background_color": "#F7F5F0",
+  "theme_color": "#F7F5F0",
   "lang": "tr",
   "dir": "ltr",
   "categories": ["education"],
@@ -18,7 +18,7 @@
     { "src": "icons/studio-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Soru çöz", "short_name": "Soru", "url": "./studio.html#practice" },
-    { "name": "Deneme", "short_name": "Deneme", "url": "./studio.html#exam" }
+    { "name": "Soru çöz", "short_name": "Soru", "url": "./#practice" },
+    { "name": "Deneme", "short_name": "Deneme", "url": "./#exam" }
   ]
 }

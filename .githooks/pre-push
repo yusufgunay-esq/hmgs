@@ -1,0 +1,51 @@
+#!/bin/sh
+# ==============================================================================
+# HMGS PUBLIC-REPO GUARD - pre-push
+# Push edilecek araliktaki TUM dosyalar beyaz listede olmali.
+# Ayrica dal silme push'u ve gecmisle sizinti push'u engellenir.
+# ==============================================================================
+
+allow=".githooks/allowlist.txt"
+zero="0000000000000000000000000000000000000000"
+bad=0
+tmp="$(mktemp)"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ -z "$local_sha" ] && continue
+
+    # Dal silme push'u engellenir (yanlislikla yayini kaldirmayi onler)
+    if [ "$local_sha" = "$zero" ]; then
+        echo "  ENGEL: dal silme push'u ($remote_ref)"
+        bad=1
+        continue
+    fi
+
+    # Karsilastirma tabani: uzakta var ise aralik, yok ise commit'in tamami
+    if [ "$remote_sha" != "$zero" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+        git -c core.quotepath=false diff --name-only "$remote_sha" "$local_sha" > "$tmp" 2>/dev/null
+    else
+        git -c core.quotepath=false ls-tree -r --name-only "$local_sha" > "$tmp" 2>/dev/null
+    fi
+
+    while IFS= read -r f; do
+        [ -z "$f" ] && continue
+        case "$f" in
+            .gitignore|README.md|LICENSE|.githooks/*) continue ;;
+        esac
+        if ! grep -Fxq -- "$f" "$allow"; then
+            echo "  ENGEL: $f ($remote_ref)"
+            bad=1
+        fi
+    done < "$tmp"
+done
+
+rm -f "$tmp"
+
+if [ "$bad" -ne 0 ]; then
+    echo ""
+    echo "  PUSH ENGELLENDI."
+    echo "  Bu depo PUBLIC. Yukaridaki dosyalar kisisel/telifli veri iceriyor olabilir."
+    echo "  Guvenli yayin yolu: HMGS_Yayinla.bat (git kullanmaz, API ile kabuk gonderir)."
+    exit 1
+fi
+exit 0

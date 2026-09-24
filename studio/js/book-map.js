@@ -15,6 +15,9 @@
    Anayasa Yargısı) hiçbir konusu için sayfa uydurulmadı — NO_BOOK_SUBJECTS'te
    listeleniyor, arayüz bunlar için "kitap verisi henüz eklenmedi" gösterir.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 /** İçindekiler dökümü hiç gelmemiş dersler — sayfa göstermeye çalışma. */
 export const NO_BOOK_SUBJECTS = new Set([

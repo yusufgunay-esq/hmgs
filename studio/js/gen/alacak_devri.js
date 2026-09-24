@@ -1,6 +1,9 @@
 /* ==========================================================================
    gen/alacak_devri.js — ALACAĞIN DEVRİ VE DEF'İLER SİMÜLATÖRÜ
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { rng } from './miras.js';
 

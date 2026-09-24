@@ -1,10 +1,13 @@
 /* ==========================================================================
    vault-client.js — HMGS STÜDYO SIFIR-VERİ İSTEMCİ & GİZLİ KASA MOTORU
-   - GitHub'da 0 telifli soru ve 0 konu barındırır.
+   - GitHub'da 0 soru ve 0 konu barındırır.
    - Soru ve konu kütüphanesi kullanıcının şahsi Google Drive'ından (hmgs_vault.json)
      güvenle çekilir ve telefonun IndexedDB yerel veritabanına kalıcı yazılır.
    - İlk indirmeden sonra %100 çevrimdışı (offline / PWA) çalışır.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 const DB_NAME = 'HMGS_VAULT_DB';
 const DB_VERSION = 1;
@@ -12,7 +15,213 @@ const STORE_NAME = 'vault_store';
 const VAULT_KEY = 'hmgs_vault_master';
 
 const CLIENT_ID = '235274565512-c8oalrvo4idikpbkh2j3g8sgdjsq3v83.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file';
+
+// ORTAK YETKİ SETİ (17 Eylül 2026) — Takip uygulamasıyla (HMGS_Takip_App/index.html)
+// BİREBİR AYNI olmak ZORUNDA. Tarayıcı farklı istek listelerini farklı onay ekranı
+// sayar; iki uygulama ayrı set istediği sürece kullanıcı iki kez bağlanmak zorunda
+// kalıyordu. Tek set = tek onay ekranı, tek giriş, paylaşılan jeton.
+//
+//   • drive.appdata  : ESKİ veri yeri. Yalnızca Takip'in tek seferlik taşıması
+//                      için duruyor; Stüdyo kullanmaz. (Jeton ortak olduğu için
+//                      bu kapsam burada da istenmek zorunda.)
+//   • drive.readonly : hmgs_vault.json (7,4 MB soru+konu kasası) okuması.
+//   • drive.file     : Stüdyo'nun KENDİ oluşturduğu dosyaları yazması
+//                      (HMGS/hmgs_studio_progress.json, HMGS/hmgs_studio_queue.json).
+const SCOPES = 'https://www.googleapis.com/auth/drive.appdata '
+             + 'https://www.googleapis.com/auth/drive.readonly '
+             + 'https://www.googleapis.com/auth/drive.file';
+
+// Drive'da verinin durduğu tek görünür klasör — Takip uygulamasıyla aynı sabit.
+const HMGS_FOLDER_NAME = 'HMGS';
+
+const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
+const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
+
+// ------------------------------------------------------------- Jeton paylaşımı
+
+// Takip uygulaması jetonu `hmgs_gtoken` altında saklar ({t, exp}). Stüdyo da AYNI
+// anahtarı okur/yazar; aynı origin'de (GitHub Pages) iki uygulama tek oturum
+// paylaşır, kullanıcı Stüdyo'ya geçince yeniden giriş yapmaz.
+//
+// NOT: yerel geliştirmede Stüdyo 8766, Takip 8000 portunda çalışır — farklı
+// origin sayıldıkları için localStorage PAYLAŞILMAZ. O durumda her biri kendi
+// girişini ister; prod'da (tek origin) paylaşım geçerlidir.
+const SHARED_TOKEN_KEY = 'hmgs_gtoken';
+const SHARED_FOLDER_KEY = 'hmgs_drive_folder_id';
+
+let activeAccessToken = null;
+
+function readSharedToken() {
+  try {
+    const raw = localStorage.getItem(SHARED_TOKEN_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || !o.t) return null;
+    // Süresi dolmuşsa temizle — Takip ile aynı 2 dakikalık emniyet payı.
+    if (o.exp && o.exp - Date.now() < 120000) {
+      localStorage.removeItem(SHARED_TOKEN_KEY);
+      return null;
+    }
+    return o.t;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Takip'in beklediği biçimde yazar: {t, exp}. İki uygulama aynı jetonu kullanır. */
+function saveSharedToken(token, expiresIn) {
+  try {
+    const ttl = parseInt(expiresIn || 3600, 10);
+    localStorage.setItem(SHARED_TOKEN_KEY, JSON.stringify({
+      t: token,
+      exp: Date.now() + (ttl * 1000)
+    }));
+  } catch (e) { /* private mode vb. — oturum yine de çalışır */ }
+}
+
+/** Sadece sessionStorage (sayfa oturumu) — kalıcı saklama `hmgs_gtoken` üzerinden. */
+export function getActiveToken() {
+  if (!activeAccessToken) {
+    activeAccessToken = readSharedToken()
+      || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hmgs_access_token') : null);
+  }
+  return activeAccessToken;
+}
+
+export function setActiveToken(token) {
+  activeAccessToken = token;
+  if (typeof sessionStorage !== 'undefined') {
+    if (token) sessionStorage.setItem('hmgs_access_token', token);
+    else sessionStorage.removeItem('hmgs_access_token');
+  }
+}
+
+/**
+ * Onay ekranı AÇMADAN taze bir jeton ister (18 Eylül 2026).
+ *
+ * NEDEN GEREKLİ: paylaşılan jeton (`hmgs_gtoken`) ~1 saatte düşüyor.
+ * Kullanıcı GitHub Pages'te tek origin kullanıyor (Stüdyo ile Takip aynı
+ * adres) — yani paylaşım kendisi çalışıyor, sorun paylaşımda değil. Sorun:
+ * jeton düştüğünde Stüdyo'nun seans/deneme sonu otomatik gönderimi
+ * `getActiveToken()`in null dönmesiyle SESSİZCE pes ediyordu; hiçbir yerde
+ * yeniden istek denemiyordu (o adım sadece Takip'in kendi giriş ekranında
+ * vardı). Google Identity Services `prompt:''` ile çağrılırsa, kullanıcı bu
+ * origin'de daha önce Google'a bağlandıysa, POPUP AÇMADAN arka planda yeni
+ * jeton döner — tam da "otomatik gitmeli" için gereken şey.
+ *
+ * Kullanıcı hiç bağlanmamışsa ya da tarayıcı sessiz izni reddederse (ör.
+ * üçüncü taraf çerez engeli) `null` döner; bu durumda zorlanmaz, çağıran
+ * taraf normal "kuyrukta bekliyor" yoluna düşer. 5 sn'lik zaman aşımı var ki
+ * Google betiği yüklenmemişse ya da geri çağrı hiç tetiklenmezse arayan
+ * fonksiyon sonsuza dek asılı kalmasın.
+ */
+export function requestSilentToken() {
+  return new Promise(resolve => {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const finish = (token) => {
+      if (settled) return;
+      settled = true;
+      resolve(token);
+    };
+    const timer = setTimeout(() => finish(null), 5000);
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: resp => {
+          clearTimeout(timer);
+          if (resp && resp.access_token) {
+            setActiveToken(resp.access_token);
+            saveSharedToken(resp.access_token, resp.expires_in);
+            finish(resp.access_token);
+          } else {
+            finish(null);
+          }
+        },
+        error_callback: () => { clearTimeout(timer); finish(null); }
+      });
+      client.requestAccessToken({ prompt: '' });
+    } catch (e) {
+      clearTimeout(timer);
+      finish(null);
+    }
+  });
+}
+
+/** Drive kökündeki HMGS klasörünü bulur, yoksa oluşturur. */
+let hmgsFolderId = null;
+try { hmgsFolderId = localStorage.getItem(SHARED_FOLDER_KEY) || null; } catch (e) {}
+
+async function driveFetch(url, token, opts = {}) {
+  return fetch(url, {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, ...(opts.headers || {}) }
+  });
+}
+
+async function ensureHmgsFolder(token) {
+  if (hmgsFolderId) return hmgsFolderId;
+
+  const q = encodeURIComponent(`name='${HMGS_FOLDER_NAME}' and trashed=false`);
+  const listRes = await driveFetch(`${DRIVE_API}?q=${q}&fields=files(id,mimeType)&orderBy=modifiedTime desc`, token);
+  if (listRes.ok) {
+    const { files } = await listRes.json();
+    const folder = (files || []).find(f => f.mimeType === 'application/vnd.google-apps.folder');
+    if (folder) {
+      hmgsFolderId = folder.id;
+      try { localStorage.setItem(SHARED_FOLDER_KEY, hmgsFolderId); } catch (e) {}
+      return hmgsFolderId;
+    }
+  }
+
+  const createRes = await driveFetch(DRIVE_API, token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({
+      name: HMGS_FOLDER_NAME,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: ['root']
+    })
+  });
+  if (!createRes.ok) {
+    console.warn('[vault] HMGS klasörü oluşturulamadı:', createRes.status, await createRes.text());
+    return null;
+  }
+  const created = await createRes.json();
+  hmgsFolderId = created.id || null;
+  try { if (hmgsFolderId) localStorage.setItem(SHARED_FOLDER_KEY, hmgsFolderId); } catch (e) {}
+  return hmgsFolderId;
+}
+
+/**
+ * Dosyayı ÖNCE HMGS/ klasöründe, bulamazsa Drive kökünde arar.
+ * @returns {Promise<object|null>} {id, inFolder}
+ */
+async function findSharedFile(name, token) {
+  const q = encodeURIComponent(`name='${name}' and trashed=false`);
+  const folder = await ensureHmgsFolder(token);
+  if (folder) {
+    const res = await driveFetch(
+      `${DRIVE_API}?q=${q}+and+'${folder}'+in+parents&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`,
+      token
+    );
+    if (res.ok) {
+      const { files } = await res.json();
+      if (files && files.length) return { id: files[0].id, inFolder: true };
+    }
+  }
+  // Geriye dönük: eski sürümler dosyaları doğrudan köke yazıyordu.
+  const legacy = await driveFetch(`${DRIVE_API}?q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc`, token);
+  if (legacy.ok) {
+    const { files } = await legacy.json();
+    if (files && files.length) return { id: files[0].id, inFolder: false };
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------- IndexedDB
 
@@ -75,48 +284,18 @@ export async function clearVaultIndexedDB() {
   }
 }
 
-// ---------------------------------------------------------------- Google Drive Sync
-
-let activeAccessToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('hmgs_access_token') : null;
-
-export function getActiveToken() {
-  if (!activeAccessToken && typeof sessionStorage !== 'undefined') {
-    activeAccessToken = sessionStorage.getItem('hmgs_access_token');
-  }
-  return activeAccessToken;
-}
-
-export function setActiveToken(token) {
-  activeAccessToken = token;
-  if (typeof sessionStorage !== 'undefined') {
-    if (token) sessionStorage.setItem('hmgs_access_token', token);
-    else sessionStorage.removeItem('hmgs_access_token');
-  }
-}
+// ---------------------------------------------- Google Drive Sync (HMGS/ klasörü)
 
 export async function fetchVaultFromDrive(token) {
   setActiveToken(token);
-  const q = encodeURIComponent("name='hmgs_vault.json' and trashed=false");
-  const listRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime,size)&orderBy=modifiedTime desc`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
 
-  if (!listRes.ok) {
-    const err = await listRes.text();
-    throw new Error(`Drive dosya arama hatası (${listRes.status}): ${err}`);
+  const found = await findSharedFile('hmgs_vault.json', token);
+  if (!found) {
+    throw new Error('Google Drive\'da "hmgs_vault.json" bulunamadı (HMGS klasörü ve kök tarandı). '
+      + 'Lütfen önce bilgisayarda kasayı Drive\'a gönderin.');
   }
 
-  const listData = await listRes.json();
-  if (!listData.files || listData.files.length === 0) {
-    throw new Error('Google Drive hesabınızda "hmgs_vault.json" bulunamadı. Lütfen önce bilgisayarda senkronizasyonu çalıştırın.');
-  }
-
-  const fileId = listData.files[0].id;
-  const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
+  const dlRes = await driveFetch(`${DRIVE_API}/${found.id}?alt=media`, token);
   if (!dlRes.ok) {
     const err = await dlRes.text();
     throw new Error(`Drive dosya indirme hatası (${dlRes.status}): ${err}`);
@@ -125,6 +304,32 @@ export async function fetchVaultFromDrive(token) {
   const vaultData = await dlRes.json();
   if (!vaultData || !vaultData.questions || !vaultData.topics) {
     throw new Error('İndirilen dosya geçerli bir HMGS Vault formatında değil.');
+  }
+
+  // Kalıcı IndexedDB'ye kaydetmeden önce bellekteki yerel ve AI sorularını içine kat
+  if (typeof window !== 'undefined') {
+    let globalQ = window.QUESTIONS_DATA;
+    if (!globalQ || !globalQ.length) {
+      try { globalQ = (new Function("return typeof QUESTIONS_DATA !== 'undefined' ? QUESTIONS_DATA : undefined;"))(); } catch (e) {}
+    }
+    const seen = new Set((vaultData.questions || []).map(q => q.id));
+    if (Array.isArray(globalQ) && globalQ.length > 0) {
+      const extraBase = globalQ.filter(q => q && q.id && !seen.has(q.id));
+      if (extraBase.length > 0) {
+        vaultData.questions = (vaultData.questions || []).concat(extraBase);
+        extraBase.forEach(q => seen.add(q.id));
+      }
+    }
+    let ai = window.QUESTIONS_AI_DATA;
+    if (!ai || !ai.length) {
+      try { ai = (new Function("return typeof QUESTIONS_AI_DATA !== 'undefined' ? QUESTIONS_AI_DATA : undefined;"))(); } catch (e) {}
+    }
+    if (Array.isArray(ai) && ai.length > 0) {
+      const extraAi = ai.filter(q => q && q.id && !seen.has(q.id));
+      if (extraAi.length > 0) {
+        vaultData.questions = (vaultData.questions || []).concat(extraAi);
+      }
+    }
   }
 
   // Kalıcı IndexedDB'ye kaydet
@@ -143,19 +348,9 @@ const PROGRESS_FILE_NAME = 'hmgs_studio_progress.json';
 
 export async function fetchProgressFromDrive(token) {
   try {
-    const q = encodeURIComponent(`name='${PROGRESS_FILE_NAME}' and trashed=false`);
-    const listRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!listRes.ok) return null;
-    const listData = await listRes.json();
-    if (!listData.files || listData.files.length === 0) return null;
-
-    const fileId = listData.files[0].id;
-    const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const found = await findSharedFile(PROGRESS_FILE_NAME, token);
+    if (!found) return null;
+    const dlRes = await driveFetch(`${DRIVE_API}/${found.id}?alt=media`, token);
     if (!dlRes.ok) return null;
     return await dlRes.json();
   } catch (err) {
@@ -166,59 +361,129 @@ export async function fetchProgressFromDrive(token) {
 
 export async function uploadProgressToDrive(token, stateData) {
   try {
-    const q = encodeURIComponent(`name='${PROGRESS_FILE_NAME}' and trashed=false`);
-    const listRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!listRes.ok) return false;
-    const listData = await listRes.json();
-    const fileId = listData.files && listData.files.length > 0 ? listData.files[0].id : null;
+    const found = await findSharedFile(PROGRESS_FILE_NAME, token);
     const jsonContent = JSON.stringify(stateData, null, 2);
 
-    if (fileId) {
+    if (found) {
       // Mevcut dosyayı güncelle (PATCH)
-      const patchRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      const patchRes = await driveFetch(`${DRIVE_UPLOAD}/${found.id}?uploadType=media`, token, {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json; charset=UTF-8'
-        },
+        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
         body: jsonContent
       });
       return patchRes.ok;
-    } else {
-      // Yeni dosya oluştur (Multipart POST)
-      const boundary = '-------HMGS_STUDIO_SYNC_BOUNDARY';
-      const delimiter = `\r\n--${boundary}\r\n`;
-      const closeDelim = `\r\n--${boundary}--`;
-
-      const metadata = {
-        name: PROGRESS_FILE_NAME,
-        mimeType: 'application/json'
-      };
-
-      const multipartBody =
-        delimiter +
-        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-        JSON.stringify(metadata) +
-        delimiter +
-        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-        jsonContent +
-        closeDelim;
-
-      const postRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`
-        },
-        body: multipartBody
-      });
-      return postRes.ok;
     }
+
+    // Yeni dosya: HMGS/ klasörünün İÇİNDE oluştur.
+    // (Kök yerine klasör: kullanıcı verisi Drive arayüzünde görünür ve yedeklenebilir
+    // olsun. drive.file kapsamı yalnızca uygulamanın yarattığı dosyayı yazabildiği
+    // için yaratıcı burada tarayıcı olur — sonraki PATCH'ler bu yüzden çalışır.)
+    const folderId = await ensureHmgsFolder(token);
+    const boundary = '-------HMGS_STUDIO_SYNC_BOUNDARY';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+
+    const metadata = {
+      name: PROGRESS_FILE_NAME,
+      mimeType: 'application/json',
+      parents: folderId ? [folderId] : ['root']
+    };
+
+    const multipartBody =
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) +
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      jsonContent +
+      closeDelim;
+
+    const postRes = await fetch(`${DRIVE_UPLOAD}?uploadType=multipart`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`
+      },
+      body: multipartBody
+    });
+    return postRes.ok;
   } catch (err) {
     console.warn('[progress sync] Drive yazma hatası:', err);
+    return false;
+  }
+}
+
+// ------------------------------------------------- Stüdyo → Takip aktarım kuyruğu
+
+const QUEUE_FILE_NAME = 'hmgs_studio_queue.json';
+
+/**
+ * Stüdyo'nun pratik seanslarını + ham cevaplarını Drive'daki
+ * `HMGS/hmgs_studio_queue.json` dosyasına yazar.
+ *
+ * NEDEN: eskiden seanslar ancak masaüstü `hmgs-sync.mjs sessions-push`
+ * çalıştığında Takip'e ulaşabiliyordu. O script ayrı bir OAuth istemcisi
+ * kullandığı için Takip'in appDataFolder'ını göremiyor, refresh token'ı da
+ * sürekli düşüyordu → zincir hiçbir zaman kapanmıyordu. Artık Stüdyo kuyruğu
+ * doğrudan ortak HMGS/ klasörüne yazıyor, Takip açılışta okuyor.
+ *
+ * TEK YAZAR: bu dosyanın tek yazarı Stüdyo'dur. Takip sadece okur.
+ * Takip tarafı `studioSessionId` üzerinden idempotent çevirdiği için aynı
+ * seans iki kez çalışma kaydına dönmez.
+ */
+export async function pushStudioQueueToDrive(token, sessions, answers = [], exams = []) {
+  setActiveToken(token);
+  try {
+    const payload = JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      sessions: Array.isArray(sessions) ? sessions : [],
+      answers: Array.isArray(answers) ? answers : [],
+      // 18 Eylül 2026: denemeler de aynı kuyruk dosyasına eklendi — daha önce
+      // Stüdyo'daki denemeler Drive'a hiç gitmiyordu, kullanıcı elle "panoya
+      // kopyala" yapmak zorundaydı. Takip tarafı `pullStudioQueue()` bu alanı
+      // okuyup `convertPendingStudioExams()` ile idempotent çeviriyor.
+      exams: Array.isArray(exams) ? exams : []
+    }, null, 2);
+
+    const found = await findSharedFile(QUEUE_FILE_NAME, token);
+    if (found) {
+      const res = await driveFetch(`${DRIVE_UPLOAD}/${found.id}?uploadType=media`, token, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+        body: payload
+      });
+      return res.ok;
+    }
+
+    const folderId = await ensureHmgsFolder(token);
+    const boundary = '-------HMGS_STUDIO_QUEUE_BOUNDARY';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+    const metadata = {
+      name: QUEUE_FILE_NAME,
+      mimeType: 'application/json',
+      parents: folderId ? [folderId] : ['root']
+    };
+    const multipartBody =
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) +
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      payload +
+      closeDelim;
+
+    const postRes = await fetch(`${DRIVE_UPLOAD}?uploadType=multipart`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`
+      },
+      body: multipartBody
+    });
+    return postRes.ok;
+  } catch (err) {
+    console.warn('[studio queue] Drive yazma hatası:', err);
     return false;
   }
 }
@@ -227,17 +492,19 @@ export function mergeStudioStates(local, remote) {
   if (!remote || typeof remote !== 'object') return local;
   if (!local || typeof local !== 'object') return remote;
 
-  // 1. Answers (qId + ts + opt bazında tam birleşim)
+  // 1. Answers — anahtar: zaman + soru + seçilen şık.
+  // 19 Eylül 2026 düzeltmesi: anahtar `a.ts` ve `a.opt` alanlarından
+  // kuruluyordu ama cevap kaydında bu alanlar YOK (store.recordAnswer `at` ve
+  // `chosen` yazar). Anahtar her satırda "0_<qId>_" oluyor, aynı sorunun bütün
+  // denemeleri her Drive eşitlemesinde TEK satıra iniyordu: deneme sayısı,
+  // "kaç kez takıldın", ders bazında görülen sayısı sessizce küçülüyordu.
+  // Eski alan adları geriye dönük uyum için yedek olarak duruyor.
+  const keyOf = a => `${a.at || a.ts || 0}_${a.qId || ''}_${a.chosen ?? a.opt ?? ''}_${a.mode || ''}`;
   const answersMap = new Map();
-  (local.answers || []).forEach(a => {
-    const k = `${a.ts || 0}_${a.qId || ''}_${a.opt || ''}`;
-    answersMap.set(k, a);
-  });
-  (remote.answers || []).forEach(a => {
-    const k = `${a.ts || 0}_${a.qId || ''}_${a.opt || ''}`;
-    answersMap.set(k, a);
-  });
-  const mergedAnswers = Array.from(answersMap.values()).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  (local.answers || []).forEach(a => answersMap.set(keyOf(a), a));
+  (remote.answers || []).forEach(a => answersMap.set(keyOf(a), a));
+  const tOf = a => (a.at ? new Date(a.at).getTime() : (a.ts || 0));
+  const mergedAnswers = Array.from(answersMap.values()).sort((a, b) => tOf(a) - tOf(b));
 
   // 2. SRS (En güncel lastAt'e sahip olanı seç)
   const mergedSRS = { ...(local.srs || {}) };
@@ -353,6 +620,15 @@ if (typeof window !== 'undefined') {
 }
 
 export function requestDriveLoginAndDownload() {
+  // Elde geçerli PAYLAŞILAN jeton varsa onay ekranı hiç açılmaz. Kullanıcı
+  // Takip'te bir kez bağlanmışsa Stüdyo'ya geçerken yeniden giriş yapmaz
+  // (aynı origin — prod).
+  const paylasilan = readSharedToken();
+  if (paylasilan) {
+    setActiveToken(paylasilan);
+    return fetchVaultFromDrive(paylasilan);
+  }
+
   return new Promise((resolve, reject) => {
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
       return reject(new Error('Google kimlik kütüphanesi yüklenemedi. Lütfen internet bağlantınızı kontrol edin.'));
@@ -367,6 +643,7 @@ export function requestDriveLoginAndDownload() {
         }
         try {
           setActiveToken(resp.access_token);
+          saveSharedToken(resp.access_token, resp.expires_in);
           const vault = await fetchVaultFromDrive(resp.access_token);
           resolve(vault);
         } catch (fetchErr) {
@@ -384,26 +661,52 @@ export function requestDriveLoginAndDownload() {
 export async function loadMasterVault() {
   // 1. Yerel script'lerden zaten bellekte var mı? (localhost / development)
   if (typeof window !== 'undefined') {
-    const hasGlobalQ = Array.isArray(window.QUESTIONS_DATA) && window.QUESTIONS_DATA.length > 0;
-    const hasGlobalT = Array.isArray(window.TOPICS_DATA) && window.TOPICS_DATA.length > 0;
+    let globalQ = window.QUESTIONS_DATA;
+    if (!globalQ || !globalQ.length) {
+      try { globalQ = (new Function("return typeof QUESTIONS_DATA !== 'undefined' ? QUESTIONS_DATA : undefined;"))(); } catch (e) {}
+    }
+    let globalT = window.TOPICS_DATA;
+    if (!globalT || !globalT.length) {
+      try { globalT = (new Function("return typeof TOPICS_DATA !== 'undefined' ? TOPICS_DATA : undefined;"))(); } catch (e) {}
+    }
+    const hasGlobalQ = Array.isArray(globalQ) && globalQ.length > 0;
+    const hasGlobalT = Array.isArray(globalT) && globalT.length > 0;
     if (hasGlobalQ && hasGlobalT) {
-      return {
+      const base = globalQ;
+      let ai = window.QUESTIONS_AI_DATA;
+      if (!ai || !ai.length) {
+        try { ai = (new Function("return typeof QUESTIONS_AI_DATA !== 'undefined' ? QUESTIONS_AI_DATA : undefined;"))(); } catch (e) {}
+      }
+      ai = Array.isArray(ai) ? ai : [];
+      const seen = new Set(base.map(q => q.id));
+      const extra = ai.filter(q => q && q.id && !seen.has(q.id));
+      const vaultObj = {
         source: 'globals',
-        questions: window.QUESTIONS_DATA,
-        topics: window.TOPICS_DATA,
-        subjects: window.SUBJECTS_DATA || []
+        questions: base.concat(extra),
+        topics: globalT,
+        subjects: window.SUBJECTS_DATA || [],
+        kitaplar: window.KITAPLAR_DATA,
+        roentgen: window.HMGS_ROENTGEN_DATA
       };
+      saveVaultToIndexedDB(vaultObj).catch(() => {});
+      return vaultObj;
     }
   }
 
   // 2. IndexedDB'den oku (Mobil PWA / Offline)
   const cached = await loadVaultFromIndexedDB();
   if (cached && Array.isArray(cached.questions) && cached.questions.length > 0) {
+    const base = cached.questions;
+    const ai = (typeof window !== 'undefined' && Array.isArray(window.QUESTIONS_AI_DATA)) ? window.QUESTIONS_AI_DATA : [];
+    const seen = new Set(base.map(q => q.id));
+    const extra = ai.filter(q => q && q.id && !seen.has(q.id));
     return {
       source: 'indexedDB',
-      questions: cached.questions,
+      questions: base.concat(extra),
       topics: cached.topics || [],
       subjects: cached.subjects || [],
+      kitaplar: cached.kitaplar,
+      roentgen: cached.roentgen,
       syncedAt: cached.generatedAt
     };
   }
@@ -415,5 +718,58 @@ export async function loadMasterVault() {
     topics: [],
     needAuth: true
   };
+}
+
+// ------------------------------------------------ Arşiv Röntgeni (cikmis.html)
+
+/**
+ * Arşiv Röntgeni verisini PASİF getirir: önce yerel global (cikmis_roentgen_data.js),
+ * sonra IndexedDB kasası. Oturum AÇMAZ — yoksa null döner, sayfa giriş istemi gösterir.
+ */
+export async function loadRoentgen() {
+  if (typeof window !== 'undefined'
+      && Array.isArray(window.HMGS_ROENTGEN_DATA) && window.HMGS_ROENTGEN_DATA.length > 0) {
+    return window.HMGS_ROENTGEN_DATA;
+  }
+  const cached = await loadVaultFromIndexedDB();
+  if (cached && Array.isArray(cached.roentgen) && cached.roentgen.length > 0) {
+    return cached.roentgen;
+  }
+  return null;
+}
+
+/**
+ * Arşiv Röntgeni için Google girişi başlatır, kasayı indirir ve roentgen dizisini
+ * döner. requestDriveLoginAndDownload ile AYNI istemci/scope/prompt — tek onay ekranı.
+ */
+export function requestRoentgenFromDrive() {
+  return new Promise((resolve, reject) => {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+      return reject(new Error('Google kimlik kütüphanesi yüklenemedi. İnternet bağlantınızı kontrol edin.'));
+    }
+
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: async resp => {
+        if (resp.error) {
+          return reject(new Error(`Google Giriş İptal Edildi / Hata: ${resp.error}`));
+        }
+        try {
+          setActiveToken(resp.access_token);
+          saveSharedToken(resp.access_token, resp.expires_in);
+          const vault = await fetchVaultFromDrive(resp.access_token);
+          if (!Array.isArray(vault.roentgen) || !vault.roentgen.length) {
+            return reject(new Error('Kasada "roentgen" verisi bulunamadı.'));
+          }
+          resolve(vault.roentgen);
+        } catch (e) {
+          reject(e);
+        }
+      }
+    });
+
+    client.requestAccessToken({ prompt: '' });
+  });
 }
 

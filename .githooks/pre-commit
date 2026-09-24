@@ -1,0 +1,46 @@
+#!/bin/sh
+# ==============================================================================
+# HMGS PUBLIC-REPO GUARD - pre-commit
+# Yalnizca yayinlanan arayuz kabugu commit edilebilir.
+# Soru bankasi / sinav taramasi / kisisel not / takip verisi ASLA.
+# Kaldirmak icin: git config --unset core.hooksPath
+# ==============================================================================
+
+allow=".githooks/allowlist.txt"
+bad=0
+tmp="$(mktemp)"
+
+# --- 1) Eklenen/degisen dosyalar beyaz listede mi? ---------------------------
+git -c core.quotepath=false diff --cached --name-only --diff-filter=ACMR > "$tmp" 2>/dev/null
+while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    case "$f" in
+        .gitignore|README.md|LICENSE|.githooks/*) continue ;;
+    esac
+    if ! grep -Fxq -- "$f" "$allow"; then
+        echo "  ENGEL: $f"
+        bad=1
+    fi
+done < "$tmp"
+
+# --- 2) Yayindaki bir dosya siliniyor mu? ------------------------------------
+git -c core.quotepath=false diff --cached --name-only --diff-filter=D > "$tmp" 2>/dev/null
+while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    if grep -Fxq -- "$f" "$allow"; then
+        echo "  SILME ENGELI: $f (yayindaki kabuk dosyasi silinemez)"
+        bad=1
+    fi
+done < "$tmp"
+
+rm -f "$tmp"
+
+if [ "$bad" -ne 0 ]; then
+    echo ""
+    echo "  COMMIT ENGELLENDI."
+    echo "  Bu depo yalnizca arayuz kabugunu barindirir (public)."
+    echo "  Kisisel veri icin: HMGS_Yayinla.bat -> sadece kabuk, API ile yayinlar."
+    echo "  Bilerek eklemek istediginiz dosya varsa: .githooks/allowlist.txt"
+    exit 1
+fi
+exit 0

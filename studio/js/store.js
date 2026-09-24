@@ -6,6 +6,9 @@
    İlke: ham cevap kaydı asla silinmez. Şema değişirse migrate edilir.
    Türetilmiş her metrik (başarı, hız, mastery) bu ham kayıttan hesaplanır.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 const KEY = 'hmgs_studio_v1';
 const SCHEMA = 1;
@@ -40,6 +43,11 @@ function blank() {
     drills: [],
     /** Devam eden deneme (yarıda kalırsa geri dönülebilir) */
     examInProgress: null,
+    /** Koçun bugün için atadığı Stüdyo işi — odevler.js yazar, engine okur.
+        { date:'YYYY-MM-DD', questions:sayı, quizTasks:sayı, readingTasks:sayı,
+          totalTasks:sayı, source:'/api/claude-tasks', at:ISO }
+        Yoksa null: hedef o zaman Stüdyo'nun kendi tabanından türetilir. */
+    plan: null,
     settings: { dailyTarget: 40, theme: 'system', fontSize: 'normal' }
   };
 }
@@ -123,12 +131,17 @@ export function exportJSON() {
 /* ---------- TELEMETRİ: her cevap kaydedilir ---------- */
 
 /**
- * @param {object} q      soru nesnesi
- * @param {string|null} chosen  seçilen şık ('A'..'E') veya null = boş
- * @param {number} ms     soruya harcanan süre (ms)
- * @param {string} mode   'practice' | 'exam' | 'review' | 'flow'
+ * @param {object} q          soru nesnesi
+ * @param {string|null} chosen seçilen şık ('A'..'E') veya null = boş
+ * @param {number} ms         soruya harcanan AKTİF süre (ms). seans.js'in
+ *   duraksatmalı saatinden gelir: sekme gizliyken ve kullanıcı boştayken
+ *   geçen zaman bu sayıya girmez. Ham (duvar) süre flags.rawMs'tedir.
+ * @param {string} mode       'practice' | 'exam' | 'review' | 'flow'
+ * @param {object} [flags]    davranış sinyalleri { usedElim, askedGemini, logicGuess }
+ *   logicGuess: cevaptan ÖNCE ipucu istendiyse true — bu satır SRS'te olduğu gibi
+ *   mastery/hız hesaplarında da bağımsız bir "çözüm" sayılmaz (bkz. engine.js computeMastery).
  */
-export function recordAnswer(q, chosen, ms, mode) {
+export function recordAnswer(q, chosen, ms, mode, flags = {}) {
   const prior = S.answers.filter(a => a.qId === q.id).length;
   const row = {
     qId: q.id,
@@ -137,14 +150,56 @@ export function recordAnswer(q, chosen, ms, mode) {
     chosen: chosen,
     correctKey: q.correct,
     ok: chosen === q.correct,
+    logicGuess: !!flags.logicGuess,
+    attentionError: false,
+    usedElim: !!flags.usedElim,
+    askedGemini: !!flags.askedGemini,
     ms: Math.max(0, Math.round(ms)),
+    // rawMs: soru ekranda kaldığı toplam süre. idleMs: bunun boşa geçen
+    // kısmı; ms + idleMs = rawMs. Eski kayıtlarda bu iki alan yoktur,
+    // okuyan taraf yokluğunu ms ile doldurur.
+    rawMs: Number.isFinite(flags.rawMs) ? Math.max(0, Math.round(flags.rawMs)) : undefined,
+    idleMs: Number.isFinite(flags.idleMs) ? Math.max(0, Math.round(flags.idleMs)) : undefined,
     attempt: prior + 1,
     mode,
+    // set: hangi kapıdan girildi (ör. 'srs', 'sure', 'inatci', 'odev', 'deadlines').
+    // mode kaba sınıftır (practice/review/flow/exam); rota.js günün adımlarını
+    // bununla sayar. Yoksa alan hiç yazılmaz.
+    set: flags.set || undefined,
     at: new Date().toISOString()
   };
+  if (row.rawMs === undefined) delete row.rawMs;
+  if (row.idleMs === undefined) delete row.idleMs;
+  if (row.set === undefined) delete row.set;
   S.answers.push(row);
   return row;
 }
+
+/**
+ * Son verilen cevabın mantık/konu-eksik bayrağını günceller.
+ * @param {boolean} flag
+ */
+export function markLastAnswerLogic(flag = true) {
+  if (!S.answers.length) return null;
+  const last = S.answers[S.answers.length - 1];
+  last.logicGuess = !!flag;
+  save();
+  return last;
+}
+
+/**
+ * Son verilen yanlış cevabı "dikkat hatası" olarak etiketler/kaldırır.
+ * SRS'i değiştirmez — yalnızca analitik sinyal.
+ * @param {boolean} flag
+ */
+export function markLastAnswerAttention(flag = true) {
+  if (!S.answers.length) return null;
+  const last = S.answers[S.answers.length - 1];
+  last.attentionError = !!flag;
+  save();
+  return last;
+}
+
 
 /**
  * Pratik alanında doldurulan bir hücreyi kaydeder.
@@ -204,6 +259,30 @@ export function saveExam(result) {
 }
 
 /**
+ * Takip Uygulamasından gelen denemeleri içeri aktarır.
+ * Mükerrerliği önler, kronolojik sıralar ve durumu kaydeder.
+ */
+export function importTakipExams(list) {
+  if (!Array.isArray(list) || !list.length) return false;
+  let added = 0;
+  list.forEach(ex => {
+    const exists = S.exams.some(e => {
+      if (e.id && ex.id) return String(e.id) === String(ex.id);
+      return e.at && ex.at && e.at.slice(0, 16) === ex.at.slice(0, 16) && e.label === ex.label;
+    });
+    if (!exists) {
+      S.exams.push(ex);
+      added++;
+    }
+  });
+  if (added > 0) {
+    S.exams.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
+    save();
+  }
+  return added > 0;
+}
+
+/**
  * Pratik seansı (küçük/karma test) bitince özetini kaydeder. `saveExam`in
  * küçük hâli — result şekli için bkz. views/practice.js finalizeSession().
  */
@@ -215,8 +294,17 @@ export function saveSession(result) {
 
 export function answersFor(qId) { return S.answers.filter(a => a.qId === qId); }
 
+/**
+ * Sınava kalan TAKVİM günü (çarşamba → pazar = 4). Eskiden saat farkının
+ * tavanıydı; sabah 04:00'te 5, öğlen 4 diyordu ve üst şerit ile Bugün
+ * rotası aynı anda farklı sayı gösteriyordu. Sınav günü 0.
+ */
 export function daysLeft() {
-  return Math.max(0, Math.ceil((EXAM_DATE - new Date()) / 86400000));
+  // Gün, cevap günlüğüyle aynı ölçekten (todayKey) sayılır: gece 01:00'de
+  // çalışma günü henüz dönmediyse kalan gün de dönmez.
+  const a = Date.parse(todayKey() + 'T00:00:00Z');
+  const b = Date.UTC(EXAM_DATE.getFullYear(), EXAM_DATE.getMonth(), EXAM_DATE.getDate());
+  return Math.max(0, Math.round((b - a) / 86400000));
 }
 
 export function todayKey(d = new Date()) {
@@ -241,6 +329,39 @@ export function streak() {
 }
 
 export function lastExam() { return S.exams.length ? S.exams[S.exams.length - 1] : null; }
+
+/**
+ * Bugünün koç planı — yalnızca BUGÜNE ait kayıt geçerli sayılır. Dünün planı
+ * ekranda hedef olarak görünmeye devam ederse kullanıcı bitmiş bir işin
+ * peşinden koşar.
+ */
+export function getDailyPlan() {
+  const p = S.plan;
+  if (!p || typeof p !== 'object') return null;
+  if (p.date !== todayKey()) return null;
+  if (!Number.isFinite(p.questions) || p.questions <= 0) return null;
+  return p;
+}
+
+/** odevler.js koç görevlerini çektikten sonra çağırır. */
+export function setDailyPlan({ questions, quizTasks = 0, readingTasks = 0, totalTasks = 0, source = '' }) {
+  S.plan = {
+    date: todayKey(),
+    questions: Math.round(questions),
+    quizTasks, readingTasks, totalTasks, source,
+    at: new Date().toISOString()
+  };
+  return S.plan;
+}
+
+/**
+ * Cevap kaydından bağımsız, doğrudan hedef sayısı verilir. Test ve dış
+ * çağrılar için; günlük kullanımda plan akışı geçerlidir.
+ */
+export function setDailyTarget(n) {
+  S.settings.dailyTarget = Math.max(1, Math.round(n));
+  save();
+}
 
 export function getSettings() {
   return S.settings || { dailyTarget: 40, theme: 'system', fontSize: 'normal' };

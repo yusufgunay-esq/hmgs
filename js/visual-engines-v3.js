@@ -6,6 +6,9 @@
              time_slider · guess_table · step_reveal · interactive_hierarchy ·
              family_tree
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 window.HMGSV3 = (function () {
   const types = ['decision_sim', 'calculator', 'scene_story', 'drag_classify', 'time_slider',
@@ -76,8 +79,8 @@ window.HMGSV3 = (function () {
 .hv3 .hv3-nav button:disabled{opacity:.35;cursor:default}
 .hv3 .hv3-cap{flex:1;text-align:center;font-size:13.5px;font-weight:600;color:var(--hv3-muted)}
 /* Doldurma kalıbı (fill_slots) — göstermek değil, doldurtmak */
-.hv3 .hv3-fs{border:1px solid var(--hv3-line);border-radius:14px;overflow:hidden;background:var(--hv3-surface);margin-top:4px}
-.hv3 .hv3-fsr{display:grid;grid-template-columns:1.5fr repeat(calc(var(--fs-cols) - 1),1fr);gap:1px;background:var(--hv3-line)}
+.hv3 .hv3-fs{border:1px solid var(--hv3-line);border-radius:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--hv3-surface);margin-top:4px}
+.hv3 .hv3-fsr{display:grid;grid-template-columns:1.5fr repeat(calc(var(--fs-cols) - 1),1fr);gap:1px;background:var(--hv3-line);min-width:460px}
 .hv3 .hv3-fsr>*{background:var(--hv3-surface);padding:11px 13px;font-size:13px;display:flex;align-items:center}
 .hv3 .hv3-fsh>*{background:var(--hv3-raise);font-size:11.5px;font-weight:600;color:var(--hv3-faint);text-transform:uppercase;letter-spacing:.03em}
 .hv3 .hv3-fsname{font-weight:600}
@@ -520,7 +523,7 @@ body.hv3-scroll-lock{overflow:hidden}
     function updScore() {
       const placed = chipsEl.querySelectorAll('.placed').length;
       root.querySelector('[data-el=score]').textContent = `Doğru ${ok} · yerleştirilen ${placed}/${items.length}` +
-        (placed === items.length ? (ok === items.length ? ' — kusursuz 🎯' : ' — yanlışları incele') : '');
+        (placed === items.length ? (ok === items.length ? ': kusursuz' : '; yanlışları incele') : '');
     }
   }
 
@@ -682,7 +685,7 @@ body.hv3-scroll-lock{overflow:hidden}
   }
 
   /* ---------- 8) INTERACTIVE_HIERARCHY — katmanlı yapılar ----------
-     Katmana tıklayınca istisnalar + çıkmış soru tuzağı açılır.
+     Katmana tıklayınca istisnalar + arşiv sorusu tuzağı açılır.
      Ardından "hangisi üstün?" mini testi.
      vd = { title, levels:[{ label, law, desc, exceptions:[...] }], quiz:[{ q, a, b, correct, why }], trap }
   */
@@ -1453,7 +1456,7 @@ body.hv3-scroll-lock{overflow:hidden}
       state[k] = v;
       const [ri, si] = k.split('-').map(Number);
       const slot = (rows[ri].slots || [])[si] || {};
-      const okc = v === slot.answer;
+      const okc = String(v).trim() === String(slot.answer).trim();
       drawGrid();
       poolEl.style.display = 'none'; poolEl.innerHTML = '';
       active = null;
@@ -1461,17 +1464,22 @@ body.hv3-scroll-lock{overflow:hidden}
       fbEl.className = 'hv3-askfb ' + (okc ? 'ok' : 'no');
       fbEl.innerHTML = `<b>${okc ? '✓ Doğru' : '✗ Değil'}</b> — ${slot.why || (okc ? 'Kural bu.' : 'Doğrusu: ' + slot.answer)}`;
       updScore();
+      try {
+        window.dispatchEvent(new CustomEvent('hv3-slot-commit', {
+          detail: { ok: okc, val: v, answer: slot.answer, label: rows[ri].label, sub: rows[ri].sub }
+        }));
+      } catch (e) {}
     }
 
     function updScore() {
       const done = Object.keys(state).length;
       const ok = Object.entries(state).filter(([k, v]) => {
         const [ri, si] = k.split('-').map(Number);
-        return v === (rows[ri].slots || [])[si].answer;
+        return String(v).trim() === String((rows[ri].slots || [])[si].answer).trim();
       }).length;
       root.querySelector('[data-el=score]').textContent =
         `Doğru ${ok} · dolduruldu ${done}/${total}` +
-        (done === total ? (ok === total ? ' — tablo eksiksiz 🎯' : ' — yanlışların gerekçesini oku') : '');
+        (done === total ? (ok === total ? ': tablo eksiksiz tamamlandı' : '; yanlışların gerekçesini oku') : '');
     }
   }
 

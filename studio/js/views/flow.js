@@ -1,11 +1,14 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    views/flow.js — AKIŞ: SEKMESİZ TEK SÜTUN KONU OKUMA
    Eski 4 sekmeli yapı kaldırıldı. Sıra:
      mevzuat şeridi → kavra bölümleri → etkileşimli görsel → tuzaklar
-     → pratik olay (açılır) → bağlı çıkmış soruları çöz
+     → pratik olay (açılır) → bağlı arşiv soruları çöz
    Görsel: v3 konularda HMGSV3 motoru; eski tipler okunur şekilde gösterilir
    ve açıkça "v3 bekliyor" olarak işaretlenir (sessizce iyi gibi durmasın).
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import {
   esc, rich, $, $$, toast,
@@ -13,6 +16,7 @@ import {
 import { SUBJECTS, subjectName, topicsOf, topicById, questionsOfTopic, V3_TYPES } from '../data.js';
 import { markTopicRead, save } from '../store.js';
 import { topicMastery, MASTERY_LABEL } from '../engine.js';
+import { kitapPaneliHTML, ozetEtiketiHTML, kitapVar } from '../kitap.js';
 
 let cur = { subjectId: 'medeni_hukuk', topicId: null };
 
@@ -87,6 +91,9 @@ function topicHTML(t) {
       ${m.n ? `<span class="chip">${m.n} çözüm · %${Math.round(m.acc * 100)} · ${Math.round(m.medianSec)} sn medyan</span>` : ''}
     </div>` : ''}
 
+    ${kitapPaneliHTML(t.subjectId)}
+
+    ${kitapVar(t.subjectId) ? ozetEtiketiHTML(t.subjectId) : ''}
     ${(t.chunks || []).map(c => `
       <section>
         ${c.legalRef ? `<div class="ref">${esc(shortRef(c.legalRef))}</div>` : ''}

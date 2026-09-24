@@ -6,11 +6,16 @@
    Inline onclick yok: tüm etkileşim document seviyesinde data-act ile yakalanır.
    Bu sayede yeniden render sonrası handler bağlamak gerekmez.
    ========================================================================== */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { $, $$, toast } from './ui.js';
 import { initData, initDataAsync, populateData, topicById, questionById } from './data.js';
-import { load, save, daysLeft, state, getSettings, updateSettings } from './store.js';
-import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress } from './vault-client.js';
+import { load, save, daysLeft, state, getSettings, updateSettings, importTakipExams } from './store.js';
+import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress, requestSilentToken, fetchVaultFromDrive } from './vault-client.js';
+import { applySrsPolicy } from './engine.js';
+import { kuralToggle } from './kural.js';
 
 
 import * as today from './views/today.js';
@@ -20,9 +25,11 @@ import * as exam from './views/exam.js';
 import * as flow from './views/flow.js';
 import * as progress from './views/progress.js';
 import * as pratik from './views/pratik.js';
+import * as akim from './views/akim.js';
+import { rota, adimSorulari, kagitSorulari, konuSetSorulari } from './rota.js';
 
 
-const VIEWS = ['today', 'odevler', 'flow', 'practice', 'pratik', 'exam', 'progress'];
+const VIEWS = ['today', 'odevler', 'flow', 'akim', 'practice', 'pratik', 'exam', 'progress'];
 let currentView = 'today';
 let lastAction = null;
 
@@ -63,6 +70,9 @@ try {
 /* ---------- yönlendirme ---------- */
 
 function show(view, push = true) {
+  // Ödevler sekmesi 23 Eylül 2026'da kaldırıldı: ödevler artık Bugün
+  // rotasında "Konu ödevi" adımı (rota.js konuOdevleri). Eski bağlantılar Bugün'e düşer.
+  if (view === 'odevler') view = 'today';
   if (!VIEWS.includes(view)) view = 'today';
 
   // Sınav sürüyorsa kazayla çıkmayı engelle
@@ -72,6 +82,12 @@ function show(view, push = true) {
   }
 
   currentView = view;
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.setAttribute('data-view', view);
+    document.body.classList.toggle('view-practice', view === 'practice');
+    document.body.classList.toggle('in-session',
+      (view === 'practice' && practice.hasSession()) || (view === 'akim' && akim.hasSession()));
+  }
   VIEWS.forEach(v => $('#view-' + v)?.classList.toggle('on', v === view));
   $$('.nav button').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === view)));
 
@@ -79,6 +95,7 @@ function show(view, push = true) {
     if (view === 'today') today.render();
     if (view === 'odevler') odevler.fetchTasks();
     if (view === 'flow') flow.render();
+    if (view === 'akim') akim.render();
     if (view === 'practice') practice.render();
     if (view === 'pratik') pratik.render();
     if (view === 'exam') exam.render();
@@ -101,10 +118,20 @@ function show(view, push = true) {
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
-/** Koçun döndürdüğü action nesnesini uygular. */
+/**
+ * Koçun döndürdüğü action nesnesini uygular.
+ * 'karma' önerisi artık pratik'in sabit sayılı, kapanış ekranlı seansına değil
+ * akış'ın kapanışsız kuyruğuna giriyor — stüdyo kullanıcıyı gerçekten flow'a
+ * atmalı, sayfadan çıkmaya değil soru çözmeye devam etmeye yönlendirmeli
+ * (18 Eylül 2026, kullanıcı talimatı). action nesnesinin şekli (view/mode/
+ * count) engine.js testleriyle kilitli, burada yalnız yönlendirme değişiyor.
+ */
 function runAction(a) {
   if (!a) return;
-  if (a.view === 'practice') {
+  if (a.view === 'practice' && a.mode === 'karma') {
+    if (akim.start({ scope: a.targetScope || 'core' })) show('akim');
+    else show('today');
+  } else if (a.view === 'practice') {
     if (practice.startSession(a)) show('practice');
     else show('today');
   } else if (a.view === 'exam') {
@@ -118,7 +145,13 @@ function runAction(a) {
 /* ---------- tek olay dinleyici ---------- */
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-act], [data-view]');
+  // `:not(body)` ŞART: show() görünüm adını <body data-view="…"> üzerine de yazar
+  // (CSS kancası). Bu nitelik seçiciye takılırsa, soru/çözüm ekranında etkileşimsiz
+  // bir alana (açıklama metni, boşluk) yapılan HER tıklama closest() ile body'yi
+  // bulur, show(aynı görünüm) → render() çalışır. practice.js render() içinde
+  // S.answered=false ve S.qStart=performance.now() yaptığı için sonuç: cevap
+  // silinir, soru geri gelir ve süre ölçümü sıfırlanır (exam.js'te E.qStart aynı).
+  const el = e.target.closest('[data-act], [data-view]:not(body)');
 
   if (!el) return;
 
@@ -147,6 +180,7 @@ document.addEventListener('click', async e => {
     /* --- gezinme --- */
     case 'go-today':   show('today'); break;
     case 'go-exam':    show('exam'); break;
+    case 'go-akim':    show('akim'); break;
     case 'go-flow-subject': flow.setSubject(el.dataset.subject); show('flow'); break;
     case 'go-flow-topic':   if (flow.open(el.dataset.topic)) show('flow'); break;
 
@@ -179,6 +213,7 @@ document.addEventListener('click', async e => {
         sessionOpts = { mode: 'mixed', count };
       }
 
+      sessionOpts.tag = 'odev';   // Bugün rotası koç ödevini bununla sayar
       const ok = practice.startSession(sessionOpts);
       if (ok) show('practice');   // havuz boşsa startSession zaten uyarı basıyor
       break;
@@ -204,6 +239,24 @@ document.addEventListener('click', async e => {
     case 'practice-subject':
       if (practice.startSession({ mode: 'subject', subjectId: el.dataset.subject, count: 15 })) show('practice');
       break;
+    case 'start-deadlines':
+      if (practice.startSession({ mode: 'deadlines', count: 20, customLabel: 'Süreler ve Parasal Sınırlar' })) show('practice');
+      break;
+
+    /* --- günün rotası (rota.js): bir adımı ya da sıradakini başlat --- */
+    case 'rota-go': {
+      const r = rota({ examActive: exam.active() });
+      const adim = r.adimlar.find(a => a.id === el.dataset.step)
+        || (el.dataset.step === 'akis' ? r.adimlar.find(a => a.tur === 'akis') : null);
+      rotaBaslat(adim);
+      break;
+    }
+    case 'rota-next': {
+      const r = rota({ examActive: exam.active() });
+      if (r.simdi && !r.kart) rotaBaslat(r.simdi);
+      else show('today');
+      break;
+    }
 
     /* --- yanlışlarım (SRS tekrarı) — kalıcı giriş, koç ödevine bağlı değil --- */
     case 'review-due': {
@@ -216,14 +269,23 @@ document.addEventListener('click', async e => {
       if (practice.startSession({ mode: 'review', subjectId: el.dataset.subject, count: n })) show('practice');
       break;
     }
+    case 'practice-hmgs-benzeri':
+      if (practice.startSession({ mode: 'hmgsBenzeri', count: 50, customLabel: 'HMGS Benzeri Sorular' })) show('practice');
+      break;
+    case 'practice-hmgs-benzeri-all':
+      if (practice.startSession({ mode: 'hmgsBenzeri', count: 999, customLabel: 'HMGS Benzeri Tüm Havuz' })) show('practice');
+      break;
+    case 'start-hmgs-benzeri':
+      if (practice.startSession({ mode: 'hmgsBenzeri', count: 20, customLabel: 'HMGS Benzeri Hızlı Pratik (20 Soru)' })) show('practice');
+      break;
     case 'practice-pastexam':
       if (practice.startSession({ mode: 'pastExam', count: 999 })) show('practice');
       break;
     case 'practice-core-karma':
-      if (practice.startSession({ mode: 'karma', count: 20, targetScope: 'core', customLabel: 'HMGS Çekirdek Karma' })) show('practice');
+      if (akim.start({ scope: 'core', label: 'HMGS Çekirdek Karma' })) show('akim');
       break;
     case 'practice-all-karma':
-      if (practice.startSession({ mode: 'karma', count: 20, targetScope: 'all', customLabel: 'Tüm Havuz Karma (İleri Dahil)' })) show('practice');
+      if (akim.start({ scope: 'all', label: 'Tüm Havuz Karma (İleri Dahil)' })) show('akim');
       break;
 
     /* --- akış --- */
@@ -246,29 +308,66 @@ document.addEventListener('click', async e => {
       break;
     }
 
+    /* --- kural köprüsü: yanlıştan interaktif kural alıştırmasına --- */
+    case 'kural': {
+      // Seans durumu korunur: render() ÇAĞRILMAZ, yalnız geri bildirim kartının
+      // içine bir panel açılır. practice.js render()'ı S.answered/qStart'ı
+      // sıfırladığı için burada render etmek cevabı silerdi.
+      kuralToggle(el.dataset.topic, el.dataset.qid);
+      break;
+    }
+
     /* --- soru çözme --- */
-    case 'pick':     practice.pick(el.dataset.key); break;
-    case 'dontknow': practice.dontKnow(); break;
-    case 'next':     practice.next(); break;
-    case 'quit':     practice.quit(); break;
-    case 'again':    if (!practice.repeatSession()) show('today'); break;
+    // Soru ekranının bahis şeridi (Akış ile aynı sözleşme): şık seç → güven
+    // düğmesiyle kilitle. Bu iki eylem practice.js'te çiziliyordu ama burada
+    // karşılığı yoktu; dokunmatik ekranda şıklara basmak hiçbir şey yapmıyordu.
+    case 'practice-arm':  practice.arm(el.dataset.key); break;
+    case 'practice-conf': practice.commit(el.dataset.conf); break;
+    case 'pick':         practice.pick(el.dataset.key); break;
+    case 'dontknow':     practice.dontKnow(); break;
+    case 'ask-gemini':   practice.askGemini(); break;
+    case 'next':            practice.next(); break;
+    case 'next-logic':      practice.nextLogic(); break;
+    case 'toggle-logic':    practice.toggleLogic(); break;
+    case 'toggle-attention':practice.toggleAttention(); break;
+    case 'quit':            practice.quit(); break;
+    case 'again':        if (!practice.repeatSession()) show('today'); break;
     case 'push-session': practice.pushSession(); break;
+    case 'copy-session-to-takip': practice.copySessionToClipboard(); break;
+    // Seans/akış kapanışlarındaki ana buton: kapanmayan karma akışına geçer.
+    // Sabit sayılı bir seans bitince bile devam yolu her zaman bu.
+    case 'continue-flow': if (akim.start()) show('akim'); else show('today'); break;
+
+    /* --- akış modu --- */
+    case 'akim-start':         akim.start(); break;
+    case 'akim-quit':          akim.quit(); break;
+    case 'akim-pick':          akim.arm(el.dataset.key); break;
+    case 'akim-conf':          akim.commit(el.dataset.conf); break;
+    case 'akim-break':         akim.takeBreak(); break;
+    case 'akim-dontknow':      akim.dontKnow(); break;
+    case 'akim-next':          akim.next(); break;
+    case 'akim-toggle-attention': akim.toggleAttention(); break;
+    case 'akim-ask-gemini':    akim.askGemini(); break;
 
     /* --- şık / öncül eleme (pratik + sınav ortak) --- */
     case 'eliminate': {
       if (currentView === 'exam') exam.eliminateOption(el.dataset.key);
+      else if (currentView === 'akim') akim.eliminateOption(el.dataset.key);
       else practice.eliminateOption(el.dataset.key);
       break;
     }
     case 'eliminate-premise': {
       if (currentView === 'exam') exam.eliminatePremise(el.dataset.numeral);
+      else if (currentView === 'akim') akim.eliminatePremise(el.dataset.numeral);
       else practice.eliminatePremise(el.dataset.numeral);
       break;
     }
 
     /* --- sınav --- */
-    case 'exam-start':  exam.start(); break;
+    case 'exam-start-smart': exam.startSmart(); break;
     case 'exam-start-real': exam.startReal(el.dataset.source); break;
+    case 'exam-start-deneme':
+    case 'exam-start-yekti': if (exam.startDenemeSet(el.dataset.source)) show('exam'); break;
     case 'exam-pick':   exam.pick(el.dataset.key); break;
     case 'exam-clear':  exam.clear(); break;
     case 'exam-mark':   exam.mark(); break;
@@ -277,11 +376,21 @@ document.addEventListener('click', async e => {
     case 'exam-next':   exam.next(); break;
     case 'exam-finish': exam.finish(false); break;
     case 'exam-export-stats': exam.exportStats(); break;
+    case 'exam-filter': exam.setFilter(el.dataset.f); break;
+    case 'exam-open-review': exam.openReview(); break;
+    case 'exam-back': exam.backToList(); break;
+    case 'rv-goto': exam.rvGoto(Number(el.dataset.no)); break;
+    case 'rv-prev': exam.rvPrev(); break;
+    case 'rv-next': exam.rvNext(); break;
+    case 'rv-analyze': exam.rvAnalyze(); break;
     case 'exam-review-wrong': {
-      const ids = exam.wrongIdsOfLast();
+      // Tekrar havuzu yalnız yanlış ve boşlar değil: kuşkuluyken bulunan
+      // doğrular da buraya girer (net gerçek değil, soru oturmamış).
+      const ids = exam.repeatIdsOfLast();
       const qs = ids.map(id => questionById.get(id)).filter(Boolean);
-      if (!qs.length) { toast('Yanlış soru yok.'); break; }
-      if (practice.startSession({ mode: 'review', count: qs.length })) { show('practice'); break; }
+      if (!qs.length) { toast('Son denemede tekrar edilecek soru yok.'); break; }
+      const ok = practice.startSession({ questions: qs, customLabel: `Deneme tekrarı · ${qs.length} soru` });
+      if (ok) { show('practice'); break; }
       toast('Tekrar seansı kurulamadı.');
       break;
     }
@@ -322,6 +431,36 @@ document.addEventListener('click', async e => {
       break;
     }
 
+    /* BUG (17 Eyl 2026): loadMasterVault() bir kez IndexedDB'ye kasa
+       yazdıktan sonra Drive'daki güncel sürümü BİR DAHA HİÇ KONTROL ETMİYOR —
+       "sync-vault" eylemini tetikleyecek görünür bir buton da (ilk açılış
+       ekranı dışında) hiçbir yerde yoktu. Sonuç: PC'de yeni soru ekleyip
+       kasayı Drive'a gönderseniz bile, zaten bir kez eşitlenmiş her cihaz
+       (telefon/tarayıcı) o günkü eski kopyada sonsuza kadar takılı kalıyordu.
+       Düzeltme: üst çubuğa her zaman erişilebilir küçük bir "Kütüphaneyi
+       Yenile" butonu eklendi (bkz. studio.html) — mevcut sync-vault
+       mantığını simge butonuna uyacak şekilde (metne dönüştürmeden) çağırır. */
+    case 'sync-vault-quiet': {
+      const btn = el;
+      btn.disabled = true;
+      btn.style.opacity = '0.45';
+      try {
+        const vault = await requestDriveLoginAndDownload();
+        populateData(vault);
+        const pSync = await syncStudioProgress(false);
+        toast(pSync ? 'Kütüphane ve ilerleme eşitlendi ✓' : 'Kütüphane güncellendi ✓', 'ok');
+        const initial = (location.hash || '#today').slice(1);
+        show(VIEWS.includes(initial) ? initial : 'today', false);
+      } catch (err) {
+        console.error('[vault sync error]', err);
+        toast(`Bağlantı hatası: ${err.message}`, 'no');
+      } finally {
+        btn.disabled = false;
+        btn.style.opacity = '';
+      }
+      break;
+    }
+
     default: break;
   }
 });
@@ -346,13 +485,53 @@ document.addEventListener('keydown', e => {
     : ({ '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E' })[k];
 
   if (currentView === 'practice') {
-    if (letter) { practice.pick(letter); e.preventDefault(); }
-    else if (e.key === 'Enter' || e.key === ' ') { practice.next(); e.preventDefault(); }
-    else if (k === 'B') { practice.dontKnow(); e.preventDefault(); }
+    if (k === 'G') { practice.askGemini(); e.preventDefault(); return; }
+    if (k === 'K' && practice.isAnswered()) {
+      const btn = document.querySelector('#view-practice [data-act="kural"]');
+      if (btn) { kuralToggle(btn.dataset.topic, btn.dataset.qid); e.preventDefault(); }
+      return;
+    }
+    if (practice.isAnswered()) {
+      if (e.key === 'Enter' || e.key === ' ') { practice.next(); e.preventDefault(); }
+      else if (k === 'M') { practice.nextLogic(); e.preventDefault(); }
+    } else {
+      // Akış ile aynı: şık seçiliyse 1-2-3 bahis (Enter = Sanırım), değilse 1-5 şık.
+      const conf = practice.isArmed() ? ({ '1': 'sure', '2': 'think', '3': 'guess' })[e.key] : null;
+      if (conf) { practice.commit(conf); e.preventDefault(); }
+      else if (practice.isArmed() && e.key === 'Enter') { practice.commit('think'); e.preventDefault(); }
+      else if (letter) { practice.arm(letter); e.preventDefault(); }
+    }
+  } else if (currentView === 'akim' && akim.hasSession()) {
+    if (e.key === 'Escape') { akim.quit(); e.preventDefault(); return; }
+    if (k === 'G') { akim.askGemini(); e.preventDefault(); return; }
+    if (k === 'K' && akim.isAnswered()) {
+      const btn = document.querySelector('#view-akim [data-act="kural"]');
+      if (btn) { kuralToggle(btn.dataset.topic, btn.dataset.qid); e.preventDefault(); }
+      return;
+    }
+    if (akim.isAnswered()) {
+      // M (mantık) kısayolu 20 Eylül 2026'da kaldırıldı: karar artık cevaptan
+      // ÖNCE, bahis şeridinde veriliyor (3 = Mantıkla).
+      if (e.key === 'Enter' || e.key === ' ') { akim.next(); e.preventDefault(); }
+    } else {
+      // Şık seçildiyse 1-2-3 bahistir (Enter = Sanırım); seçilmediyse 1-5 şıktır.
+      const conf = akim.isArmed() ? ({ '1': 'sure', '2': 'think', '3': 'guess' })[e.key] : null;
+      if (conf) { akim.commit(conf); e.preventDefault(); }
+      else if (akim.isArmed() && e.key === 'Enter') { akim.commit('think'); e.preventDefault(); }
+      else if (letter) { akim.arm(letter); e.preventDefault(); }
+    }
   } else if (currentView === 'exam' && exam.active()) {
+    // K: bu soruda kuşkum var. Hem soru haritasında işaretli kalır hem de
+    // sonuç ekranında cevabı "kuşkulu" kovasına yazar.
+    if (k === 'K') { exam.mark(); e.preventDefault(); return; }
     if (letter) { exam.pick(letter); e.preventDefault(); }
     else if (e.key === 'ArrowRight') { exam.next(); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { exam.prev(); e.preventDefault(); }
+  } else if (currentView === 'exam' && exam.reviewing()) {
+    // Çözüm ekranı: oklar soru değiştirir, G analiz istemini kopyalar.
+    if (e.key === 'ArrowRight') { exam.rvNext(); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { exam.rvPrev(); e.preventDefault(); }
+    else if (k === 'G') { exam.rvAnalyze(); e.preventDefault(); }
   }
 });
 
@@ -398,10 +577,107 @@ function renderDriveConnectScreen() {
 }
 
 
+/* ---------- Takip Uygulaması Deneme Köprüsü ---------- */
+
+async function syncTakipExams() {
+  if (typeof window === 'undefined') return;
+  try {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    let exams = [];
+    if (isLocal) {
+      try {
+        const res = await fetch('/api/takip-denemeler');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && Array.isArray(data.exams)) exams = data.exams;
+        }
+      } catch (err) {}
+    }
+    if (!exams.length) {
+      try {
+        const resExp = await fetch('studio_sessions_export.json');
+        if (resExp.ok) {
+          const dataExp = await resExp.json();
+          if (Array.isArray(dataExp.exams)) exams = dataExp.exams;
+        }
+      } catch (err) {}
+    }
+    if (exams.length) {
+      const changed = importTakipExams(exams);
+      if (changed) {
+        if (currentView === 'today') today.render();
+        else if (currentView === 'progress') progress.render($('#view-progress'));
+      }
+    }
+  } catch (e) {
+    // sessiz geçiş
+  }
+}
+
+
+/* ---------- günün rotası: adım başlatıcı ----------
+   Karar rota.js'te; burası yalnız adımı doğru seansa çevirir. Adım ne kadar
+   kaldıysa seans o kadar soruyla açılır, cevaplar `set` etiketiyle kaydolur ve
+   Bugün ekranı ilerlemeyi oradan sayar. */
+function rotaBaslat(adim) {
+  if (!adim) { show('today'); return; }
+  const kalan = Math.max(1, (adim.plan || 0) - (adim.yapilan || 0));
+  const L = adim.launch || {};
+  let ok = false;
+  switch (L.tur) {
+    case 'deneme-devam':
+    case 'deneme-sayfa':
+      show('exam'); return;
+    case 'deneme': {
+      const sec = L.secim || {};
+      ok = sec.kind === 'real' ? exam.startReal(sec.source)
+        : sec.kind === 'set' ? exam.startQuestions(kagitSorulari(sec.source), sec.label, sec.source)
+          : sec.kind === 'ai' ? exam.startAi()
+            : exam.start();
+      if (ok !== false) show('exam');
+      return;
+    }
+    case 'srs':
+      ok = practice.startSession({ mode: 'review', count: kalan, tag: 'srs' });
+      break;
+    case 'tekrar': {
+      const qs = adimSorulari('tekrar').slice(0, 30);
+      if (!qs.length) { toast('Denemenin bütün yanlışlarını zaten çözdün.'); today.render(); return; }
+      ok = practice.startSession({ questions: qs, customLabel: `Deneme tekrarı · ${qs.length} soru`, tag: 'tekrar' });
+      break;
+    }
+    case 'sure':
+      ok = practice.startSession({ mode: 'deadlines', count: kalan, customLabel: 'Süreler ve sayılar', tag: 'sure' });
+      break;
+    case 'inatci': {
+      const qs = adimSorulari('inatci').slice(0, kalan);
+      ok = practice.startSession({ questions: qs, customLabel: `İnatçı sorular · ${qs.length}`, tag: 'inatci' });
+      break;
+    }
+    case 'odev':
+      ok = practice.startSession({ mode: 'topic', topicId: L.topicId, count: kalan, tag: 'odev' });
+      break;
+    case 'konu': {
+      // Konu onarımı: önce kardeş sorular (kuralı kur), sonra yanlışlar (sına).
+      const qs = konuSetSorulari(L.key);
+      if (!qs.length) { toast('Bu konunun bugünlük onarımı bitti.'); today.render(); return; }
+      ok = practice.startSession({ questions: qs, customLabel: `Konu onarımı · ${adim.baslik}`, tag: 'konu:' + L.key });
+      break;
+    }
+    case 'akis':
+      if (akim.start({ label: 'Günün akışı', hedef: adim.plan ? kalan : 0 })) show('akim');
+      return;
+    default:
+      show('today'); return;
+  }
+  if (ok) show('practice');
+}
+
 /* ---------- başlangıç ---------- */
 
 async function boot() {
   window.__STUDIO_LOADED__ = true;
+  console.log('%c© 2026 Yusuf GÜNAY — Tüm hakları saklıdır. İzinsiz kullanım ve kopyalama yasaktır.', 'font-weight:600;color:#6f7ce6');
   try {
     load();
     const curSettings = getSettings();
@@ -412,12 +688,17 @@ async function boot() {
 
     const d = daysLeft();
     const cd = $('#countdown');
-    if (cd) cd.innerHTML = `Sınava <b>${d} gün</b>`;
+    if (cd) cd.innerHTML = d > 0 ? `Sınava <b>${d} gün</b>` : '<b>Sınav günü</b>';
 
     if (rep.needAuth || rep.questions === 0) {
       renderDriveConnectScreen();
       return;
     }
+
+    // Tekrar politikası v2 (19 Eylül 2026): eski Leitner kayıtlarını yalnız
+    // mezun eder/bırakır, kuyruğa soru eklemez. Soru katmanını bildiği için
+    // veri yüklendikten SONRA çalışır; Drive birleştirmesinden sonra tekrar.
+    try { if (applySrsPolicy() > 0) save(); } catch (e) { console.warn('[srs politika]', e); }
 
     const initial = (location.hash || '#today').slice(1);
     show(VIEWS.includes(initial) ? initial : 'today', false);
@@ -425,8 +706,24 @@ async function boot() {
 
     // Arka planda Drive'daki güncel ilerlemeyi sessizce birleştir
     syncStudioProgress(false).then(res => {
+      if (res) { try { if (applySrsPolicy() > 0) save(); } catch (e) {} }
       if (res && currentView === 'progress') progress.render($('#view-progress'));
     }).catch(() => {});
+
+    // Oturum açıksa kütüphaneyi de arka planda sessizce kontrol et ve güncelle
+    requestSilentToken().then(token => {
+      if (token) {
+        fetchVaultFromDrive(token).then(v => {
+          if (v && Array.isArray(v.questions) && v.questions.length >= (questionById.size || 0)) {
+            populateData(v);
+            if (currentView === 'exam') exam.render();
+          }
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+
+    // Takip Uygulamasından gelen denemeleri içeri aktar
+    syncTakipExams().catch(() => {});
 
 
     // Veri sorunlarını sessizce geçme
