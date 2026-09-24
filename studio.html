@@ -1,0 +1,158 @@
+<!--
+  أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+  بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+  رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
+-->
+<!-- © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+     Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+     veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. -->
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover: çentik/köşe boşluklarını env(safe-area-inset-*) ile biz yönetiyoruz.
+       Yakınlaştırma bilerek serbest bırakıldı — kanun metni okunurken gerekebiliyor. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- AI / veri madenciligi rezervi: bu icerik model egitimi icin lisansli DEGILDIR. -->
+  <meta name="robots" content="noai, noimageai">
+  <meta name="tdm-reservation" content="1">
+  <title>HMGS Stüdyo — Kişisel Çalışma Koçu</title>
+
+  <!-- Telefona uygulama olarak kurulum (PWA) -->
+  <link rel="manifest" href="studio.webmanifest">
+  <meta name="theme-color" content="#F7F5F0">
+  <script>
+    (function() {
+      try {
+        var raw = localStorage.getItem('hmgs_studio_v1');
+        var theme = 'system';
+        var fontSize = 'normal';
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && parsed.settings) {
+            theme = parsed.settings.theme || 'system';
+            fontSize = parsed.settings.fontSize || 'normal';
+          }
+        }
+        var isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+        if (fontSize === 'large') {
+          document.documentElement.setAttribute('data-font-size', 'large');
+        }
+        var metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme) metaTheme.setAttribute('content', isDark ? '#121316' : '#F7F5F0');
+      } catch (e) {}
+    })();
+  </script>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Stüdyo">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon.png">
+  <link rel="shortcut icon" href="icons/favicon.ico">
+
+  <link rel="stylesheet" href="studio/css/studio.css?v=20260923_4">
+  <!-- Mobil katman: studio.css'ten SONRA gelmeli, tüm kuralları @media içinde -->
+  <link rel="stylesheet" href="studio/css/studio-mobile.css?v=20260923_4">
+  <!-- Google Identity Services (Drive Vault Eşitleme) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">HMGS <span>Stüdyo</span></div>
+    <nav class="nav">
+      <button data-view="today"    aria-current="true">Bugün</button>
+      <button data-view="flow"     aria-current="false">Konular</button>
+      <button data-view="akim"     aria-current="false">Akış</button>
+      <button data-view="practice" aria-current="false">Soru</button>
+      <button data-view="pratik"   aria-current="false">Pratik</button>
+      <button data-view="exam"     aria-current="false">Deneme</button>
+      <button data-view="progress" aria-current="false">İlerleme</button>
+    </nav>
+    <a href="cikmis.html" class="nav-portal-badge emerald" title="240 Arşiv Sorusu & Detaylı Odak Röntgeni">Arşiv Röntgeni</a>
+    <a href="portal.html" class="nav-portal-badge indigo" title="HMGS Portala Dön">Portal</a>
+    <span class="countdown" id="countdown">Sınava <b>–</b></span>
+
+    <div class="topbar-actions">
+      <!-- BUG (17 Eyl 2026): önceden kütüphaneyi Drive'dan elle yeniden çekecek
+           hiçbir erişilebilir buton yoktu (sync-vault yalnızca ilk-açılış
+           ekranında vardı). PC'de yeni soru ekleyip kasayı gönderdiğinizde
+           telefon/tarayıcı eski (önbellekteki) kopyada takılı kalıyordu.
+           Bu buton her zaman görünür; tıklanınca Drive'daki en güncel
+           kasayı indirip anında uygular. -->
+      <button class="icon-btn" id="btnSyncVault" data-act="sync-vault-quiet" title="Kütüphaneyi Drive'dan Yeniden Eşitle (yeni soru eklediysen kullan)" aria-label="Kütüphaneyi yenile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 2v6h-6"></path>
+          <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+          <path d="M3 22v-6h6"></path>
+          <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+        </svg>
+      </button>
+      <button class="icon-btn" id="btnToggleFontSize" data-act="toggle-font-size" title="Metin Boyutunu Değiştir" aria-label="Metin boyutu">
+        <span style="font-family:var(--sans);font-size:0.72rem;font-weight:700">A±</span>
+      </button>
+      <button class="icon-btn" id="btnToggleTheme" data-act="toggle-theme" title="Karanlık / Aydınlık Tema" aria-label="Tema değiştir">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-today"    class="view on"></section>
+    <section id="view-odevler"  class="view"></section>
+    <section id="view-flow"     class="view"></section>
+    <section id="view-akim"     class="view"></section>
+    <section id="view-practice" class="view"></section>
+    <section id="view-pratik"   class="view"></section>
+    <section id="view-exam"     class="view"></section>
+    <section id="view-progress" class="view"></section>
+  </main>
+
+  <!-- Veri katmanı: klasik script, yerel ve çevrimdışı çalışma için global sabitler -->
+  <script src="topics.js"></script>
+  <script src="questions.js"></script>
+  <script src="questions_ai.js"></script>
+  <!-- Kitap envanteri: yerelde var, prod'da 404 (veri kasaya tasindi) -->
+  <script src="kitap_envanteri.js"></script>
+
+  <!-- Etkileşimli görsel motoru (window.HMGSV3) -->
+  <script src="js/visual-engines-v3.js"></script>
+
+  <!-- Uygulama: ES modülleri (Vault & IndexedDB Destekli) -->
+  <script type="module" src="studio/js/main.js?v=20260924_2"></script>
+
+  <!-- Servis çalışanı: yalnız güvenli bağlamda (https / localhost) kayıt olur. -->
+  <script>
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('[sw] kayıt olmadı:', err));
+      });
+    }
+
+    // Yalnızca file:// protokolü ile açıldığında uyar (CORS engeli)
+    if (location.protocol === 'file:') {
+      window.addEventListener('DOMContentLoaded', function() {
+        var host = document.getElementById('view-today');
+        if (host) {
+          host.innerHTML = '<div class="wrap" style="padding:2rem 1rem"><div class="card" style="border-left:4px solid var(--warn);background:#fff">' +
+            '<h3 style="font-size:1.15rem;font-weight:700;margin-bottom:0.6rem;color:var(--ink)">HMGS Stüdyo Yerel Sunucu Gerektiriyor</h3>' +
+            '<p style="color:var(--ink-2);font-size:0.92rem;line-height:1.6;margin-bottom:1.2rem">' +
+            'Uygulama doğrudan dosya sisteminden (<code>file://</code>) açıldığı için tarayıcı güvenlik politikası (CORS) gereği JavaScript modülleri engellendi.' +
+            '<br><br><b>Çözüm:</b> Proje klasöründeki <code>baslat.bat</code> dosyasını çalıştırın veya tarayıcıda <b><a href="http://localhost:8766/studio.html" style="color:var(--accent);text-decoration:underline">http://localhost:8766/studio.html</a></b> adresini açın.</p>' +
+            '<a href="http://localhost:8766/studio.html" class="btn" style="text-decoration:none;display:inline-block">http://localhost:8766 Adresine Git</a>' +
+            '</div></div>';
+        }
+      });
+    }
+  </script>
+</body>
+</html>
+
