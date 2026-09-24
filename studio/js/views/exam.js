@@ -11,10 +11,10 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich, richBlock, stripEmoji, splitStem, fmtClock, emptyState, $, toast } from '../ui.js';
-import { buildAlgorithmicExamSet, getAlgorithmicExamPreview, subjectName, SUBJECTS, topicById, questionById, pastExamList, pastExamQuestions, denemeSetList, denemeSetQuestions } from '../data.js';
+import { buildAlgorithmicExamSet, getAlgorithmicExamPreview, subjectName, SUBJECTS, topicById, questionById, questionsBySubject, pastExamList, pastExamQuestions, denemeSetList, denemeSetQuestions } from '../data.js';
 import { recordAnswer, save, saveExam, state, lastExam, EXAM_TOTAL, PASS_CORRECT } from '../store.js';
 import { scheduleAfterAnswer, scoreOf } from '../engine.js';
-import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
+import { premiseHTML, optionRowHTML, toggleOption, togglePremise, extractNumerals, isAutoStruck } from '../elim.js';
 import { bookLocationFor, NO_BOOK_SUBJECTS } from '../book-map.js';
 import { pushStudioQueueToDrive, getActiveToken, setActiveToken, requestSilentToken } from '../vault-client.js';
 import { buildGeminiPrompt } from './practice.js';
@@ -114,8 +114,10 @@ function beginExam(questions, { shortfall, label, real, stats }) {
     shortfall: shortfall || [],
     label,
     real,
-    stats: stats || null,
-    finished: false
+    finished: false,
+    // Sınav boyunca her sorunun elenen şıkları ve öncülleri hafızada tutulur.
+    elimOptions: new Array(questions.length).fill(null).map(() => new Set()),
+    elimPremises: new Array(questions.length).fill(null).map(() => new Set())
   };
   if (shortfall && shortfall.length) {
     const miss = shortfall.reduce((a, s) => a + (s.want - s.got), 0);
@@ -127,8 +129,73 @@ function beginExam(questions, { shortfall, label, real, stats }) {
 
 export function active() { return !!E && !E.finished; }
 
-function activeResult() {
-  return lastResult || lastExam();
+export function getExamById(id) {
+  if (!id) return null;
+  return (state().exams || []).find(e => e.id === id) || null;
+}
+
+export function activeResult() {
+  if (lastResult && lastResult.id) {
+    const fresh = getExamById(lastResult.id);
+    if (fresh) lastResult = fresh;
+  }
+  if (!lastResult) {
+    lastResult = lastExam();
+  }
+  return lastResult;
+}
+
+function getRepeatCount(e) {
+  if (!e) return 0;
+  if (Array.isArray(e.repeatIds)) return e.repeatIds.length;
+  if (Array.isArray(e.wrongIds)) return e.wrongIds.length;
+  if (Array.isArray(e.review)) {
+    return e.review.filter(r => !r.ok || r.doubt).length;
+  }
+  if (Array.isArray(e.misses)) {
+    return e.misses.reduce((sum, m) => sum + (m.wrongCount || 1), 0);
+  }
+  return (e.wrong || 0) + (e.blank || 0);
+}
+
+function pastExamsBlock(exams, currentId) {
+  if (!exams || !exams.length) return '';
+  return `
+    <div style="margin-top:2rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+        <h3 style="font-size:1.05rem;font-weight:700;margin:0;color:var(--ink)">Geçmiş Denemelerim</h3>
+        <span style="font-size:0.82rem;color:var(--ink-2)">Toplam ${exams.length} deneme</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:0.75rem">
+        ${exams.map(e => {
+          const isLatest = e.id === currentId;
+          const repCount = getRepeatCount(e);
+          const dateStr = e.at ? new Date(e.at).toLocaleString('tr-TR', { dateStyle: 'medium', timeStyle: 'short' }) : '–';
+          return `
+          <div class="card" style="padding:0.9rem 1.1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;${isLatest ? 'border-left:3px solid var(--accent);' : ''}">
+            <div style="min-width:200px">
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem">
+                <h4 style="font-size:0.95rem;font-weight:600;margin:0;color:var(--ink)">${esc(e.label || 'Deneme Sınavı')}</h4>
+                <span class="chip ${e.pass ? 'accent' : ''}" style="font-size:0.72rem;font-weight:700">${e.net} net</span>
+                ${isLatest ? `<span class="chip" style="font-size:0.68rem;opacity:0.8">Son Sınav</span>` : ''}
+              </div>
+              <div style="font-size:0.82rem;color:var(--ink-2)">
+                ${dateStr} · ${e.correct || 0} doğru, ${e.wrong || 0} yanlış${e.blank ? `, ${e.blank} boş` : ''} · ${fmtClock(e.durationMs)}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+              <button class="btn btn-2 btn-s" data-act="exam-open-review" data-exam-id="${esc(e.id)}">
+                Çözümleri İncele
+              </button>
+              ${repCount ? `
+              <button class="btn btn-s" data-act="exam-review-wrong" data-exam-id="${esc(e.id)}">
+                Yanlışları Çöz (${repCount})
+              </button>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
 }
 
 export function render() {
@@ -148,11 +215,13 @@ export function render() {
     const s = state();
     const seen = new Map((s.answers || []).map(a => [a.qId, new Date(a.at || 0).getTime()]));
     const prev = getAlgorithmicExamPreview(seen);
+    const pastExams = (s.exams || []).slice().reverse();
 
     host.innerHTML = `<div class="wrap">
       <h1 class="page">Deneme Sınavı</h1>
       <p class="page-sub">120 soru · 155 dakika · resmi ders dağılımı</p>
       ${res ? resultBlock(res, true) : ''}
+      ${pastExams.length > 1 ? pastExamsBlock(pastExams, res?.id) : ''}
 
       <!-- 1. BİRİNCİL ODAK: AKILLI ALGORİTMİK DENEME -->
       <div class="card" style="margin-top:1.25rem;border:1px solid rgba(var(--accent-rgb, 99, 102, 241), 0.25);background:var(--surface)">
@@ -238,6 +307,9 @@ export function render() {
   const { premise, ask } = splitStem(q.stem);
   const chosen = E.answers[E.i];
   const answeredCount = E.answers.filter(a => a !== null).length;
+  const struckPremises = E.elimPremises[E.i] || (E.elimPremises[E.i] = new Set());
+  const struckOptions = E.elimOptions[E.i] || (E.elimOptions[E.i] = new Set());
+  const allNumerals = extractNumerals(premise);
 
   host.innerHTML = `
     <div class="wrap">
@@ -267,10 +339,19 @@ export function render() {
         </div>
 
         <div class="card">
-          ${premiseHTML(premise)}
+          ${premiseHTML(premise, struckPremises)}
           <div class="q-ask">${rich(ask)}</div>
           <div class="opts" id="exam-opts">
-            ${q.options.map(o => optionRowHTML(o, { pickAct: 'exam-pick', extraClass: chosen === o.key ? 'pick-ok' : '' })).join('')}
+            ${q.options.map(o => {
+              const isStruckManual = struckOptions.has(o.key);
+              const isStruckAuto = isAutoStruck(o.text, struckPremises, allNumerals);
+              return optionRowHTML(o, {
+                pickAct: 'exam-pick',
+                extraClass: chosen === o.key ? 'pick-ok' : '',
+                isStruckManual,
+                isStruckAuto
+              });
+            }).join('')}
           </div>
         </div>
 
@@ -335,21 +416,52 @@ export function pick(key) {
 
 export function clear() { if (E) { E.answers[E.i] = null; render(); } }
 
-/* ---------- şık / öncül eleme (görsel, cevap kaydı değil) ---------- */
+/* ---------- şık / öncül eleme (sınav boyunca kalıcı tutulur, telemetriye işlenir) ---------- */
 
 export function eliminateOption(key) {
   if (!E || E.finished) return;
+  const currentSet = E.elimOptions[E.i] || (E.elimOptions[E.i] = new Set());
+  if (currentSet.has(key)) {
+    currentSet.delete(key);
+  } else {
+    currentSet.add(key);
+  }
   toggleOption('#view-exam', key);
 }
 
 export function eliminatePremise(numeral) {
   if (!E || E.finished) return;
+  const currentSet = E.elimPremises[E.i] || (E.elimPremises[E.i] = new Set());
+  if (currentSet.has(numeral)) {
+    currentSet.delete(numeral);
+  } else {
+    currentSet.add(numeral);
+  }
   togglePremise('#view-exam', numeral);
 }
+
 export function mark() {
-  if (!E) return;
-  E.marked.has(E.i) ? E.marked.delete(E.i) : E.marked.add(E.i);
-  render();
+  if (!E || E.finished) return;
+  const wasMarked = E.marked.has(E.i);
+  if (wasMarked) {
+    E.marked.delete(E.i);
+  } else {
+    E.marked.add(E.i);
+  }
+  const isMarked = E.marked.has(E.i);
+
+  // Doğrudan hedef DOM elemanlarını güncelle (ekranı baştan çizmeden, sıfır titreşim ve süre kaybı olmadan)
+  const btn = $('#view-exam .exam-doubt');
+  if (btn) {
+    btn.classList.toggle('on', isMarked);
+    btn.innerHTML = `${isMarked ? 'Kuşkuyu kaldır' : 'Kuşkuluyum'} <span class="kbd">K</span>`;
+  }
+  const mapBtn = $(`#exam-map button[data-i="${E.i}"]`);
+  if (mapBtn) {
+    mapBtn.classList.toggle('marked', isMarked);
+  }
+  const pe = $('#exam-pace');
+  if (pe) pe.textContent = paceText();
 }
 export function goto(i) { if (E) { accrueTime(); E.i = Math.max(0, Math.min(E.questions.length - 1, i)); render(); } }
 export function prev() { goto(E ? E.i - 1 : 0); }
@@ -386,6 +498,9 @@ export function finish(auto = false) {
     const chosen = E.answers[i];
     const ok = chosen === q.correct;
     const doubt = E.marked.has(i);
+    const qElims = Array.from(E.elimOptions[i] || []);
+    const qElimPremises = Array.from(E.elimPremises[i] || []);
+    const usedElim = qElims.length > 0 || qElimPremises.length > 0;
     if (ok) correct++;
     if (!ok && !doubt && chosen !== null) kavram++;
     if (ok && doubt) sans++;
@@ -394,7 +509,11 @@ export function finish(auto = false) {
     // sınav temposunu bozar. Onun yerine tek kuşku işareti iki uçlu bahse
     // çevrilir: işaretlenmemiş cevap "Eminim", işaretli cevap "Mantıkla".
     const conf = doubt ? 'guess' : 'sure';
-    const row = recordAnswer(q, chosen, E.times[i] || 0, 'exam', { logicGuess: doubt });
+    const row = recordAnswer(q, chosen, E.times[i] || 0, 'exam', {
+      logicGuess: doubt,
+      usedElim,
+      eliminatedOptions: qElims
+    });
     row.conf = conf;
     // Kuşkuyla bulunan doğru "öğrenildi" sayılmaz; soru tekrar sırasında kalır.
     scheduleAfterAnswer(q.id, ok && !doubt);
@@ -428,6 +547,9 @@ export function finish(auto = false) {
     // Kuşkusuz doğrunun öğretecek bir şeyi yok; 120 sorunun tamamını saklamak
     // da tarayıcı kotasını gereksiz yere yer.
     if (ok && !doubt) return;
+    const qElims = Array.from(E.elimOptions[i] || []);
+    const qElimPremises = Array.from(E.elimPremises[i] || []);
+    const elimScenario = computeElimScenario(q, chosen, qElims);
     review.push({
       no: i + 1,
       qId: q.id,
@@ -437,14 +559,40 @@ export function finish(auto = false) {
       options: Array.isArray(q.options) ? q.options : [],
       correct: q.correct,
       chosen: chosen === null ? null : chosen,
+      eliminated: qElims,
+      elimPremises: qElimPremises,
+      elimScenario,
       ok,
       doubt,
       bucket: chosen === null ? 'bos' : (ok ? 'sans' : (doubt ? 'eksik' : 'kavram')),
       ms: Math.round(E.times[i] || 0),
       explanation: q.explanation || '',
       legalBasis: q.legalBasis || '',
-      sourceBadgeLabel: q.sourceBadgeLabel || ''
+      sourceBadgeLabel: q.sourceBadgeLabel || '',
+      source: q.source || '',
+      category: q.category || ''
     });
+  });
+
+  const usedCount = E.questions.filter((_, i) => (E.elimOptions[i]?.size || 0) > 0 || (E.elimPremises[i]?.size || 0) > 0).length;
+  const totalEliminated = E.questions.reduce((sum, _, i) => sum + (E.elimOptions[i]?.size || 0), 0);
+  const correctEliminatedCount = E.questions.filter((q, i) => E.elimOptions[i]?.has(q.correct)).length;
+  let totalTwoOptionsCount = 0;
+  let twoOptionsTrapCount = 0;
+  let twoOptionsSuccessCount = 0;
+
+  E.questions.forEach((q, i) => {
+    const optCount = Array.isArray(q.options) && q.options.length ? q.options.length : 5;
+    const elims = E.elimOptions[i] || new Set();
+    const isTwo = optCount >= 4 && elims.size === (optCount - 2);
+    if (isTwo) {
+      totalTwoOptionsCount++;
+      if (E.answers[i] === q.correct) {
+        twoOptionsSuccessCount++;
+      } else if (!elims.has(q.correct) && E.answers[i] !== null) {
+        twoOptionsTrapCount++;
+      }
+    }
   });
 
   const result = {
@@ -462,19 +610,31 @@ export function finish(auto = false) {
     kavram,
     sans,
     doubtCount: E.marked.size,
+    elimStats: {
+      usedCount,
+      totalEliminated,
+      correctEliminatedCount,
+      totalTwoOptionsCount,
+      twoOptionsTrapCount,
+      twoOptionsSuccessCount
+    },
     bySubject,
     byTopic,
     shortfall: E.shortfall,
     review,
-    // Sınav haritası: her soru için yalnız kimlik ve kova. Temiz doğruların
-    // metni saklanmaz; çözüm ekranı onları soru havuzundan okur.
+    // Sınav haritası: her soru için kimlik, kova ve elenenler.
     map: E.questions.map((q, i) => {
       const chosen = E.answers[i];
       const doubt = E.marked.has(i);
       const b = chosen === null ? 'bos'
         : chosen === q.correct ? (doubt ? 'sans' : 'ok')
           : (doubt ? 'eksik' : 'kavram');
-      return { qId: q.id, b };
+      return {
+        qId: q.id,
+        b,
+        elims: Array.from(E.elimOptions[i] || []),
+        elimPremises: Array.from(E.elimPremises[i] || [])
+      };
     }),
     wrongIds: E.questions.filter((q, i) => E.answers[i] !== q.correct).map(q => q.id),
     // Tekrar havuzu: yanlışlar, boşlar ve kuşkuyla bulunan doğrular.
@@ -496,7 +656,9 @@ export function finish(auto = false) {
   // dener.
   pushExamToDriveDirectly(result).catch(() => {});
   lastResult = result;
-  rv.f = 'fix'; rv.pos = 0;
+  const c = counts(result);
+  rv.f = (c.kavram + c.eksik > 0) ? 'yanlis' : (result.blank > 0 || c.sans > 0 ? 'fix' : 'hepsi');
+  rv.pos = 0;
   E.finished = true;
   render();
 }
@@ -547,6 +709,84 @@ async function pushExamToDriveDirectly(examResult) {
   }
 }
 
+/**
+ * Bir sorudaki eleme davranışının bilişsel senaryosunu çıkarır:
+ * - Doğru şıkkı eleme (en kritik tuzak).
+ * - İki şık arasında kalıp çeldiriciye gitme (50-50 ikileminde kayıp).
+ * - İki şık arasından doğruya ulaşma (50-50 ikileminde zafer).
+ * - Elediği şıkkı işaretleme (refleks hatası).
+ * - Kısmi eleme sonrası yanlış.
+ */
+export function computeElimScenario(q, chosen, elimOptions) {
+  if (!q) return null;
+  const elims = elimOptions instanceof Set ? elimOptions : new Set(elimOptions || []);
+  if (!elims.size) return null;
+
+  const totalOpts = Array.isArray(q.options) && q.options.length ? q.options.length : 5;
+  const correct = q.correct;
+  const isCorrectEliminated = elims.has(correct);
+  const isPickedEliminated = chosen !== null && elims.has(chosen);
+  const isOk = chosen === correct;
+  const remainingCount = Math.max(0, totalOpts - elims.size);
+
+  if (isCorrectEliminated) {
+    return {
+      type: 'correct_eliminated',
+      badge: 'Doğru Şıkkı Eledin',
+      cls: 'no',
+      text: `Doğru cevap olan ${correct} şıkkını eledin. Çeldirici kurala aldanarak doğru hukuki kuralı yanlış saydın.`
+    };
+  }
+
+  if (isPickedEliminated) {
+    return {
+      type: 'picked_eliminated',
+      badge: 'Elediğin Şıkkı Seçtin',
+      cls: 'warn',
+      text: `${chosen} şıkkını elemiş olmana rağmen işaretledin (refleks veya anlık tereddüt hatası).`
+    };
+  }
+
+  // İki şık arasına indirme (50-50 durumu: örneğin 5 şıktan 3'ü elenmiş veya 4 şıktan 2'si elenmiş)
+  if (remainingCount === 2) {
+    if (isOk) {
+      return {
+        type: 'two_options_success',
+        badge: 'İkilemden Doğru Çıktın (50-50)',
+        cls: 'ok',
+        text: `Seçenekleri iki şık arasına kadar başarıyla eledin ve kalanlar arasından doğru karar vererek ${correct} şıkkına ulaştın.`
+      };
+    } else if (chosen !== null) {
+      return {
+        type: 'two_options_trap',
+        badge: 'İkilemde Çeldiriciye Gittin (50-50)',
+        cls: 'warn',
+        text: `Doğru şıkkı elemedin; ${correct} ile ${chosen} arasında kaldın ancak son adımda çeldiriciye yöneldin.`
+      };
+    }
+  }
+
+  if (remainingCount === 1 && isOk) {
+    return {
+      type: 'full_elim_success',
+      badge: 'Tam İsabet Eleme',
+      cls: 'ok',
+      text: `Tüm yanlış şıkları başarıyla eleyerek tek kalan doğru yanıta ulaştın.`
+    };
+  }
+
+  if (!isOk && chosen !== null) {
+    return {
+      type: 'partial_elim_wrong',
+      badge: 'Kısmi Eleme / Çeldirici',
+      cls: 'no',
+      text: `Doğru şıkkı elemedin fakat seçenekleri ikiye indiremeden ${chosen} çeldiricisine takıldın.`
+    };
+  }
+
+  return null;
+}
+
 /* ---------- sonuç ve çözüm analizi ---------- */
 
 /**
@@ -581,12 +821,41 @@ function entries(r) {
 
 function listFor(r, f) {
   const all = entries(r);
-  if (f === 'hepsi') return all;
-  if (f === 'fix') {
-    return all.filter(e => e.b !== 'ok')
-      .sort((a, b) => (BUCKETS[a.b].order - BUCKETS[b.b].order) || (a.no - b.no));
+  let res = [];
+  if (f === 'hepsi') {
+    res = all;
+  } else if (f === 'yanlis') {
+    // Hem fark etmeden yanlış (kavram) hem de kuşkulu yanlış (eksik)
+    res = all.filter(e => e.b === 'kavram' || e.b === 'eksik');
+  } else if (f === 'kusku') {
+    // Hem kuşkulu yanlış (eksik) hem de kurtarılmış kuşkulu doğru (sans)
+    res = all.filter(e => e.b === 'eksik' || e.b === 'sans');
+  } else if (f === 'fix') {
+    // Tekrar havuzu: tüm yanlışlar, kuşkulu doğrular ve boşlar
+    res = all.filter(e => e.b !== 'ok');
+  } else if (f === 'ok') {
+    res = all.filter(e => e.b === 'ok');
+  } else if (f === 'trap') {
+    // Doğru şıkkı eleme tuzağına düşülen sorular
+    res = all.filter(e => {
+      const m = contentOf(e);
+      return m && m.eliminated && m.eliminated.includes(m.correct);
+    });
+  } else if (f === 'ikilem') {
+    // İki şık arasında kalınan (50-50) sorular
+    res = all.filter(e => {
+      const m = contentOf(e);
+      if (!m) return false;
+      const totalOpts = (m.options || []).length || 5;
+      const elims = m.eliminated || [];
+      return totalOpts >= 4 && elims.length === (totalOpts - 2);
+    });
+  } else {
+    res = all.filter(e => e.b === f);
   }
-  return all.filter(e => e.b === f);
+  // Sınavdaki doğal soru sırasına (1..120) göre sıralanır:
+  // Asla bucket önceliğine göre atlama yapılmaz
+  return res.sort((a, b) => a.no - b.no);
 }
 
 /** Okuyucuda gösterilecek soru: önce saklanan kopya, yoksa havuz. */
@@ -594,18 +863,41 @@ function contentOf(e) {
   if (e.row) return e.row;
   const q = questionById.get(e.qId);
   if (!q) return null;
+  const elims = e.elims || [];
+  const chosen = e.b === 'ok' ? q.correct : null;
   return {
     no: e.no, qId: q.id, subjectId: q.subjectId, topicId: q.topicId || null,
     stem: q.stem, options: Array.isArray(q.options) ? q.options : [],
-    correct: q.correct, chosen: e.b === 'ok' ? q.correct : null,
+    correct: q.correct, chosen,
+    eliminated: elims,
+    elimPremises: e.elimPremises || [],
+    elimScenario: computeElimScenario(q, chosen, elims),
     ok: e.b === 'ok', doubt: false, bucket: e.b, ms: 0,
     explanation: q.explanation || '', legalBasis: q.legalBasis || '',
-    sourceBadgeLabel: q.sourceBadgeLabel || ''
+    sourceBadgeLabel: q.sourceBadgeLabel || '',
+    source: q.source || '',
+    category: q.category || ''
   };
 }
 
 export function reviewing() { return (!!E && E.finished) || (!E && reviewOpen && !!lastResult); }
-export function openReview() { if (lastResult) { reviewOpen = true; rv.f = 'fix'; rv.pos = 0; render(); } }
+export function openReview(examId) {
+  let res = null;
+  if (examId) {
+    res = getExamById(examId);
+  }
+  if (!res) {
+    res = activeResult();
+  }
+  if (res) {
+    lastResult = res;
+    reviewOpen = true;
+    const c = counts(res);
+    rv.f = (c.kavram + c.eksik > 0) ? 'yanlis' : (res.blank > 0 || c.sans > 0 ? 'fix' : 'hepsi');
+    rv.pos = 0;
+    render();
+  }
+}
 export function closeReview() { reviewOpen = false; render(); }
 export function backToList() { E = null; reviewOpen = false; stopClock(); render(); }
 
@@ -618,19 +910,44 @@ export function rvNext() { step(1); }
 export function rvPrev() { step(-1); }
 function step(d) {
   if (!lastResult || !reviewing()) return;
-  const n = listFor(lastResult, rv.f).length;
+  const list = listFor(lastResult, rv.f);
+  const n = list.length;
   if (!n) return;
   const to = rv.pos + d;
   if (to < 0 || to >= n) return;
   rv.pos = to;
   paintReview();
+  const el = document.getElementById('rv-reader');
+  if (el && el.getBoundingClientRect && el.getBoundingClientRect().top < 0) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 /** Haritadaki bir kareye basıldı: o soru okuyucuya gelir. */
 export function rvGoto(no) {
   if (!lastResult) return;
   let list = listFor(lastResult, rv.f);
   let i = list.findIndex(e => e.no === no);
-  if (i < 0) { rv.f = 'hepsi'; list = listFor(lastResult, 'hepsi'); i = list.findIndex(e => e.no === no); }
+  if (i < 0) {
+    const all = entries(lastResult);
+    const target = all.find(e => e.no === no);
+    if (target && (target.b === 'kavram' || target.b === 'eksik')) {
+      rv.f = 'yanlis';
+      list = listFor(lastResult, 'yanlis');
+      i = list.findIndex(e => e.no === no);
+    } else if (target && (target.b === 'eksik' || target.b === 'sans')) {
+      rv.f = 'kusku';
+      list = listFor(lastResult, 'kusku');
+      i = list.findIndex(e => e.no === no);
+    } else if (target && target.b !== 'ok') {
+      rv.f = 'fix';
+      list = listFor(lastResult, 'fix');
+      i = list.findIndex(e => e.no === no);
+    } else {
+      rv.f = 'hepsi';
+      list = listFor(lastResult, 'hepsi');
+      i = list.findIndex(e => e.no === no);
+    }
+  }
   if (i < 0) return;
   rv.pos = i;
   paintReview();
@@ -681,7 +998,10 @@ function scoreHTML(r) {
   const pct = Math.min(100, Math.round((r.correct / PASS_CORRECT) * 100));
   const c = counts(r);
   const gap = PASS_CORRECT - r.correct;
-  const stat = (k, v, cls) => `<div class="rv-stat"><span class="rv-stat-v ${v ? cls : 'zero'}">${v}</span><span class="rv-stat-k">${k}</span></div>`;
+  const stat = (k, v, cls, filterKey) => filterKey
+    ? `<button class="rv-stat clickable" data-act="exam-filter" data-f="${filterKey}" title="${esc(k)} filtrele"><span class="rv-stat-v ${v ? cls : 'zero'}">${v}</span><span class="rv-stat-k">${esc(k)}</span></button>`
+    : `<div class="rv-stat"><span class="rv-stat-v ${v ? cls : 'zero'}">${v}</span><span class="rv-stat-k">${esc(k)}</span></div>`;
+  const elSt = r.elimStats;
   return `
     <section class="rv-score">
       <div class="rv-score-main">
@@ -693,12 +1013,15 @@ function scoreHTML(r) {
         </div>
       </div>
       <div class="rv-stats">
-        ${stat('Doğru', r.correct, 'ok')}
-        ${stat('Yanlış', r.wrong, 'no')}
-        ${stat('Boş', r.blank, 'warn')}
+        ${stat('Doğru', r.correct, 'ok', 'ok')}
+        ${stat('Yanlış', r.wrong, 'no', 'yanlis')}
+        ${stat('Boş', r.blank, 'warn', 'bos')}
         <span class="rv-stats-sep"></span>
-        ${stat('Fark etmeden yanlış', c.kavram, 'no')}
-        ${stat('Kurtarılmış doğru', c.sans, 'ok')}
+        ${stat('Fark etmeden yanlış', c.kavram, 'no', 'kavram')}
+        ${stat('Kurtarılmış doğru', c.sans, 'ok', 'sans')}
+        ${elSt && elSt.correctEliminatedCount ? stat('Doğruyu Eleme', elSt.correctEliminatedCount, 'no', 'trap') : ''}
+        ${elSt && elSt.twoOptionsTrapCount ? stat('İkilemde Kayıp', elSt.twoOptionsTrapCount, 'warn', 'ikilem') : ''}
+        ${elSt && elSt.twoOptionsSuccessCount ? stat('İkilemde İsabet', elSt.twoOptionsSuccessCount, 'ok', 'ikilem') : ''}
       </div>
     </section>`;
 }
@@ -709,10 +1032,15 @@ function mapInner(r) {
   const cur = list[rv.pos];
   const inList = new Set(list.map(e => e.no));
   const c = counts(r);
+  const wrongN = c.kavram + c.eksik;
+  const doubtN = c.eksik + c.sans;
   const fixN = all.length - (c.ok || 0);
+  const elSt = r.elimStats;
+  const trapN = elSt?.correctEliminatedCount || 0;
+  const ikilemN = elSt?.totalTwoOptionsCount || 0;
 
-  const chip = (k, label, n) => n
-    ? `<button class="rv-chip${rv.f === k ? ' on' : ''}" data-act="exam-filter" data-f="${k}">${k === 'fix' || k === 'hepsi' ? '' : `<i class="rv-sw ${k}"></i>`}${esc(label)}<b>${n}</b></button>`
+  const chip = (k, label, n, customSw) => n
+    ? `<button class="rv-chip${rv.f === k ? ' on' : ''}" data-act="exam-filter" data-f="${k}">${customSw ? `<i class="rv-sw ${customSw}"></i>` : ''}${esc(label)}<b>${n}</b></button>`
     : '';
 
   return `
@@ -721,12 +1049,16 @@ function mapInner(r) {
         data-act="rv-goto" data-no="${e.no}" title="Soru ${e.no} · ${esc(BUCKETS[e.b].label)}">${e.no}</button>`).join('')}
     </div>
     <div class="rv-chips">
-      ${chip('fix', 'Düzeltilecekler', fixN)}
-      ${chip('kavram', BUCKETS.kavram.label, c.kavram)}
-      ${chip('eksik', BUCKETS.eksik.label, c.eksik)}
-      ${chip('bos', BUCKETS.bos.label, c.bos)}
-      ${chip('sans', BUCKETS.sans.label, c.sans)}
-      ${chip('hepsi', 'Tümü', all.length)}
+      ${chip('yanlis', 'Tüm Yanlışlar', wrongN, 'kavram')}
+      ${chip('kusku', 'Kuşkulular', doubtN, 'sans')}
+      ${chip('fix', 'Yanlış + Kuşkulu', fixN, '')}
+      ${trapN > 0 ? chip('trap', 'Doğruyu Eleyenler', trapN, 'kavram') : ''}
+      ${ikilemN > 0 ? chip('ikilem', 'İkilem (50-50)', ikilemN, 'sans') : ''}
+      ${chip('kavram', BUCKETS.kavram.label, c.kavram, 'kavram')}
+      ${chip('eksik', BUCKETS.eksik.label, c.eksik, 'eksik')}
+      ${chip('bos', BUCKETS.bos.label, c.bos, 'bos')}
+      ${chip('sans', BUCKETS.sans.label, c.sans, 'sans')}
+      ${chip('hepsi', 'Tüm Sınav', all.length, '')}
     </div>
     ${r.doubtCount === 0 ? `<p class="rv-hint">Bu denemede hiç kuşku işaretlemedin, yanlışlar tek kovada duruyor. Sınavda <span class="kbd">K</span> ile işaretlersen bilmediğin ile yanlış bildiğin ayrılır.</p>` : ''}`;
 }
@@ -754,16 +1086,59 @@ function readerInner(r) {
   const topic = m.topicId ? topicById.get(m.topicId) : null;
   const { premise, ask } = splitStem(m.stem);
   const sec = m.ms ? Math.round(m.ms / 1000) : 0;
+  const struckPremises = new Set(m.elimPremises || []);
+  const struckOptions = new Set(m.eliminated || []);
+  const allNumerals = extractNumerals(premise);
+  const correctWasEliminated = struckOptions.has(m.correct);
+  const totalOptionsCount = (m.options || []).length;
+  const isNarrowedToTwo = totalOptionsCount >= 4 && struckOptions.size === (totalOptionsCount - 2);
+  const scen = m.elimScenario || computeElimScenario(m, m.chosen, m.eliminated);
 
   const opts = (m.options || []).map(o => {
     const isC = o.key === m.correct;
     const isP = o.key === m.chosen;
-    const cls = isC ? 'right' : (isP ? 'picked' : '');
-    const tag = isC && isP ? 'Doğru · senin cevabın' : isC ? 'Doğru cevap' : isP ? 'Senin cevabın' : '';
-    return `<div class="rv-opt ${cls}">
+    const isElim = struckOptions.has(o.key) || isAutoStruck(o.text, struckPremises, allNumerals);
+
+    let cls = isC ? 'right' : (isP ? 'picked' : '');
+    if (isElim) cls += ' struck-manual';
+
+    let tag = '';
+    let tagCls = '';
+
+    if (isC && isP) {
+      if (scen && scen.type === 'two_options_success') {
+        tag = 'Doğru · senin cevabın (ikilemden çıktın)';
+      } else {
+        tag = 'Doğru · senin cevabın';
+      }
+    } else if (isC) {
+      if (isElim) {
+        tag = 'Doğru cevap · eledin!';
+        tagCls = ' rv-opt-tag-trap';
+      } else if (scen && scen.type === 'two_options_trap') {
+        tag = 'Doğru cevap (ikilemde kaldın)';
+      } else {
+        tag = 'Doğru cevap';
+      }
+    } else if (isP) {
+      if (isElim) {
+        tag = 'Senin cevabın (eledin)';
+        tagCls = ' rv-opt-tag-warn';
+      } else if (scen && scen.type === 'two_options_trap') {
+        tag = 'Senin cevabın (çeldirici)';
+        tagCls = ' rv-opt-tag-warn';
+      } else {
+        tag = 'Senin cevabın';
+      }
+    } else if (isElim) {
+      tag = 'Eledin';
+      tagCls = ' rv-opt-tag-elim';
+    }
+
+    return `<div class="rv-opt ${cls.trim()}">
       <span class="rv-opt-k">${esc(o.key)}</span>
       <span class="rv-opt-t">${rich(o.text)}</span>
-      ${tag ? `<span class="rv-opt-tag">${tag}</span>` : ''}
+      ${tag ? `<span class="rv-opt-tag${tagCls}">${tag}</span>` : ''}
     </div>`;
   }).join('');
 
@@ -782,11 +1157,18 @@ function readerInner(r) {
     <article class="rv-q" data-no="${m.no}">
       <div class="rv-tagline">
         <span class="rv-tag ${m.bucket}">${esc(b.label)}</span>
+        ${correctWasEliminated ? `<span class="rv-tag no" title="Çeldiriciye takılarak doğru seçeneği eledin">Doğru Şıkkı Eledin</span>` : ''}
+        ${isNarrowedToTwo && !correctWasEliminated ? `<span class="rv-tag warn" title="Bu soruda seçenekleri iki şıkka kadar indirdin">2 Şıkka İndirildi</span>` : ''}
         ${b.note ? `<span class="rv-tag-note">${b.note}</span>` : ''}
         ${sec ? `<span class="rv-sec">${sec} sn</span>` : ''}
       </div>
+      ${scen ? `
+      <div class="rv-scen ${scen.cls}">
+        <span class="rv-scen-tag">${esc(scen.badge)}</span>
+        <span class="rv-scen-desc">${rich(scen.text)}</span>
+      </div>` : ''}
       <div class="rv-stem">
-        ${premiseHTML(premise)}
+        ${premiseHTML(premise, struckPremises)}
         <div class="q-ask">${rich(ask)}</div>
       </div>
       <div class="rv-opts">${opts}</div>
@@ -801,10 +1183,15 @@ function readerInner(r) {
         ok: m.ok,
         sec: m.ms ? m.ms / 1000 : 0,
         isReview: true,
-        isMarked: m.doubt || m.bucket === 'eksik' || m.bucket === 'sans'
+        isMarked: m.doubt || m.bucket === 'eksik' || m.bucket === 'sans',
+        isElimTrap: correctWasEliminated
       })}
       <div class="rv-actions">
         <button class="btn btn-2 btn-s" data-act="rv-analyze">${g} <span class="kbd">G</span></button>
+        <div class="rv-nav-bottom">
+          <button class="btn btn-2 btn-s" data-act="rv-prev" ${rv.pos === 0 ? 'disabled' : ''}>‹ Önceki</button>
+          <button class="btn btn-s" data-act="rv-next" ${rv.pos >= list.length - 1 ? 'disabled' : ''}>Sıradaki Soru ›</button>
+        </div>
         <span class="rv-keys"><span class="kbd">←</span> <span class="kbd">→</span> soru değiştir</span>
       </div>
     </article>`;
@@ -819,8 +1206,8 @@ function resultBlock(r, compact) {
       <div class="section-label">Son deneme${r.label ? ' · ' + esc(r.label) : ''}</div>
       ${scoreHTML(r)}
       <div class="btn-row" style="margin-top:0.9rem">
-        <button class="btn" data-act="exam-open-review">Çözümleri aç${n ? ` (${n} soru)` : ''}</button>
-        ${n ? `<button class="btn btn-2" data-act="exam-review-wrong">Tekrar havuzunu çöz</button>` : ''}
+        <button class="btn" data-act="exam-open-review" data-exam-id="${esc(r.id)}">Çözümleri aç${n ? ` (${n} soru)` : ''}</button>
+        ${n ? `<button class="btn btn-2" data-act="exam-review-wrong" data-exam-id="${esc(r.id)}">Tekrar havuzunu çöz</button>` : ''}
       </div>`;
   }
 
@@ -848,7 +1235,7 @@ function resultBlock(r, compact) {
       </details>
 
       <div class="btn-row" style="margin-top:1.5rem">
-        <button class="btn" data-act="exam-review-wrong">Düzeltilecekleri pratikte çöz (${(r.repeatIds || r.wrongIds || []).length})</button>
+        <button class="btn" data-act="exam-review-wrong" data-exam-id="${esc(r.id)}">Düzeltilecekleri pratikte çöz (${(r.repeatIds || r.wrongIds || []).length || listFor(r, 'fix').length})</button>
         <button class="btn btn-2" data-act="exam-back">Denemelere dön</button>
         <button class="btn btn-2" data-act="exam-export-stats">Takip uygulamasına aktar</button>
       </div>
@@ -927,11 +1314,94 @@ function topicBreakdownHTML(r) {
     </p>`;
 }
 
-export function wrongIdsOfLast() { return lastResult ? lastResult.wrongIds : []; }
+export function getRepeatQuestionsForExam(examOrId) {
+  let exam = (typeof examOrId === 'object' && examOrId !== null) ? examOrId : getExamById(examOrId);
+  if (!exam) exam = activeResult();
+  if (!exam) return [];
+
+  const qs = [];
+  const seenIds = new Set();
+  const reviewMap = new Map((exam.review || []).map(r => [r.qId, r]));
+
+  // 1. repeatIds veya wrongIds varsa
+  const ids = (exam.repeatIds && exam.repeatIds.length) ? exam.repeatIds : (exam.wrongIds || []);
+  ids.forEach(id => {
+    if (!id || seenIds.has(id)) return;
+    let q = questionById.get(id);
+    if (!q && reviewMap.has(id)) {
+      const r = reviewMap.get(id);
+      q = {
+        id: r.qId,
+        stem: r.stem,
+        options: r.options || [],
+        correct: r.correct,
+        subjectId: r.subjectId,
+        topicId: r.topicId || null,
+        explanation: r.explanation || '',
+        legalBasis: r.legalBasis || '',
+        category: r.category || 'Deneme Tekrarı',
+        source: r.source || exam.label || 'Deneme'
+      };
+    }
+    if (q) {
+      seenIds.add(id);
+      qs.push(q);
+    }
+  });
+
+  // 2. ids ile soru bulunamadıysa fakat review dizisi varsa
+  if (!qs.length && Array.isArray(exam.review) && exam.review.length) {
+    exam.review.forEach(r => {
+      if (!r.qId || seenIds.has(r.qId)) return;
+      if (r.ok && !r.doubt) return; // Temiz doğruyu geç
+      let q = questionById.get(r.qId);
+      if (!q) {
+        q = {
+          id: r.qId,
+          stem: r.stem,
+          options: r.options || [],
+          correct: r.correct,
+          subjectId: r.subjectId,
+          topicId: r.topicId || null,
+          explanation: r.explanation || '',
+          legalBasis: r.legalBasis || '',
+          category: r.category || 'Deneme Tekrarı',
+          source: r.source || exam.label || 'Deneme'
+        };
+      }
+      if (q) {
+        seenIds.add(r.qId);
+        qs.push(q);
+      }
+    });
+  }
+
+  // 3. Harici/Takip formatı: misses dizisi varsa
+  if (!qs.length && Array.isArray(exam.misses) && exam.misses.length) {
+    exam.misses.forEach(m => {
+      const subId = m.subjectId;
+      const countNeeded = m.wrongCount || 1;
+      const pool = questionsBySubject.get(subId) || [];
+      let added = 0;
+      for (const q of pool) {
+        if (added >= countNeeded) break;
+        if (!seenIds.has(q.id)) {
+          seenIds.add(q.id);
+          qs.push(q);
+          added++;
+        }
+      }
+    });
+  }
+
+  return qs;
+}
+
+export function wrongIdsOfLast() { return lastResult ? (lastResult.wrongIds || []) : []; }
 /** Tekrar havuzu: yanlışlar, boşlar ve kuşkuyla bulunan doğrular. */
 export function repeatIdsOfLast() {
-  if (!lastResult) return [];
-  return lastResult.repeatIds || lastResult.wrongIds || [];
+  const qs = getRepeatQuestionsForExam(lastResult);
+  return qs.map(q => q.id);
 }
 export function reset() { E = null; reviewOpen = false; rv.f = 'fix'; rv.pos = 0; stopClock(); }
 
