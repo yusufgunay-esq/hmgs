@@ -672,7 +672,7 @@ function buildAlts(kinds) {
 export const KARMA_DUE_SHARE = 0.30;
 export const KARMA_DUE_SHARE_MAX = 0.45;
 export const KARMA_DUE_BACKLOG_FULL = 120;
-/* 23 Eylül 2026 (kullanıcı talimatı): görülmemiş çıkmış soru bitince yeni
+/* 23 Eylül 2026 (kullanıcı talimatı): görülmemiş gerçek sınav sorusu bitince yeni
    malzeme artık denemeden/AI'dan gelir; o noktada çıkmış yanlışlarını geri
    getirmek daha değerli, tekrar payı bir basamak yükselir. Yığılma olmasın
    diye tavan yine yarının altında. KARAR, ölçüm değil. */

@@ -650,7 +650,7 @@ export function getAlgorithmicExamPreview(seen = null) {
 
 export const isPastExam = q => q.category === 'Çıkmış Sorular' || /^hmgs_\d+/i.test(String(q.source || ''));
 
-/** Tüm çıkmış sorular, kaynağa göre filtrelenebilir. Sınav numarasına göre sıralı (orijinal sırayla). */
+/** Tüm gerçek sınav soruları, kaynağa göre filtrelenebilir. Sınav numarasına göre sıralı (orijinal sırayla). */
 export function pastExamQuestions(sourceId = null) {
   return QUESTIONS
     .filter(q => isPastExam(q) && (!sourceId || q.source === sourceId))

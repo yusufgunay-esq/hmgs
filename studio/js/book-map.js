@@ -1,7 +1,7 @@
 /* ==========================================================================
    book-map.js — KONU → FİZİKSEL KİTAP SAYFASI EŞLEMESİ
    Kaynak: "Benim fiziksel soru bankalarımın içindekiler kısımları.md"
-   (kullanıcının elindeki spiralli kitapların içindekiler dökümü, 1 Ağu 2026).
+   (kullanıcının elindeki kitapların içindekiler dökümü, 1 Ağu 2026).
 
    Amaç: deneme sonucunda zayıf çıkan konu → "kitapta hangi sayfaya bak" cevabı.
    Bu dosya İÇERİK ÜRETMEZ, sadece iki var olan kaynağı (topics.js'teki 124
