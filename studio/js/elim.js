@@ -53,7 +53,7 @@ export function premiseHTML(premise, struckNumerals) {
       const isStruck = struckSet.has(m[1]);
       return `<div class="premise-item${isStruck ? ' struck' : ''}" data-act="eliminate-premise" data-numeral="${esc(m[1])}"
         title="Bu öncülü yanlış say (onu içeren şıklar otomatik elenir)">
-        <span class="premise-num">${esc(m[1])}</span><span class="premise-txt">${rich(m[2])}</span>
+        <span class="premise-num">${esc(m[1])}.</span><span class="premise-txt">${rich(m[2])}</span>
       </div>`;
     }
     return `<div class="premise-lead">${rich(line)}</div>`;
