@@ -26,10 +26,11 @@ import * as flow from './views/flow.js';
 import * as progress from './views/progress.js';
 import * as pratik from './views/pratik.js';
 import * as akim from './views/akim.js';
+import * as notlar from './views/notlar.js';
 import { rota, adimSorulari, kagitSorulari, konuSetSorulari } from './rota.js';
 
 
-const VIEWS = ['today', 'odevler', 'flow', 'akim', 'practice', 'pratik', 'exam', 'progress'];
+const VIEWS = ['today', 'odevler', 'flow', 'notlar', 'akim', 'practice', 'pratik', 'exam', 'progress'];
 let currentView = 'today';
 let lastAction = null;
 
@@ -100,6 +101,7 @@ function show(view, push = true) {
     if (view === 'pratik') pratik.render();
     if (view === 'exam') exam.render();
     if (view === 'progress') progress.render();
+    if (view === 'notlar') notlar.render();
   } catch (err) {
     console.error(`[studio] view render hatası (${view}):`, err);
     const host = $('#view-' + view);
@@ -388,6 +390,7 @@ document.addEventListener('click', async e => {
     case 'rv-prev': exam.rvPrev(); break;
     case 'rv-next': exam.rvNext(); break;
     case 'rv-analyze': exam.rvAnalyze(); break;
+    case 'rv-toggle-attention': exam.rvToggleAttention(); break;
     case 'exam-review-wrong': {
       const examId = el.dataset.examId;
       const qs = exam.getRepeatQuestionsForExam(examId);
@@ -541,10 +544,11 @@ document.addEventListener('keydown', e => {
     else if (e.key === 'ArrowRight') { exam.next(); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { exam.prev(); e.preventDefault(); }
   } else if (currentView === 'exam' && exam.reviewing()) {
-    // Çözüm ekranı: oklar soru değiştirir, G analiz istemini kopyalar.
+    // Çözüm ekranı: oklar soru değiştirir, G analiz istemini kopyalar, D dikkat hatasını işaretler.
     if (e.key === 'ArrowRight') { exam.rvNext(); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { exam.rvPrev(); e.preventDefault(); }
     else if (k === 'G') { exam.rvAnalyze(); e.preventDefault(); }
+    else if (k === 'D') { exam.rvToggleAttention(); e.preventDefault(); }
   }
 });
 
