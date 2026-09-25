@@ -56,7 +56,7 @@ button, .opt, .opt-x, .premise-item, .flow-toc a, .item-card, .opt-btn {
     z-index: 60;
     margin: 0;
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(8, 1fr);
     gap: 0;
     background: var(--topbar-bg);
     backdrop-filter: saturate(180%) blur(16px);
@@ -67,7 +67,7 @@ button, .opt, .opt-x, .premise-item, .flow-toc a, .item-card, .opt-btn {
   .nav button {
     padding: 0.5rem 0.15rem 0.45rem;
     border-radius: var(--r-s);
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     font-weight: 600;
     line-height: 1.15;
     color: var(--ink-3);
