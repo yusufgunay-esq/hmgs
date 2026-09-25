@@ -39,7 +39,7 @@
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-import { questionById, pastExamList, pastExamQuestions, aiQuestions, tierOf, topicById, questionsOfTopic, questionsOf, SUBJECT_BY_ID, subjectName, shuffle, TIER_REAL, TIER_DENEME, TIER_ADV } from './data.js';
+import { questionById, pastExamList, pastExamQuestions, aiQuestions, tierOf, topicById, questionsOfTopic, questionsOf, SUBJECT_BY_ID, subjectName, shuffle, TIER_REAL, TIER_DENEME, TIER_AI, TIER_ADV, aiModelRank } from './data.js';
 import { state, todayKey, lastExam, EXAM_DATE } from './store.js';
 import { dueQuestions, leechQuestions, karmaWeights, isDeadlinesQuestion, BOXES } from './engine.js';
 import { denemeLabel, arsivLabel } from './labels.js';
@@ -240,13 +240,32 @@ function grupAdi(k) {
   return { baslik: subjectName(sid) + ' · karışık', subjectId: sid };
 }
 
-/** Grubun kardeş soru havuzu: aynı konu (yoksa ders), görülmemiş, hâkimlik hariç. */
+/** Grubun kardeş soru havuzu: kesin hiyerarşi (T1 Gerçek HMGS > T2 Deneme Setleri > T3 AI > T4 İleri). */
 function kardesHavuzu(k, haric) {
   const gorulen = new Set((state().answers || []).map(a => a.qId));
   const liste = k.startsWith('t:') ? questionsOfTopic(k.slice(2), 'all') : questionsOf(k.slice(2), 'all');
-  const aday = liste.filter(q => tierOf(q) !== TIER_ADV && !gorulen.has(q.id) && !haric.has(q.id));
-  // Önce HMGS ve YETKİ, sonra HMGS benzeri: kural sınavın kendi diliyle kurulsun.
-  return shuffle(aday.filter(onarimYanlisi)).concat(shuffle(aday.filter(q => !onarimYanlisi(q))));
+  const aday = liste.filter(q => !gorulen.has(q.id) && !haric.has(q.id));
+
+  const t1 = shuffle(aday.filter(q => tierOf(q) === TIER_REAL));
+  const t2 = shuffle(aday.filter(q => tierOf(q) === TIER_DENEME));
+  const t3 = aday.filter(q => tierOf(q) === TIER_AI).sort((a, b) => aiModelRank(a) - aiModelRank(b));
+  const t4 = shuffle(aday.filter(q => tierOf(q) === TIER_ADV));
+
+  // Eğer bu konuda görülmemiş Gerçek HMGS veya Deneme Seti kalmadıysa,
+  // doğrudan AI sorusuna atlamak yerine aynı dersin henüz görülmemiş Gerçek HMGS ve Deneme Seti sorularına bak:
+  if (!t1.length && !t2.length && k.startsWith('t:')) {
+    const topic = topicById.get(k.slice(2));
+    if (topic && topic.subjectId) {
+      const subjectAday = questionsOf(topic.subjectId, 'all').filter(q => !gorulen.has(q.id) && !haric.has(q.id));
+      const subjT1 = shuffle(subjectAday.filter(q => tierOf(q) === TIER_REAL));
+      const subjT2 = shuffle(subjectAday.filter(q => tierOf(q) === TIER_DENEME));
+      if (subjT1.length || subjT2.length) {
+        return subjT1.concat(subjT2);
+      }
+    }
+  }
+
+  return t1.concat(t2, t3, t4);
 }
 
 /**
@@ -342,7 +361,7 @@ export function denemeSecimi() {
   const ai = aiQuestions();
   if (ai.length >= 120) {
     const g = ai.filter(q => gorulen.has(q.id)).length / ai.length;
-    secenek.push({ kind: 'ai', label: 'HMGS benzeri deneme', n: 120, gorulen: g, yapildi: yapilan.has('ai_hmgs') });
+    secenek.push({ kind: 'ai', label: 'Yapay Zeka Denemesi', n: 120, gorulen: g, yapildi: yapilan.has('ai_hmgs') });
   }
   const cekirdek = [...questionById.values()].filter(q => tierOf(q) !== TIER_ADV);
   if (cekirdek.length >= 120) {
