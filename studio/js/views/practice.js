@@ -10,7 +10,7 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich, richBlock, stripEmoji, splitStem, fmtSec, emptyState, groupLegalRefs, $, toast } from '../ui.js';
-import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions, aiQuestions, isCoreTarget, QUESTIONS } from '../data.js';
+import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions, aiQuestions, isCoreTarget, QUESTIONS, tierOf, TIER_REAL, TIER_DENEME, TIER_AI, TIER_ADV, aiModelRank } from '../data.js';
 import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
 import * as seans from '../seans.js';
 import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet, buildDeadlinesSet, CONF } from '../engine.js';
@@ -25,6 +25,60 @@ let tick = null;
 /** Bugün rotasından açılan seanslar: kapanışta birincil düğme sıradaki adıma gider. */
 const ROTA_TAGS = new Set(['srs', 'sure', 'inatci', 'tekrar', 'odev']);
 const rotaSeansi = tag => ROTA_TAGS.has(tag) || String(tag || '').startsWith('konu:');
+
+/**
+ * Kesin Katman Sıralaması:
+ * 1. Görülmemiş T1 (Gerçek HMGS Arşiv)
+ * 2. Görülmemiş T2 (Deneme Setleri)
+ * 3. Görülmemiş T3 (HMGS Benzeri AI - Opus > Sonnet > Gemini)
+ * 4. Görülmüş T1 / T2 / T3
+ * 5. Görülmemiş T4 (Hâkimlik/Savcılık İleri Düzey)
+ * 6. Görülmüş T4
+ */
+export function sortByTierPriority(list) {
+  const seenIds = new Set((state().answers || []).map(a => a.qId));
+  const gor = q => seenIds.has(q.id);
+  const t = q => tierOf(q);
+
+  const buckets = {
+    t1_unseen: [],
+    t2_unseen: [],
+    t3_unseen: [],
+    t1_seen: [],
+    t2_seen: [],
+    t3_seen: [],
+    t4_unseen: [],
+    t4_seen: []
+  };
+
+  for (const q of list) {
+    const tier = t(q);
+    const seen = gor(q);
+    if (tier === TIER_REAL) {
+      if (seen) buckets.t1_seen.push(q); else buckets.t1_unseen.push(q);
+    } else if (tier === TIER_DENEME) {
+      if (seen) buckets.t2_seen.push(q); else buckets.t2_unseen.push(q);
+    } else if (tier === TIER_AI) {
+      if (seen) buckets.t3_seen.push(q); else buckets.t3_unseen.push(q);
+    } else {
+      if (seen) buckets.t4_seen.push(q); else buckets.t4_unseen.push(q);
+    }
+  }
+
+  buckets.t3_unseen.sort((a, b) => aiModelRank(a) - aiModelRank(b));
+  buckets.t3_seen.sort((a, b) => aiModelRank(a) - aiModelRank(b));
+
+  return [
+    ...shuffle(buckets.t1_unseen),
+    ...shuffle(buckets.t2_unseen),
+    ...buckets.t3_unseen,
+    ...shuffle(buckets.t1_seen),
+    ...shuffle(buckets.t2_seen),
+    ...buckets.t3_seen,
+    ...shuffle(buckets.t4_unseen),
+    ...shuffle(buckets.t4_seen)
+  ];
+}
 
 /** Seans kur. opts: { mode, subjectId, topicId, topicIds, count, customLabel, targetScope } */
 export function startSession(opts = {}) {
@@ -64,17 +118,17 @@ export function startSession(opts = {}) {
     }
     label = subjectId ? `Tekrar · ${subjectName(subjectId)}` : 'Tekrar seansı';
   } else if (mode === 'topics' && Array.isArray(topicIds) && topicIds.length) {
-    pool = shuffle(questionsOfTopics(topicIds, targetScope));
-    if (!pool.length && targetScope === 'core') pool = shuffle(questionsOfTopics(topicIds, 'all'));
+    pool = sortByTierPriority(questionsOfTopics(topicIds, targetScope));
+    if (!pool.length && targetScope === 'core') pool = sortByTierPriority(questionsOfTopics(topicIds, 'all'));
     const titles = topicIds.map(id => topicById.get(id)?.title).filter(Boolean);
     label = customLabel || (titles.length === 1 ? titles[0] : (titles.length ? `${titles[0]} (+${titles.length - 1} konu)` : 'Seçili Konular'));
   } else if (mode === 'topic' || (topicId && mode !== 'subject' && mode !== 'pastExam' && mode !== 'review')) {
-    pool = shuffle(questionsOfTopic(topicId, targetScope));
-    if (!pool.length && targetScope === 'core') pool = shuffle(questionsOfTopic(topicId, 'all'));
+    pool = sortByTierPriority(questionsOfTopic(topicId, targetScope));
+    if (!pool.length && targetScope === 'core') pool = sortByTierPriority(questionsOfTopic(topicId, 'all'));
     label = customLabel || topicById.get(topicId)?.title || 'Konu soruları';
   } else if (mode === 'subject') {
-    pool = shuffle(questionsOf(subjectId, targetScope));
-    if (!pool.length && targetScope === 'core') pool = shuffle(questionsOf(subjectId, 'all'));
+    pool = sortByTierPriority(questionsOf(subjectId, targetScope));
+    if (!pool.length && targetScope === 'core') pool = sortByTierPriority(questionsOf(subjectId, 'all'));
     label = customLabel || subjectName(subjectId);
   } else if (mode === 'unseen') {
     let unseen = unseenQuestions(subjectId);
@@ -82,7 +136,7 @@ export function startSession(opts = {}) {
       const coreOnly = unseen.filter(isCoreTarget);
       if (coreOnly.length) unseen = coreOnly;
     }
-    pool = shuffle(unseen);
+    pool = sortByTierPriority(unseen);
     label = 'Yeni sorular';
   } else if (mode === 'pastExam') {
     pool = shuffle(pastExamQuestions());
@@ -97,7 +151,7 @@ export function startSession(opts = {}) {
       const coreOnly = raw.filter(isCoreTarget);
       if (coreOnly.length) raw = coreOnly;
     }
-    pool = shuffle(raw);
+    pool = sortByTierPriority(raw);
     label = customLabel || (subjectId ? subjectName(subjectId) : 'Karma set');
   }
 
