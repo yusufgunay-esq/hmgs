@@ -153,6 +153,9 @@ export function recordAnswer(q, chosen, ms, mode, flags = {}) {
     logicGuess: !!flags.logicGuess,
     attentionError: false,
     usedElim: !!flags.usedElim,
+    elimTrap: !!flags.elimTrap,
+    dilemma5050: !!flags.dilemma5050,
+    eliminatedOptions: Array.isArray(flags.eliminatedOptions) && flags.eliminatedOptions.length ? flags.eliminatedOptions : undefined,
     askedGemini: !!flags.askedGemini,
     ms: Math.max(0, Math.round(ms)),
     // rawMs: soru ekranda kaldığı toplam süre. idleMs: bunun boşa geçen
@@ -171,6 +174,9 @@ export function recordAnswer(q, chosen, ms, mode, flags = {}) {
   if (row.rawMs === undefined) delete row.rawMs;
   if (row.idleMs === undefined) delete row.idleMs;
   if (row.set === undefined) delete row.set;
+  if (row.elimTrap === false) delete row.elimTrap;
+  if (row.dilemma5050 === false) delete row.dilemma5050;
+  if (row.eliminatedOptions === undefined) delete row.eliminatedOptions;
   S.answers.push(row);
   return row;
 }
@@ -198,6 +204,35 @@ export function markLastAnswerAttention(flag = true) {
   last.attentionError = !!flag;
   save();
   return last;
+}
+
+/**
+ * Deneme sinavindaki belirli bir sorunun yanlis cevabini dikkat hatasi olarak etiketler veya kaldirir.
+ * @param {string} qId
+ * @param {boolean} flag
+ * @param {string} [examAt]
+ */
+export function markExamAnswerAttention(qId, flag = true, examAt = null) {
+  if (!S.answers.length) return null;
+  for (let i = S.answers.length - 1; i >= 0; i--) {
+    const a = S.answers[i];
+    if (a.qId === qId && a.mode === 'exam') {
+      if (!examAt || !a.at || a.at.startsWith(examAt.slice(0, 10)) || Math.abs(new Date(a.at) - new Date(examAt)) < 3600000) {
+        a.attentionError = !!flag;
+        save();
+        return a;
+      }
+    }
+  }
+  for (let i = S.answers.length - 1; i >= 0; i--) {
+    const a = S.answers[i];
+    if (a.qId === qId && a.mode === 'exam') {
+      a.attentionError = !!flag;
+      save();
+      return a;
+    }
+  }
+  return null;
 }
 
 
