@@ -12,7 +12,7 @@
 
 import { esc, rich, richBlock, stripEmoji, splitStem, fmtClock, emptyState, $, toast } from '../ui.js';
 import { buildAlgorithmicExamSet, getAlgorithmicExamPreview, subjectName, SUBJECTS, topicById, questionById, questionsBySubject, pastExamList, pastExamQuestions, denemeSetList, denemeSetQuestions } from '../data.js';
-import { recordAnswer, save, saveExam, state, lastExam, EXAM_TOTAL, PASS_CORRECT } from '../store.js';
+import { recordAnswer, markExamAnswerAttention, save, saveExam, state, lastExam, EXAM_TOTAL, PASS_CORRECT } from '../store.js';
 import { scheduleAfterAnswer, scoreOf } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise, extractNumerals, isAutoStruck } from '../elim.js';
 import { bookLocationFor, NO_BOOK_SUBJECTS } from '../book-map.js';
@@ -330,8 +330,6 @@ export function render() {
         <div class="q-head">
           <span>Soru ${E.i + 1} / ${E.questions.length}</span>
           <span>${esc(subjectName(q.subjectId))}</span>
-          ${''/* Hedef/kaynak rozeti yok: sınavda da sorunun kaynağı yazmaz. */}
-          ${q.difficulty && q.difficulty !== 'etiketsiz' ? `<span class="chip">${esc(q.difficulty)}</span>` : ''}
           <button class="btn btn-2 btn-s exam-doubt${E.marked.has(E.i) ? ' on' : ''}" data-act="exam-mark" style="margin-left:auto"
             title="Bu soruda kuşkun olduğunu işaretler. Soru haritasında işaretli kalır, sonuç ekranında da kuşkulu sayılır (K)">
             ${E.marked.has(E.i) ? 'Kuşkuyu kaldır' : 'Kuşkuluyum'} <span class="kbd">K</span>
@@ -508,15 +506,20 @@ export function finish(auto = false) {
     // simülasyonda her soruya ikinci bir karar eklemek ölçtüğümüz şeyi, yani
     // sınav temposunu bozar. Onun yerine tek kuşku işareti iki uçlu bahse
     // çevrilir: işaretlenmemiş cevap "Eminim", işaretli cevap "Mantıkla".
-    const conf = doubt ? 'guess' : 'sure';
+    const isCorrectEliminated = qElims.includes(q.correct);
+    const totalOpts = Array.isArray(q.options) && q.options.length ? q.options.length : 5;
+    const isTwoOptions = totalOpts >= 4 && qElims.length === (totalOpts - 2);
     const row = recordAnswer(q, chosen, E.times[i] || 0, 'exam', {
       logicGuess: doubt,
       usedElim,
-      eliminatedOptions: qElims
+      eliminatedOptions: qElims,
+      elimTrap: isCorrectEliminated,
+      dilemma5050: isTwoOptions
     });
     row.conf = conf;
-    // Kuşkuyla bulunan doğru "öğrenildi" sayılmaz; soru tekrar sırasında kalır.
-    scheduleAfterAnswer(q.id, ok && !doubt);
+    // Kuşkuyla bulunan ya da doğru şıkkın elendiği soru "öğrenildi" sayılmaz; soru tekrar sırasında kalır.
+    const solidPass = ok && !doubt && !isCorrectEliminated;
+    scheduleAfterAnswer(q.id, solidPass);
     const k = q.subjectId;
     bySubject[k] = bySubject[k] || { total: 0, correct: 0, blank: 0 };
     bySubject[k].total++;
@@ -565,6 +568,7 @@ export function finish(auto = false) {
       ok,
       doubt,
       bucket: chosen === null ? 'bos' : (ok ? 'sans' : (doubt ? 'eksik' : 'kavram')),
+      attentionError: false,
       ms: Math.round(E.times[i] || 0),
       explanation: q.explanation || '',
       legalBasis: q.legalBasis || '',
@@ -835,21 +839,9 @@ function listFor(r, f) {
     res = all.filter(e => e.b !== 'ok');
   } else if (f === 'ok') {
     res = all.filter(e => e.b === 'ok');
-  } else if (f === 'trap') {
-    // Doğru şıkkı eleme tuzağına düşülen sorular
-    res = all.filter(e => {
-      const m = contentOf(e);
-      return m && m.eliminated && m.eliminated.includes(m.correct);
-    });
-  } else if (f === 'ikilem') {
-    // İki şık arasında kalınan (50-50) sorular
-    res = all.filter(e => {
-      const m = contentOf(e);
-      if (!m) return false;
-      const totalOpts = (m.options || []).length || 5;
-      const elims = m.eliminated || [];
-      return totalOpts >= 4 && elims.length === (totalOpts - 2);
-    });
+  } else if (f === 'dikkat') {
+    // Dikkatsizlik olarak isaretlenen sorular
+    res = all.filter(e => (e.row && e.row.attentionError) || (contentOf(e)?.attentionError));
   } else {
     res = all.filter(e => e.b === f);
   }
@@ -873,6 +865,7 @@ function contentOf(e) {
     elimPremises: e.elimPremises || [],
     elimScenario: computeElimScenario(q, chosen, elims),
     ok: e.b === 'ok', doubt: false, bucket: e.b, ms: 0,
+    attentionError: false,
     explanation: q.explanation || '', legalBasis: q.legalBasis || '',
     sourceBadgeLabel: q.sourceBadgeLabel || '',
     source: q.source || '',
@@ -976,6 +969,37 @@ export function rvAnalyze() {
   } catch (_) {}
 }
 
+/** Okuyucudaki soruyu dikkat hatasi olarak isaretler veya isareti kaldirir (D). */
+export function rvToggleAttention() {
+  if (!lastResult || !reviewing()) return;
+  const list = listFor(lastResult, rv.f);
+  const e = list[rv.pos];
+  if (!e) return;
+  const m = contentOf(e);
+  if (!m || m.ok) return;
+
+  const newFlag = !m.attentionError;
+  m.attentionError = newFlag;
+  if (e.row) e.row.attentionError = newFlag;
+
+  if (Array.isArray(lastResult.review)) {
+    const revItem = lastResult.review.find(r => r.no === m.no || r.qId === m.qId);
+    if (revItem) revItem.attentionError = newFlag;
+  }
+
+  markExamAnswerAttention(m.qId, newFlag, lastResult.at);
+  save();
+
+  const badge = document.getElementById('badge-attention');
+  if (badge) badge.classList.toggle('active', newFlag);
+
+  const map = document.getElementById('rv-map');
+  if (map) map.innerHTML = mapInner(lastResult);
+
+  const scoreSec = document.getElementById('rv-score-section');
+  if (scoreSec) scoreSec.outerHTML = scoreHTML(lastResult);
+}
+
 /** Gezinmede sayfayı baştan çizmeden yalnız üç bölgeyi yeniler. */
 function paintReview() {
   const r = lastResult;
@@ -987,8 +1011,13 @@ function paintReview() {
 }
 
 function counts(r) {
-  const c = { ok: 0, kavram: 0, eksik: 0, bos: 0, sans: 0 };
-  for (const e of entries(r)) c[e.b] = (c[e.b] || 0) + 1;
+  const c = { ok: 0, kavram: 0, eksik: 0, bos: 0, sans: 0, dikkat: 0 };
+  for (const e of entries(r)) {
+    c[e.b] = (c[e.b] || 0) + 1;
+    if ((e.row && e.row.attentionError) || (contentOf(e)?.attentionError)) {
+      c.dikkat = (c.dikkat || 0) + 1;
+    }
+  }
   if (!Array.isArray(r.map)) c.ok = Math.max(0, r.correct - c.sans);
   return c;
 }
@@ -1001,9 +1030,8 @@ function scoreHTML(r) {
   const stat = (k, v, cls, filterKey) => filterKey
     ? `<button class="rv-stat clickable" data-act="exam-filter" data-f="${filterKey}" title="${esc(k)} filtrele"><span class="rv-stat-v ${v ? cls : 'zero'}">${v}</span><span class="rv-stat-k">${esc(k)}</span></button>`
     : `<div class="rv-stat"><span class="rv-stat-v ${v ? cls : 'zero'}">${v}</span><span class="rv-stat-k">${esc(k)}</span></div>`;
-  const elSt = r.elimStats;
   return `
-    <section class="rv-score">
+    <section class="rv-score" id="rv-score-section">
       <div class="rv-score-main">
         <div class="rv-net ${r.pass ? 'pass' : 'fail'}">${r.net}<span>net</span></div>
         <div class="rv-score-sub">
@@ -1019,9 +1047,7 @@ function scoreHTML(r) {
         <span class="rv-stats-sep"></span>
         ${stat('Fark etmeden yanlış', c.kavram, 'no', 'kavram')}
         ${stat('Kurtarılmış doğru', c.sans, 'ok', 'sans')}
-        ${elSt && elSt.correctEliminatedCount ? stat('Doğruyu Eleme', elSt.correctEliminatedCount, 'no', 'trap') : ''}
-        ${elSt && elSt.twoOptionsTrapCount ? stat('İkilemde Kayıp', elSt.twoOptionsTrapCount, 'warn', 'ikilem') : ''}
-        ${elSt && elSt.twoOptionsSuccessCount ? stat('İkilemde İsabet', elSt.twoOptionsSuccessCount, 'ok', 'ikilem') : ''}
+        ${c.dikkat ? stat('Dikkatsizlik', c.dikkat, 'warn', 'dikkat') : ''}
       </div>
     </section>`;
 }
@@ -1035,9 +1061,6 @@ function mapInner(r) {
   const wrongN = c.kavram + c.eksik;
   const doubtN = c.eksik + c.sans;
   const fixN = all.length - (c.ok || 0);
-  const elSt = r.elimStats;
-  const trapN = elSt?.correctEliminatedCount || 0;
-  const ikilemN = elSt?.totalTwoOptionsCount || 0;
 
   const chip = (k, label, n, customSw) => n
     ? `<button class="rv-chip${rv.f === k ? ' on' : ''}" data-act="exam-filter" data-f="${k}">${customSw ? `<i class="rv-sw ${customSw}"></i>` : ''}${esc(label)}<b>${n}</b></button>`
@@ -1045,15 +1068,17 @@ function mapInner(r) {
 
   return `
     <div class="rv-tiles">
-      ${all.map(e => `<button class="rv-tile ${e.b}${cur && cur.no === e.no ? ' now' : ''}${inList.has(e.no) ? '' : ' out'}"
-        data-act="rv-goto" data-no="${e.no}" title="Soru ${e.no} · ${esc(BUCKETS[e.b].label)}">${e.no}</button>`).join('')}
+      ${all.map(e => {
+        const isAtt = (e.row && e.row.attentionError) || (contentOf(e)?.attentionError);
+        return `<button class="rv-tile ${e.b}${cur && cur.no === e.no ? ' now' : ''}${inList.has(e.no) ? '' : ' out'}${isAtt ? ' dikkat' : ''}"
+        data-act="rv-goto" data-no="${e.no}" title="Soru ${e.no} · ${esc(BUCKETS[e.b].label)}${isAtt ? ' · Dikkatsizlik' : ''}">${e.no}</button>`;
+      }).join('')}
     </div>
     <div class="rv-chips">
       ${chip('yanlis', 'Tüm Yanlışlar', wrongN, 'kavram')}
       ${chip('kusku', 'Kuşkulular', doubtN, 'sans')}
       ${chip('fix', 'Yanlış + Kuşkulu', fixN, '')}
-      ${trapN > 0 ? chip('trap', 'Doğruyu Eleyenler', trapN, 'kavram') : ''}
-      ${ikilemN > 0 ? chip('ikilem', 'İkilem (50-50)', ikilemN, 'sans') : ''}
+      ${c.dikkat > 0 ? chip('dikkat', 'Dikkatsizlik', c.dikkat, 'warn') : ''}
       ${chip('kavram', BUCKETS.kavram.label, c.kavram, 'kavram')}
       ${chip('eksik', BUCKETS.eksik.label, c.eksik, 'eksik')}
       ${chip('bos', BUCKETS.bos.label, c.bos, 'bos')}
@@ -1089,11 +1114,6 @@ function readerInner(r) {
   const struckPremises = new Set(m.elimPremises || []);
   const struckOptions = new Set(m.eliminated || []);
   const allNumerals = extractNumerals(premise);
-  const correctWasEliminated = struckOptions.has(m.correct);
-  const totalOptionsCount = (m.options || []).length;
-  const isNarrowedToTwo = totalOptionsCount >= 4 && struckOptions.size === (totalOptionsCount - 2);
-  const scen = m.elimScenario || computeElimScenario(m, m.chosen, m.eliminated);
-
   const opts = (m.options || []).map(o => {
     const isC = o.key === m.correct;
     const isP = o.key === m.chosen;
@@ -1102,47 +1122,23 @@ function readerInner(r) {
     let cls = isC ? 'right' : (isP ? 'picked' : '');
     if (isElim) cls += ' struck-manual';
 
-    let tag = '';
-    let tagCls = '';
-
-    if (isC && isP) {
-      if (scen && scen.type === 'two_options_success') {
-        tag = 'Doğru · senin cevabın (ikilemden çıktın)';
-      } else {
-        tag = 'Doğru · senin cevabın';
-      }
-    } else if (isC) {
-      if (isElim) {
-        tag = 'Doğru cevap · eledin!';
-        tagCls = ' rv-opt-tag-trap';
-      } else if (scen && scen.type === 'two_options_trap') {
-        tag = 'Doğru cevap (ikilemde kaldın)';
-      } else {
-        tag = 'Doğru cevap';
-      }
-    } else if (isP) {
-      if (isElim) {
-        tag = 'Senin cevabın (eledin)';
-        tagCls = ' rv-opt-tag-warn';
-      } else if (scen && scen.type === 'two_options_trap') {
-        tag = 'Senin cevabın (çeldirici)';
-        tagCls = ' rv-opt-tag-warn';
-      } else {
-        tag = 'Senin cevabın';
-      }
-    } else if (isElim) {
-      tag = 'Eledin';
-      tagCls = ' rv-opt-tag-elim';
-    }
+    const tag = isC ? 'Doğru cevap' : (isP ? 'Senin cevabın' : '');
 
     return `<div class="rv-opt ${cls.trim()}">
       <span class="rv-opt-k">${esc(o.key)}</span>
       <span class="rv-opt-t">${rich(o.text)}</span>
-      ${tag ? `<span class="rv-opt-tag${tagCls}">${tag}</span>` : ''}
+      ${tag ? `<span class="rv-opt-tag">${tag}</span>` : ''}
     </div>`;
   }).join('');
 
   const g = m.chosen === null ? 'Boşu analiz et' : (m.chosen === m.correct ? 'Sağlamasını yap' : 'Yanlışı analiz et');
+
+  const attentionBadgeHTML = !m.ok ? `
+    <button class="badge-logic${m.attentionError ? ' active' : ''}" data-act="rv-toggle-attention" id="badge-attention" title="Bildim ama dikkatsizlik yaptım, konu değil, dikkat eksikliği">
+      <span class="badge-logic-dot"></span>
+      <span>Dikkat</span>
+      <span class="kbd-hint">D</span>
+    </button>` : '';
 
   return `
     <div class="rv-bar-top">
@@ -1157,16 +1153,10 @@ function readerInner(r) {
     <article class="rv-q" data-no="${m.no}">
       <div class="rv-tagline">
         <span class="rv-tag ${m.bucket}">${esc(b.label)}</span>
-        ${correctWasEliminated ? `<span class="rv-tag no" title="Çeldiriciye takılarak doğru seçeneği eledin">Doğru Şıkkı Eledin</span>` : ''}
-        ${isNarrowedToTwo && !correctWasEliminated ? `<span class="rv-tag warn" title="Bu soruda seçenekleri iki şıkka kadar indirdin">2 Şıkka İndirildi</span>` : ''}
+        ${attentionBadgeHTML}
         ${b.note ? `<span class="rv-tag-note">${b.note}</span>` : ''}
         ${sec ? `<span class="rv-sec">${sec} sn</span>` : ''}
       </div>
-      ${scen ? `
-      <div class="rv-scen ${scen.cls}">
-        <span class="rv-scen-tag">${esc(scen.badge)}</span>
-        <span class="rv-scen-desc">${rich(scen.text)}</span>
-      </div>` : ''}
       <div class="rv-stem">
         ${premiseHTML(premise, struckPremises)}
         <div class="q-ask">${rich(ask)}</div>
@@ -1183,8 +1173,7 @@ function readerInner(r) {
         ok: m.ok,
         sec: m.ms ? m.ms / 1000 : 0,
         isReview: true,
-        isMarked: m.doubt || m.bucket === 'eksik' || m.bucket === 'sans',
-        isElimTrap: correctWasEliminated
+        isMarked: m.doubt || m.bucket === 'eksik' || m.bucket === 'sans'
       })}
       <div class="rv-actions">
         <button class="btn btn-2 btn-s" data-act="rv-analyze">${g} <span class="kbd">G</span></button>
@@ -1192,7 +1181,7 @@ function readerInner(r) {
           <button class="btn btn-2 btn-s" data-act="rv-prev" ${rv.pos === 0 ? 'disabled' : ''}>‹ Önceki</button>
           <button class="btn btn-s" data-act="rv-next" ${rv.pos >= list.length - 1 ? 'disabled' : ''}>Sıradaki Soru ›</button>
         </div>
-        <span class="rv-keys"><span class="kbd">←</span> <span class="kbd">→</span> soru değiştir</span>
+        <span class="rv-keys"><span class="kbd">←</span> <span class="kbd">→</span> soru değiştir${!m.ok ? ' · <span class="kbd">D</span> dikkat' : ''}</span>
       </div>
     </article>`;
 }
@@ -1410,6 +1399,8 @@ export function exportStats() {
   const r = lastResult;
   const wrongAnalysis = [];
 
+  const attentionCount = Array.isArray(r.review) ? r.review.filter(x => x.attentionError).length : 0;
+
   if (r.byTopic) {
     Object.entries(r.byTopic).forEach(([key, b]) => {
       const wrongCount = b.total - b.correct - (b.blank || 0);
@@ -1417,11 +1408,14 @@ export function exportStats() {
         const topicObj = b.topicId ? topicById.get(b.topicId) : null;
         const topicTitle = topicObj ? topicObj.title : (b.topicId || 'Genel / Etkileşimsiz');
         const sName = subjectName(b.subjectId);
+        const topicAttention = Array.isArray(r.review)
+          ? r.review.filter(x => x.attentionError && (b.topicId ? x.topicId === b.topicId : x.subjectId === b.subjectId)).length
+          : 0;
         wrongAnalysis.push({
           subject: sName,
           topic: topicTitle,
           wrongCount: wrongCount,
-          note: ''
+          note: topicAttention > 0 ? `${topicAttention} soru dikkatsizlik` : ''
         });
       }
     });
@@ -1431,7 +1425,7 @@ export function exportStats() {
     source: 'HMGS_STUDIO',
     type: 'HMGS_STUDIO_EXAM_EXPORT',
     exportedAt: new Date().toISOString(),
-    title: r.label || 'HMGS Stüdyo Denemesi',
+    title: r.label || 'Stüdyo Denemesi',
     date: r.at ? r.at.split('T')[0] : new Date().toISOString().split('T')[0],
     durationMinutes: Math.round((r.durationMs || 0) / 60000),
     totalQ: r.total || 120,
@@ -1439,6 +1433,7 @@ export function exportStats() {
     wrong: r.wrong || 0,
     empty: r.blank || 0,
     net: r.net || 0,
+    attentionErrors: attentionCount,
     wrongAnalysis: wrongAnalysis
   };
 
