@@ -9,7 +9,7 @@
 
 import { loadMasterVault } from './vault-client.js';
 import { setKitaplar } from './kitaplar.js';
-import { setVaultLabels } from './labels.js';
+import { setVaultLabels, arsivLabel, denemeLabel } from './labels.js';
 
 /* examQ = ÖLÇÜLMÜŞ resmî dağılım (15 Eylül 2026'da KAYNAK DEĞİŞTİ).
 
@@ -666,7 +666,7 @@ export function pastExamList() {
     bySource.set(q.source, bySource.get(q.source) + 1);
   });
   return [...bySource.entries()]
-    .map(([id, count]) => ({ id, label: id, count }))
+    .map(([id, count]) => ({ id, label: arsivLabel(id), count }))
     .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 }
 
@@ -681,7 +681,7 @@ export function denemeSetList() {
   });
 
   return [...bySource.entries()]
-    .map(([id, count]) => ({ id, label: id, count }))
+    .map(([id, count]) => ({ id, label: denemeLabel(id), count }))
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
