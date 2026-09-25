@@ -1,7 +1,12 @@
 /* ==========================================================================
    tuyolar.js : Soru tipine özel sınav radarı ve ampirik kurtarma tüyoları
    Kaynak: 4 gerçek sınav kitapçığının (460 soru: 2024E, 2025M, 2025E, 2026N)
-   tamamı taranarak ölçülen şık frekansları, kök yapıları ve çeldirici tuzakları.
+   tamamı taranarak ölçülen kök yapıları ve çeldirici tuzakları.
+   Ders bazlı harf oranları 25 Eylül 2026'da ÇIKARILDI: dört sınavda sınandı, tutmuyor
+   (diğer üç sınavdan seçilen favori harf dördüncüde %16,9 isabet, rastgele %20).
+   Burada yalnız dört sınavın dördünde de tutan oranlar durur.
+   Ders kartı Notlar'dan beslenir (not-eslesme.js): soruyla ilgili tuzak ya da
+   ezber öğesi, yoksa dersin "sınavda" notu.
 
    Amaç: Bir soru yanlış yapıldığında, boş bırakıldığında veya çözümü
    incelenirken geri bildirim alanında iki kolonlu, dingin ve Apple standardında
@@ -12,6 +17,7 @@
 
 import { esc } from './ui.js';
 import { isPastExam, questionById } from './data.js';
+import { ilgiliNotlar, notDersleri } from './not-eslesme.js';
 
 const ROM = /^(Yalnız\s+)?(I{1,3}|IV)(\s*,\s*(I{1,3}|IV))*(\s+ve\s+(I{1,3}|IV))?$/i;
 
@@ -74,171 +80,38 @@ export function soruTipleri(q) {
 }
 
 /* ==========================================================================
-   DERS BAZLI ÇIKMIŞ SINAV İMZASI VE FREKANS VERİTABANI
-   4 resmî sınav (460 soru) ölçüm tablosu:
+   NOTLAR KARTI
    ========================================================================== */
-export const DERS_RADARI = {
-  medeni_hukuk: {
-    ad: 'Medeni Hukuk',
-    soruSayisi: 56,
-    siklar: 'A: %16 · B: %20 · C: %21 · D: %23 · E: %20',
-    enGuclu: 'D (%23)',
-    enZayif: 'A (%16)',
-    taktik: 'Sınavın en büyük soru payına (15 soru) sahip dersidir. Şık dağılımı dengelidir. Tapu sicili karineleri, hak ehliyeti ve miras payı hesaplamalarında kuralın açık istisnalarına odaklan. Doğru şık genellikle yalındır; en uzun şık %82 ihtimalle çeldiricidir.'
-  },
-  borclar_hukuku: {
-    ad: 'Borçlar Hukuku',
-    soruSayisi: 49,
-    siklar: 'A: %6 · B: %16 · C: %27 · D: %22 · E: %29',
-    enGuclu: 'E (%29) ve C (%27)',
-    enZayif: 'A (%6)',
-    taktik: 'A şıkkı 4 sınavın 49 sorusunda yalnızca 3 kez doğru çıkmıştır (%6). Kararsız kalındığında A şıkkı elenmeli; doğru cevap %56 ihtimalle E veya C seçeneğidir. Genel hükümler, kusursuz sorumluluk ve temerrüt şartlarında net kanuni kuralı ara.'
-  },
-  hmk: {
-    ad: 'Medeni Usul Hukuku (HMK)',
-    soruSayisi: 44,
-    siklar: 'A: %20 · B: %20 · C: %11 · D: %20 · E: %27',
-    enGuclu: 'E (%27)',
-    enZayif: 'C (%11)',
-    taktik: 'Sınavın olumsuz kök zirvesidir (soruların %52\'si olumsuzdur). Olumsuz köklerde dört şık kanunun birebir hükmüdür; doğru olan tek şıkta süre (2 hafta) veya merci tek bir kelimeyle bozulmuştur. Kararsızlıkta C\'den kaçın, E şıkkını öncelikle tart.'
-  },
-  ticaret_hukuku: {
-    ad: 'Ticaret Hukuku',
-    soruSayisi: 43,
-    siklar: 'A: %26 · B: %14 · C: %26 · D: %19 · E: %16',
-    enGuclu: 'A ve C (%52)',
-    enZayif: 'B (%14)',
-    taktik: 'Genel sınav eğiliminin aksine A ve C şıkları soruların yarısından fazlasını alır (%52). Şirketler hukukunda organ yetkileri ve nisaplar; kıymetli evrakta bono ve poliçe def\'ileri öne çıkar. Kararsızlıkta A ve C seçeneklerine yönelmek beklenen değeri artırır.'
-  },
-  ceza_hukuku: {
-    ad: 'Ceza Hukuku',
-    soruSayisi: 35,
-    siklar: 'A: %29 · B: %3 · C: %17 · D: %29 · E: %23',
-    enGuclu: 'A ve D (%57)',
-    enZayif: 'B (%3 - Ölü Harf)',
-    taktik: 'B şıkkı 4 sınavda yalnızca 1 kez doğru çıkmıştır (%3). İki şık arasında kalındığında B kesinlikle işaretlenmemeli, A veya D (%57) tercih edilmelidir. Olası kast ile bilinçli taksir ve iştirak türleri sınırlarında komşu kavram tuzaklarına dikkat et.'
-  },
-  icra_iflas: {
-    ad: 'İcra ve İflas Hukuku',
-    soruSayisi: 24,
-    siklar: 'A: %29 · B: %8 · C: %13 · D: %33 · E: %17',
-    enGuclu: 'D (%33) ve A (%29)',
-    enZayif: 'B (%8)',
-    taktik: 'Soruların %62,5\'inde (15/24) doğru cevap A veya D şıkkıdır. B şıkkı son 3 sınavda hiç çıkmamıştır. 7 günlük itiraz ve şikayet süreleri ile takibin aşamalarını birbirine karıştırma.'
-  },
-  cmk: {
-    ad: 'Ceza Muhakemesi (CMK)',
-    soruSayisi: 24,
-    siklar: 'A: %21 · B: %21 · C: %29 · D: %17 · E: %13',
-    enGuclu: 'C (%29)',
-    enZayif: 'E (%13)',
-    taktik: 'Olumsuz kök oranı %46\'dır. Koruma tedbirleri süreleri (tutuklama, gözaltı) ve görevli merci (sulh ceza hakimliği / ağır ceza mahkemesi) kaydırmaları sınavın merkezidir. C şıkkı liderdir.'
-  },
-  is_hukuku: {
-    ad: 'İş ve Sosyal Güvenlik Hukuku',
-    soruSayisi: 24,
-    siklar: 'A: %12 · B: %8 · C: %25 · D: %38 · E: %17',
-    enGuclu: 'D (%38)',
-    enZayif: 'B (%8)',
-    taktik: 'D şıkkı tek başına %38 ile 4 sınavın dördünde de açık liderdir. Kararsız kalındığında en yüksek beklenen değerli şık D\'dir. İşe iade süre zinciri (1 ay arabuluculuk, 2 hafta dava) ile kıdem tazminatı şartlarındaki sayısal tuzaklara odaklan.'
-  },
-  idare_hukuku: {
-    ad: 'İdare Hukuku',
-    soruSayisi: 23,
-    siklar: 'A: %35 · B: %22 · C: %9 · D: %13 · E: %22',
-    enGuclu: 'A (%35)',
-    enZayif: 'C (%9)',
-    taktik: 'A şıkkı %35 ile belirgin liderdir; 4 sınavın dördünde de çıkmıştır. Yetki devri, imza devri, idari vesayet ve hiyerarşi gibi kavram ailesi eşleştirmelerinde A şıkkı öne çıkar; C şıkkı dip seviyededir.'
-  },
-  anayasa_hukuku: {
-    ad: 'Anayasa Hukuku',
-    soruSayisi: 22,
-    siklar: 'A: %9 · B: %14 · C: %32 · D: %32 · E: %14',
-    enGuclu: 'C ve D (%64)',
-    enZayif: 'A (%9)',
-    taktik: 'C ve D şıkları soruların %64\'ünü oluşturur (14/22). A şıkkı yalnızca %9\'da kalmıştır. TBMM karar yeter sayıları (151, 301, 360, 400) ile seçim usullerinde C ve D seçenekleri baskındır.'
-  },
-  vergi_hukuku: {
-    ad: 'Vergi Hukuku',
-    soruSayisi: 22,
-    siklar: 'A: %27 · B: %9 · C: %18 · D: %27 · E: %18',
-    enGuclu: 'A ve D (%55)',
-    enZayif: 'B (%9)',
-    taktik: 'Tarh, tebliğ, tahakkuk ve tahsil aşamaları ile 5 yıllık tarh zamanaşımı sorularında A ve D odaklıdır. B şıkkı %9 ile en zayıf tercihtir.'
-  },
-  anayasa_yargisi: {
-    ad: 'Anayasa Yargısı',
-    soruSayisi: 14,
-    siklar: 'A: %36 · B: %21 · C: %14 · D: %21 · E: %7',
-    enGuclu: 'A (%36)',
-    enZayif: 'E (%7)',
-    taktik: '6216 sayılı Kanun kapsamındaki bireysel başvuru süreleri (30 gün, mazeret sonrası 15 gün) ve iptal davası sürelerinde A şıkkı ağırlıktadır; E şıkkı yalnızca 1 kez çıkmıştır.'
-  },
-  iyuk: {
-    ad: 'İdari Yargılama Usulü (İYUK)',
-    soruSayisi: 14,
-    siklar: 'A: %7 · B: %29 · C: %14 · D: %29 · E: %21',
-    enGuclu: 'B ve D (%57)',
-    enZayif: 'A (%7)',
-    taktik: 'İdari yargıda dava açma süreleri (genel 60 gün, vergi 30 gün) ve yürütmenin durdurulması şartlarında B ve D seçenekleri öne çıkar. A şıkkı 14 soruda yalnızca 1 kez çıkmıştır.'
-  },
-  avukatlik: {
-    ad: 'Avukatlık Hukuku',
-    soruSayisi: 13,
-    siklar: 'A: %8 · B: %8 · C: %15 · D: %38 · E: %31',
-    enGuclu: 'D ve E (%69)',
-    enZayif: 'A ve B (%15)',
-    taktik: 'D ve E şıkları soruların %69\'unu oluşturur. Avukatlık Kanunu kapsamındaki sır saklama, reklam yasağı ve baro organları seçimlerinde D ve E şıkları ezici çoğunluktadır; A ve B\'den kaçınılmalıdır.'
-  },
-  hukuk_felsefesi: {
-    ad: 'Hukuk Felsefesi ve Sosyolojisi',
-    soruSayisi: 13,
-    siklar: 'A: %8 · B: %15 · C: %31 · D: %31 · E: %15',
-    enGuclu: 'C ve D (%62)',
-    enZayif: 'A (%8)',
-    taktik: 'Soruların tamamına yakını düşünür ve eser eşleştirmesidir. Doğal hukuk, hukuki pozitivizm ve tarihçi okul ayrımlarında C ve D şıkları merkezdedir.'
-  },
-  hukuk_tarihi: {
-    ad: 'Türk Hukuk Tarihi',
-    soruSayisi: 11,
-    siklar: 'A: %27 · B: %18 · C: %27 · D: %9 · E: %18',
-    enGuclu: 'A ve C (%55)',
-    enZayif: 'D (%9)',
-    taktik: 'İslam hukuku kaynakları (icma, kıyas, istihsan) ve Osmanlı Mecelle hükümlerinde A ve C seçenekleri yoğunluktadır. D şıkkı yalnızca 1 kez çıkmıştır.'
-  },
-  milletlerarasi_hukuk: {
-    ad: 'Milletlerarası Hukuk',
-    soruSayisi: 11,
-    siklar: 'A: %9 · B: %27 · C: %9 · D: %27 · E: %27',
-    enGuclu: 'B, D ve E (%82)',
-    enZayif: 'A ve C (%18)',
-    taktik: 'Devletlerin tanınması, andlaşmalar hukuku ve deniz yetki alanlarında B, D ve E seçenekleri öne çıkar. A ve C şıkları nadirdir.'
-  },
-  mohuk: {
-    ad: 'Milletlerarası Özel Hukuk (MÖHUK)',
-    soruSayisi: 9,
-    siklar: 'A: %0 · B: %44 · C: %33 · D: %22 · E: %0',
-    enGuclu: 'B (%44)',
-    enZayif: 'A ve E (%0 - Hiç Çıkmadı)',
-    taktik: 'Yabancılık unsuru, bağlama noktaları ve tenfiz şartlarında B ve C seçenekleri ağırlıktadır; A ve E şıkları 9 soruda hiç çıkmamıştır.'
-  },
-  genel_kamu: {
-    ad: 'Genel Kamu Hukuku',
-    soruSayisi: 7,
-    siklar: 'A: %29 · B: %29 · C: %0 · D: %14 · E: %29',
-    enGuclu: 'A, B ve E (%86)',
-    enZayif: 'C (%0)',
-    taktik: 'Egemenlik teorileri ve modern devlet modelleri eşleştirmesinde A, B ve E seçenekleri yoğunlaşmıştır.'
-  },
-  vergi_usul: {
-    ad: 'Vergi Usul Hukuku',
-    soruSayisi: 2,
-    siklar: 'C: %100',
-    enGuclu: 'C',
-    enZayif: 'A, B, D, E',
-    taktik: 'Vergi Usul Kanunu kapsamındaki yoklama, inceleme ve ceza kesme usullerine odaklan.'
+const md = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+
+function notOgesiHTML(o) {
+  if (o.tur === 'ezber') {
+    return `<div class="radar-num"><b>${esc(o.veri[0])}</b><span>${esc(o.veri[1])}</span></div>`;
   }
-};
+  const t = o.veri;
+  if (typeof t === 'string') return `<p class="radar-card-desc">${md(t)}</p>`;
+  return `<div class="radar-trap">
+      <span class="radar-trap-y"><em>Kurulan</em>${md(t.y)}</span>
+      <span class="radar-trap-d"><em>Doğrusu</em>${md(t.d)}</span>
+    </div>`;
+}
+
+function notKartiHTML(q) {
+  const ders = notDersleri(q);
+  if (!ders.length) return '';
+  const esl = ilgiliNotlar(q);
+  const d = (esl.length && ders.find(x => x.id === esl[0].ders)) || ders[0];
+  const govde = esl.length
+    ? esl.map(notOgesiHTML).join('')
+    : `<p class="radar-card-desc">${md(d.sinavda)}</p>`;
+  return `<div class="radar-card">
+      <div class="radar-card-head">
+        <span class="radar-card-title">${esc(d.ad)}</span>
+        <span class="radar-card-meta">Sınavda ${d.soru} soru</span>
+      </div>
+      <div class="radar-notes">${govde}</div>
+    </div>`;
+}
 
 /* ==========================================================================
    SORU KÖKÜ VE BİÇİM KURTARMA TÜYOLARI
@@ -247,13 +120,13 @@ function kokTaktigi(t, sec) {
   if (t.onculu) {
     return {
       etiket: 'Öncüllü Soru (I, II, III)',
-      taktik: '4 sınavdaki 78 öncüllü sorunun %67\'sinde doğru cevap 2 öncüllüdür (I ve II: %30, II ve III: %21, I ve III: %17). "I, II ve III (tümü doğru)" seçeneği yalnızca %7,7 çıkmıştır. Kararsızlıkta tümü doğru şıkkından kaçın; tek bir öncülü kesin elediğinde soru iki seçeneğe iner.'
+      taktik: '78 öncüllü sorunun 53\'ünde (%68) doğru cevap iki öncül; "I, II ve III" yalnız 6 kez (%8). Dört sınavın dördünde de böyle. Bir öncülü kesin elersen soru iki şıkka iner.'
     };
   }
   if (t.olumsuz) {
     return {
       etiket: 'Olumsuz Kök ("...değildir / ...yanlıştır")',
-      taktik: 'Sınavın %30\'u olumsuz köktür. Soru yazarları doğru cevabı A şıkkına koymaktan kaçınmış (A yalnızca %6,6), D ve E şıklarına ötelemiştir (%57,4). Dört şık kanunun birebir doğru hükmüyken, doğru olan tek şıkta süre veya merci tek bir kelimeyle bozulmuştur. En uzun şıkka kapılma.'
+      taktik: 'Dört şık kanunun hükmü; doğru cevapta süre ya da merci tek kelimeyle bozulmuş. Olumsuz kökte doğru cevap 120 sorunun yalnız 8\'inde A (%7), hiçbir sınavda 4\'ü geçmedi; D ya da E 66 soruda (%55). Dört sınavda da tutan tek harf oranı bu: kararsız kalırsan A\'yı en son düşün.'
     };
   }
   if (t.kisaSik || t.cokKisaSik) {
@@ -271,12 +144,12 @@ function kokTaktigi(t, sec) {
   if (t.kalip) {
     return {
       etiket: 'İfadelerden Hangisi Kalıbı',
-      taktik: 'Zıt ikizler kuralı: İki şık aynı konuda birbirine zıt iki hüküm bildiriyorsa (örneğin "durdurur" ile "durdurmaz"), doğru cevap %80 üzeri ihtimalle bu iki zıt seçenekten biridir. Diğer üç şıkkı hızla ele.'
+      taktik: 'Şıklara geçmeden kökün "doğru" mu "yanlış" mı sorduğunu bir kez daha oku, sonra her şıkkı ayrı ayrı doğru ya da yanlış diye işaretle.'
     };
   }
   return {
     etiket: 'Düz Bilgi ve Mevzuat Kökü',
-    taktik: 'Doğru şıkkın tek başına en uzun olma oranı 4 sınav genelinde yalnızca %13,9\'dur. Kararsız kalındığında "en uzun şık doğrudur" ezberine kapılma; o şık %86 ihtimalle çeldiricidir.'
+    taktik: 'Tek başına en uzun şık 395 sorunun yalnız 64\'ünde (%16) doğru; dört sınavda da %14-18 arası. Uzun diye seçme.'
   };
 }
 
@@ -284,7 +157,7 @@ function kokTaktigi(t, sec) {
  * Geri bildirim alanında görüntülenecek zengin Çıkmış Sınav Radarı HTML bloğu.
  * Yan yana iki modüler kart (CSS Grid) içeren, mat, dingin ve Apple standardında yapı.
  */
-export function kurtarmaRadariHTML({ q, chosen, ok, sec = 0, isReview = false, isMarked = false, isElimTrap = false }) {
+export function kurtarmaRadariHTML({ q, chosen, ok, sec = 0, isReview = false, isMarked = false }) {
   if (!q) return '';
   const fullQ = questionById.get(q.qId || q.id) || q;
   if (!isPastExam(fullQ)) return '';
@@ -292,26 +165,14 @@ export function kurtarmaRadariHTML({ q, chosen, ok, sec = 0, isReview = false, i
 
   const t = soruTipleri(q);
   const kt = kokTaktigi(t, sec);
-  const sId = q.subjectId || q.dersSlug || '';
-  const dr = DERS_RADARI[sId] || {
-    ad: 'Genel Sınav',
-    soruSayisi: 460,
-    siklar: 'A: %19 · B: %16 · C: %21 · D: %24 · E: %20',
-    enGuclu: 'D (%24)',
-    enZayif: 'B (%16)',
-    taktik: 'Sınav genelinde D şıkkı (%24) en yüksek, B şıkkı (%16) en düşük frekanstadır. D\'nin baskınlığı öncüllü ve olumsuz köklü sorulardan kaynaklanır.'
-  };
-
   const fastWrong = !ok && sec > 0 && sec < 40 && chosen !== null;
-  const badgeText = isElimTrap
-    ? 'Çeldirici Tuzağı (Doğru Şıkkı Eledin)'
-    : fastWrong
-      ? `Hızlı Çözüldü (${Math.round(sec)} sn)`
-      : isMarked
-        ? 'Kuşkulu İşaretlenen Soru'
-        : chosen === null
-          ? 'Boş Bırakılan Soru'
-          : 'Yanlış Çözülen Soru';
+  const badgeText = fastWrong
+    ? `Hızlı Çözüldü (${Math.round(sec)} sn)`
+    : isMarked
+      ? 'Kuşkulu İşaretlenen Soru'
+      : chosen === null
+        ? 'Boş Bırakılan Soru'
+        : 'Yanlış Çözülen Soru';
 
   return `
     <div class="radar-wrap">
@@ -332,14 +193,7 @@ export function kurtarmaRadariHTML({ q, chosen, ok, sec = 0, isReview = false, i
           <p class="radar-card-desc">${esc(kt.taktik)}</p>
         </div>
 
-        <div class="radar-card">
-          <div class="radar-card-head">
-            <span class="radar-card-title">${esc(dr.ad)}</span>
-            <span class="radar-card-meta">Lider: <b>${esc(dr.enGuclu)}</b> · Zayıf: <b>${esc(dr.enZayif)}</b></span>
-          </div>
-          <div class="radar-stats">${esc(dr.siklar)}</div>
-          <p class="radar-card-desc">${esc(dr.taktik)}</p>
-        </div>
+        ${notKartiHTML(fullQ)}
       </div>
     </div>
   `;
