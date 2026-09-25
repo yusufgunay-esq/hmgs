@@ -1136,11 +1136,16 @@ function secByTier(list, want, sayac, seenIds = new Set()) {
   const gor = q => seenIds.has(q.id);
   const hmgs = q => tierOf(q) !== TIER_ADV;
   const t = q => tierOf(q);
-  const asamalar = sayac.t3Yedek
-    ? [q => !gor(q) && t(q) === TIER_REAL, q => !gor(q) && t(q) === TIER_DENEME,
-       q => !gor(q) && t(q) === TIER_AI, q => gor(q) && hmgs(q),
-       q => !gor(q) && !hmgs(q), q => gor(q) && !hmgs(q)]
-    : [q => !gor(q), q => gor(q)];
+  const asamalar = [
+    q => !gor(q) && t(q) === TIER_REAL,
+    q => !gor(q) && t(q) === TIER_DENEME,
+    q => !gor(q) && t(q) === TIER_AI,
+    q => gor(q) && t(q) === TIER_REAL,
+    q => gor(q) && t(q) === TIER_DENEME,
+    q => gor(q) && t(q) === TIER_AI,
+    q => !gor(q) && t(q) === TIER_ADV,
+    q => gor(q) && t(q) === TIER_ADV
+  ];
   const out = [];
   for (const asama of asamalar) {
     if (out.length >= want) break;
