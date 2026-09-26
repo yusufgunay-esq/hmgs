@@ -36,7 +36,10 @@ button, .opt, .opt-x, .premise-item, .flow-toc a, .item-card, .opt-btn {
 @media (max-width: 760px) {
 
   /* ===== 1. ÜST ÇUBUK: tek satır, marka + geri sayım + tema/boyut aksiyonları ===== */
+  /* backdrop-filter, position:fixed torunlar için kapsayıcı blok yaratır;
+     açık kalırsa alttaki sekme çubuğu üst çubuğun içine yapışır. */
   .topbar {
+    backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--bg);
     gap: 0.5rem;
     padding: 0.55rem 0.85rem;
     padding-top: max(0.55rem, env(safe-area-inset-top));
@@ -157,13 +160,8 @@ button, .opt, .opt-x, .premise-item, .flow-toc a, .item-card, .opt-btn {
 
   /* ===== 5. KONU AKIŞI ===== */
   .flow-layout { gap: 1.25rem; }
-  .flow-side {
-    background: var(--bg-raise);
-    border: 1px solid var(--line);
-    border-radius: var(--r-m);
-    padding: 0.75rem;
-  }
-  .flow-toc { max-height: 38vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .flow-toc { max-height: 55vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .fl-search { font-size: 16px; }  /* 16px: odaklanınca yakınlaştırma olmasın */
   .flow-toc a { padding: 0.55rem 0.6rem; min-height: 40px; }
   .flow-select { padding: 0.65rem 0.7rem; font-size: 16px; padding-right: 2rem; }  /* 16px: odaklanınca yakınlaştırma olmasın */
   .read h2 { font-size: 1.42rem; }
