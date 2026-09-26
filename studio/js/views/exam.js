@@ -506,6 +506,7 @@ export function finish(auto = false) {
     // simülasyonda her soruya ikinci bir karar eklemek ölçtüğümüz şeyi, yani
     // sınav temposunu bozar. Onun yerine tek kuşku işareti iki uçlu bahse
     // çevrilir: işaretlenmemiş cevap "Eminim", işaretli cevap "Mantıkla".
+    const conf = chosen === null ? null : (doubt ? 'guess' : 'sure');
     const isCorrectEliminated = qElims.includes(q.correct);
     const totalOpts = Array.isArray(q.options) && q.options.length ? q.options.length : 5;
     const isTwoOptions = totalOpts >= 4 && qElims.length === (totalOpts - 2);
