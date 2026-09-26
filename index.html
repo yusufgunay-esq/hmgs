@@ -5729,6 +5729,38 @@ function migrateExistingStudioKarmaEntries() {
  *      yazıldı ne entries'e çevrildi: sessizce kayboldu.
  * Artık iki kaynak id bazında birleştirilir; hiçbir seans bir diğerini ezmez.
  */
+/**
+ * STÜDYO → TAKİP, AYNI ORIGIN (26 Eylül 2026). Stüdyo'nun kendi kaydı
+ * (`hmgs_studio_v1`: sessions[] + exams[]) aynı tarayıcıda duruyor; Drive
+ * jetonu ya da kuyruk dosyası gerekmeden doğrudan okunur. Açılışta, sekmeye
+ * dönüşte ve Stüdyo başka sekmede kaydettiğinde çalışır. İdempotent
+ * (studioSessionId / studioExamId). Yeni kayıt eklenirse Drive'a da yazılır.
+ */
+function pullLocalStudio(render = true) {
+    let st = null;
+    try { st = JSON.parse(localStorage.getItem('hmgs_studio_v1') || 'null'); } catch (e) { return false; }
+    let q = [];
+    try { q = JSON.parse(localStorage.getItem('hmgs_pending_studio_sessions') || '[]'); } catch (e) {}
+    const sessions = [...(Array.isArray(q) ? q : []), ...((st && Array.isArray(st.sessions)) ? st.sessions : [])];
+    const exams = (st && Array.isArray(st.exams)) ? st.exams : [];
+    const beforeE = entries.length, beforeD = denemeler.length;
+    if (sessions.length) applyPendingStudioSessions(sessions);
+    const addedExams = exams.length ? convertPendingStudioExams(exams) : false;
+    const added = entries.length !== beforeE || denemeler.length !== beforeD || addedExams;
+    if (added) {
+        try { localStorage.setItem('hmgs_entries', JSON.stringify(entries)); } catch (e) {}
+        if (render) { renderLogs(); renderSubjectCards(); renderDenemeler(); renderWeaknessHeatmap(); }
+        if (addedExams) showToast("Stüdyo denemesi kayda eklendi ✓", 'emerald');
+        if (typeof accessToken !== 'undefined' && accessToken) { try { saveToDrive(); } catch (e) {} }
+    }
+    return added;
+}
+window.addEventListener('focus', () => pullLocalStudio());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pullLocalStudio(); });
+window.addEventListener('storage', e => {
+    if (e.key === 'hmgs_studio_v1' || e.key === 'hmgs_pending_studio_sessions') pullLocalStudio();
+});
+
 function applyPendingStudioSessions(rawQueue) {
     if (!Array.isArray(rawQueue)) return;
 
@@ -8974,6 +9006,7 @@ function init() {
     if (Array.isArray(pendingStudioSessionsQueue) && pendingStudioSessionsQueue.length) {
         applyPendingStudioSessions(pendingStudioSessionsQueue);
     }
+    pullLocalStudio(false);
     renderLogs();
     renderSubjectCards();
     renderDenemeler();
