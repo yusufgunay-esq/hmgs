@@ -642,6 +642,10 @@ function rotaBaslat(adim) {
   const L = adim.launch || {};
   let ok = false;
   switch (L.tur) {
+    case 'hap':
+      notlar.openHap();
+      show('notlar');
+      return;
     case 'deneme-devam':
     case 'deneme-sayfa':
       show('exam'); return;
