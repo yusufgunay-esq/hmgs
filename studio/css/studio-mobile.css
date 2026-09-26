@@ -18,10 +18,11 @@
 html {
   overflow-x: clip;
 }
+/* overflow-y: auto BURAYA YAZILMAZ: bir eksen auto olunca clip de hidden'a
+   döner, body kaydırma kabı olur ve üst çubuk dahil hiçbir sticky öğe
+   yapışmaz (26 Eyl 2026'da bulundu). */
 body {
   overflow-x: clip;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 button, .opt, .opt-x, .premise-item, .flow-toc a, .item-card, .opt-btn {
   -webkit-tap-highlight-color: transparent;
