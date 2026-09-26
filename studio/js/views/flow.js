@@ -215,6 +215,7 @@ function sadeHTML(t, list, i, qs) {
       ${qs.length
         ? `<button class="btn" data-act="flow-practice" data-topic="${esc(t.id)}">Bu konunun ${qs.length} sorusunu çöz</button>`
         : `<button class="btn btn-2" data-act="flow-practice-subject" data-subject="${esc(t.subjectId)}">${esc(subjectName(t.subjectId))} sorularını çöz</button>`}
+      <button class="btn btn-2" data-act="akim-ders-start" data-subject="${esc(t.subjectId)}">${esc(subjectName(t.subjectId))} akışı</button>
     </div>
     ${pagerHTML(list, i)}`;
 }
@@ -265,6 +266,7 @@ function topicHTML(t, list) {
       ${qs.length
         ? `<button class="btn" data-act="flow-practice" data-topic="${esc(t.id)}">Bu konunun ${qs.length} sorusunu çöz</button>`
         : `<button class="btn btn-2" data-act="flow-practice-subject" data-subject="${esc(t.subjectId)}">${esc(subjectName(t.subjectId))} sorularını çöz</button>`}
+      <button class="btn btn-2" data-act="akim-ders-start" data-subject="${esc(t.subjectId)}">${esc(subjectName(t.subjectId))} akışı</button>
     </div>
     ${pagerHTML(list, i)}`;
 }
