@@ -11,7 +11,7 @@ import { DERSLER, SINAV, TAKTIK, ZAMAN } from '../notlar-data.js';
 import { HAP } from '../hap-data.js';
 import { state, save, todayKey } from '../store.js';
 
-const ui = { mod: 'oku', ders: null, gizli: false, acik: new Set(), sadeceKalan: false, ac: new Set() };
+const ui = { mod: 'oku', ders: null, hd: null, gizli: false, acik: new Set(), ac: new Set() };
 let bagli = false;
 
 const host = () => document.getElementById('view-notlar');
@@ -36,6 +36,22 @@ function seg() {
 
 const TIK = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5"/></svg>';
 
+const KISA = {
+  anayasa: 'Anayasa', aymyargi: 'Anayasa Yargısı', idare: 'İdare', iyuk: 'İYUK', medeni: 'Medeni',
+  borclar: 'Borçlar', ticaret: 'Ticaret', hmk: 'HMK', icra: 'İcra İflas', ceza: 'Ceza', cmk: 'CMK',
+  is: 'İş', vergi: 'Vergi', avukatlik: 'Avukatlık', felsefe: 'Felsefe', tarih: 'Hukuk Tarihi',
+  milletlerarasi: 'Milletlerarası', mohuk: 'MÖHUK', genelkamu: 'Genel Kamu'
+};
+const OKU_DERS = DERSLER.filter(d => HAP.some(h => h.d === d.id));
+const dersKart = id => HAP.filter(h => h.d === id);
+
+/** Okumada açık ders: seçilen, yoksa ilk okunmamış kartın dersi. */
+function aktifDers() {
+  if (ui.hd && OKU_DERS.some(d => d.id === ui.hd)) return ui.hd;
+  const ilk = HAP.find(h => !okundu(h.id));
+  return (ilk ? ilk.d : OKU_DERS[0].id);
+}
+
 function hapKart(h) {
   const ok = okundu(h.id);
   const acik = !ok || ui.ac.has(h.id);
@@ -50,42 +66,82 @@ function hapKart(h) {
   </article>`;
 }
 
-function oku() {
+function dersSayac(id) {
+  const k = dersKart(id);
+  return { n: k.length, ok: k.filter(h => okundu(h.id)).length };
+}
+
+function rehber(aktif) {
   const { toplam, okunan } = hapDurum();
-  const ilk = HAP.find(h => !okundu(h.id));
-  const yuzde = Math.round((okunan / toplam) * 100);
-  let html = '';
-  for (const d of DERSLER) {
-    const kartlar = HAP.filter(h => h.d === d.id && (!ui.sadeceKalan || !okundu(h.id)));
-    if (!kartlar.length) continue;
-    html += `<section class="hp-ders">
-      <h3 class="nt-sgroup-h"><span>${esc(d.ad)}</span><span class="nt-range">${ara(d)} · ${d.soru} soru</span></h3>
-      <div class="hp-grid">${kartlar.map(hapKart).join('')}</div>
-    </section>`;
-  }
-  return `<div class="hp-top">
-      <div class="hp-prog">
-        <div class="hp-prog-t"><b>${okunan}</b> / ${toplam} kart okundu</div>
-        <span class="hp-prog-bar"><i style="width:${yuzde}%"></i></span>
-      </div>
-      <div class="hp-actions">
-        <button class="nt-test" data-na="hp-kalan" aria-pressed="${ui.sadeceKalan}">${ui.sadeceKalan ? 'Hepsini göster' : 'Yalnız okunmamışlar'}</button>
-        ${ilk ? `<button class="btn btn-s" data-na="hp-git" data-id="${ilk.id}">Kaldığın yerden</button>` : ''}
-      </div>
+  const satir = OKU_DERS.map(d => {
+    const { n, ok } = dersSayac(d.id);
+    const tam = ok === n;
+    return `<li><button class="hp-toc-b${tam ? ' is-done' : ''}" data-na="hp-ders" data-id="${d.id}" aria-current="${d.id === aktif}">
+      <span class="hp-toc-n"><span class="hp-toc-l">${esc(d.ad)}</span><span class="hp-toc-s">${esc(KISA[d.id] || d.ad)}</span></span>
+      <span class="hp-toc-c">${tam ? TIK : `${ok}/${n}`}</span>
+    </button></li>`;
+  }).join('');
+  return `<nav class="hp-rail" aria-label="Dersler">
+    <div class="hp-rail-top">
+      <span class="hp-rail-t"><b>${okunan}</b> / ${toplam}</span>
+      <span class="hp-prog-bar"><i style="width:${Math.round((okunan / toplam) * 100)}%"></i></span>
     </div>
-    ${okunan === toplam ? '<p class="hp-bitti">Hepsi okundu. Sayılar sekmesinde "Kendini sına" ile son bir tur at.</p>' : ''}
-    ${html || '<p class="hint">Okunmamış kart kalmadı.</p>'}`;
+    <ol class="hp-toc">${satir}</ol>
+  </nav>`;
+}
+
+function oku() {
+  const id = aktifDers();
+  const i = OKU_DERS.findIndex(d => d.id === id);
+  const d = OKU_DERS[i], onc = OKU_DERS[i - 1], snr = OKU_DERS[i + 1];
+  const { n, ok } = dersSayac(id);
+  const { toplam, okunan } = hapDurum();
+  const tam = ok === n;
+  const sonrakiEksik = OKU_DERS.slice(i + 1).find(x => dersSayac(x.id).ok < dersSayac(x.id).n)
+    || OKU_DERS.slice(0, i).find(x => dersSayac(x.id).ok < dersSayac(x.id).n);
+  const bitis = okunan === toplam
+    ? '<p class="hp-end-t">Bütün kartlar okundu. Sayılar sekmesinde "Kendini sına" ile son bir tur at.</p>'
+    : tam ? `<p class="hp-end-t">${esc(KISA[id] || d.ad)} bitti.</p>` : '';
+  const ileri = tam && sonrakiEksik && sonrakiEksik !== snr ? sonrakiEksik : snr;
+  return `<div class="hp-wrap">
+    ${rehber(id)}
+    <div class="hp-main" id="hp-main">
+      <header class="hp-dh">
+        <p class="nt-eyebrow">Soru ${ara(d)} · ${d.soru} soru</p>
+        <h2 class="hp-dt">${esc(d.ad)}</h2>
+        <p class="hp-dm">${n} kart${ok ? ` · ${ok} okundu` : ''}</p>
+      </header>
+      <div class="hp-grid">${dersKart(id).map(hapKart).join('')}</div>
+      <footer class="hp-end${tam ? ' is-cue' : ''}" id="hp-end">
+        ${bitis}
+        <nav class="nt-pager">
+          ${onc ? `<button data-na="hp-ders" data-id="${onc.id}"><small>Önceki</small>${esc(onc.ad)}</button>` : '<span></span>'}
+          ${ileri ? `<button class="nt-next" data-na="hp-ders" data-id="${ileri.id}"><small>${ileri === snr ? 'Sonraki' : 'Kalan'}</small>${esc(ileri.ad)}</button>` : '<span></span>'}
+        </nav>
+      </footer>
+    </div>
+  </div>`;
+}
+
+/** Ders değiştir; sayfayı dersin başına getir. */
+function dersAc(id) {
+  ui.hd = id;
+  ciz();
+  const m = document.getElementById('hp-main');
+  const y = m ? m.getBoundingClientRect().top + window.scrollY - 90 : 0;
+  if (window.scrollY > y) window.scrollTo({ top: Math.max(0, y) });
+  document.querySelector('.hp-toc-b[aria-current="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
 
 /** Bugün rotasından doğrudan okuma kartlarına gelmek için. */
-export function openHap() { ui.mod = 'oku'; ui.ders = null; }
+export function openHap() { ui.mod = 'oku'; ui.ders = null; ui.hd = null; }
 
 function bas() {
   return `<header class="nt-head">
     <p class="nt-eyebrow">Son okuma</p>
     <h1 class="nt-title">Notlar</h1>
     <p class="nt-sub">${ui.mod === 'oku'
-      ? 'Dört sınavın en çok sorduğu konular, sınavdaki sırasıyla. Oku, işaretle, sonra soruya geç.'
+      ? 'Dört sınavın en çok sorduğu konular, sınav sırasıyla.'
       : 'Dört sınav, 460 soru. Ne çıkıyor, nerede tuzak var, hangi sayı sorulur.'}</p>
     ${seg()}
   </header>`;
@@ -255,11 +311,13 @@ function tikla(e) {
     ui.ac.delete(id);
     save();
     const simdi = !!k[id];
+    const d = HAP.find(x => x.id === id)?.d;
+    ui.hd = d || ui.hd;
     ciz();
     if (simdi) {
-      const sonraki = HAP.slice(HAP.findIndex(x => x.id === id) + 1).find(x => !okundu(x.id));
-      const hedef = sonraki && document.getElementById('hp-' + sonraki.id);
-      if (hedef) hedef.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const sonraki = dersKart(d).find(x => !okundu(x.id));
+      const hedef = document.getElementById(sonraki ? 'hp-' + sonraki.id : 'hp-end');
+      if (hedef) hedef.scrollIntoView({ behavior: 'smooth', block: sonraki ? 'start' : 'center' });
     }
   }
   else if (na === 'hp-ac') {
@@ -268,15 +326,22 @@ function tikla(e) {
     ui.ac.has(id) ? ui.ac.delete(id) : ui.ac.add(id);
     ciz();
   }
-  else if (na === 'hp-kalan') { ui.sadeceKalan = !ui.sadeceKalan; ciz(); }
-  else if (na === 'hp-git') {
-    document.getElementById('hp-' + el.dataset.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  else if (na === 'hp-ders') dersAc(el.dataset.id);
   else if (na === 'ac' && ui.gizli) {
     const k = el.dataset.key;
     ui.acik.has(k) ? ui.acik.delete(k) : ui.acik.add(k);
     el.classList.toggle('is-hidden', !ui.acik.has(k));
   }
+}
+
+/** Okumada ← → ile ders değiştir. */
+function tus(e) {
+  if (ui.mod !== 'oku' || !host()?.classList.contains('on')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const i = OKU_DERS.findIndex(d => d.id === aktifDers());
+  const h = OKU_DERS[i + (e.key === 'ArrowRight' ? 1 : -1)];
+  if (h) { e.preventDefault(); dersAc(h.id); }
 }
 
 /** Başka görünümden belirli bir dersin notunu açmak için (ör. Konular). */
@@ -288,6 +353,7 @@ export function openDers(id) {
 export function render() {
   const h = host();
   if (!h) return;
-  if (!bagli) { h.addEventListener('click', tikla); bagli = true; }
+  if (!bagli) { h.addEventListener('click', tikla); document.addEventListener('keydown', tus); bagli = true; }
   ciz();
+  if (ui.mod === 'oku') document.querySelector('.hp-toc-b[aria-current="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
