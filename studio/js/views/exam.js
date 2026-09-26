@@ -318,10 +318,11 @@ export function render() {
         <span class="chip" id="exam-pace" title="Kalan süre ÷ işaretlenmemiş soru. Bütçe büyükse acele ediyorsun: kökü ikinci kez oku, şıkları tek tek ele.">${paceText()}</span>
         ${E.real ? `<span class="chip accent">${esc(E.label)}</span>` : ''}
         <span class="chip">${answeredCount} / ${E.questions.length} işaretli</span>
+        ${answeredCount < E.questions.length ? `<button class="btn btn-2 btn-s exam-blank-jump" data-act="exam-next-blank" title="Sıradaki boş soruya git (Haritada boşlar düz, kuşkulu boşlar sarı; kuşkulu ama işaretli olanlar sarı çerçeveli mavi)">${E.questions.length - answeredCount} boş · sıradakine git</button>` : ''}
         <button class="btn btn-2 btn-s" data-act="exam-finish">Sınavı bitir</button>
         <div class="exam-map" id="exam-map">
           ${E.questions.map((_, i) => `<button data-act="exam-goto" data-i="${i}"
-            class="${E.answers[i] !== null ? 'answered' : ''} ${E.marked.has(i) ? 'marked' : ''} ${i === E.i ? 'now' : ''}"
+            class="${E.answers[i] !== null ? 'answered' : 'blank'} ${E.marked.has(i) ? 'marked' : ''} ${i === E.i ? 'now' : ''}"
             title="Soru ${i + 1}">${i + 1}</button>`).join('')}
         </div>
       </div>
@@ -462,6 +463,16 @@ export function mark() {
   if (pe) pe.textContent = paceText();
 }
 export function goto(i) { if (E) { accrueTime(); E.i = Math.max(0, Math.min(E.questions.length - 1, i)); render(); } }
+/** Kuşku işareti boşları gizliyordu: sıradaki boş soruya (döngüsel) atlar. */
+export function nextBlank() {
+  if (!E) return;
+  const n = E.answers.length;
+  for (let k = 1; k <= n; k++) {
+    const j = (E.i + k) % n;
+    if (E.answers[j] === null) { goto(j); return; }
+  }
+  toast('Boş soru kalmadı.');
+}
 export function prev() { goto(E ? E.i - 1 : 0); }
 export function next() { goto(E ? E.i + 1 : 0); }
 
@@ -481,7 +492,12 @@ export function finish(auto = false) {
     } else if (!confirm(`${dk} dakikan duruyor.${gecmis} Bitirmeden önce "hangisi yanlıştır / değildir" diye soran köklere bir kez daha bak.\n\nYine de bitirmek istiyor musun?`)) return;
   }
   if (!auto && blanks > 0) {
-    if (!confirm(`${blanks} soruyu boş bıraktın. HMGS'de yanlış cezası yok — boş bırakmak her zaman kayıptır.\n\nYine de bitirmek istiyor musun?`)) return;
+    const bosNo = E.answers.map((a, i) => a === null ? i + 1 : null).filter(Boolean);
+    const liste = bosNo.length <= 15 ? ` (${bosNo.join(', ')})` : '';
+    if (!confirm(`${blanks} soruyu boş bıraktın${liste}. HMGS'de yanlış cezası yok, boş bırakmak her zaman kayıptır.\n\nTamam: yine de bitir · İptal: ilk boş soruya git`)) {
+      goto(bosNo[0] - 1);
+      return;
+    }
   }
   accrueTime();
   stopClock();
