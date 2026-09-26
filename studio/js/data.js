@@ -524,7 +524,7 @@ export function buildAiExamSet(seen = null) {
  * @param {Map<string, number>|Set<string>|null} seen
  * @returns {{ questions: Array, shortfall: Array, stats: Object }}
  */
-export function buildAlgorithmicExamSet(seen = null) {
+export function buildAlgorithmicExamSet(seen = null, lastWrong = null) {
   const picked = [];
   const shortfall = [];
   const stats = {
@@ -547,7 +547,21 @@ export function buildAlgorithmicExamSet(seen = null) {
     return 0;
   };
 
-  SUBJECTS.forEach(s => {
+  // Gerçek kitapçık sırası (2025 Eylül ve 2026 Nisan kâğıtlarından ölçüldü,
+  // 26 Eylül 2026). Eskiden SUBJECTS sırasıyla Medeni'den başlıyordu; sınav
+  // Anayasa ile açılıp Genel Kamu ile kapanıyor, prova da öyle olsun.
+  const BOOKLET = ['anayasa_hukuku', 'anayasa_yargisi', 'idare_hukuku', 'iyuk', 'medeni_hukuk',
+    'borclar_hukuku', 'ticaret_hukuku', 'hmk', 'icra_iflas', 'ceza_hukuku', 'cmk', 'is_hukuku',
+    'vergi_hukuku', 'vergi_usul', 'avukatlik', 'hukuk_felsefesi', 'hukuk_tarihi',
+    'milletlerarasi_hukuk', 'mohuk', 'genel_kamu'];
+  const rank = id => { const i = BOOKLET.indexOf(id); return i < 0 ? 99 : i; };
+  const ordered = [...SUBJECTS].sort((a, b) => rank(a.id) - rank(b.id));
+
+  // Görülmüş sorularda önce son cevabı yanlış olanlar (tekrar değeri yüksek),
+  // sonra en eski. `lastWrong` verilmezse eski davranış (yalnız en eski).
+  const wrongFirst = q => (lastWrong && lastWrong.has(q.id)) ? 0 : 1;
+
+  ordered.forEach(s => {
     const rawPool = questionsOf(s.id, 'all');
 
     const t1Unseen = [], t2Unseen = [], t3Unseen = [], t4Unseen = [];
@@ -576,7 +590,7 @@ export function buildAlgorithmicExamSet(seen = null) {
       return seenTime(a) - seenTime(b);
     });
 
-    const oldest = (a, b) => seenTime(a) - seenTime(b);
+    const oldest = (a, b) => (wrongFirst(a) - wrongFirst(b)) || (seenTime(a) - seenTime(b));
 
     const orderedPool = [
       ...shuffle(t1Unseen),
