@@ -341,7 +341,11 @@ document.addEventListener('click', async e => {
     case 'continue-flow': if (akim.start()) show('akim'); else show('today'); break;
 
     /* --- akış modu --- */
-    case 'akim-start':         akim.start(); break;
+    case 'akim-start':         akim.startSecili(); break;
+    case 'akim-ders':          akim.toggleDers(el.dataset.id); break;
+    case 'akim-ders-hepsi':    akim.dersHepsi(); break;
+    case 'akim-ders-temizle':  akim.dersTemizle(); break;
+    case 'akim-ders-start':    if (akim.startDers(el.dataset.subject)) show('akim'); break;
     case 'akim-quit':          akim.quit(); break;
     case 'akim-pick':          akim.arm(el.dataset.key); break;
     case 'akim-conf':          akim.commit(el.dataset.conf); break;
