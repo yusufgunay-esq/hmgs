@@ -239,3 +239,64 @@
 @media (prefers-reduced-motion: reduce) {
   .nt-body, .nt-card { animation: none; }
 }
+
+/* ---------- Oku: sınav öncesi okuma kartları (26 Eyl 2026) ---------- */
+.hp-top {
+  display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap;
+  padding: 1rem 1.2rem; margin-bottom: 1.75rem;
+  background: var(--bg-raise); border: 1px solid var(--line); border-radius: var(--r-l);
+  position: sticky; top: 4.4rem; z-index: 5;
+}
+.hp-prog { flex: 1; min-width: 12rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.hp-prog-t { font-size: 0.86rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.hp-prog-t b { font-family: var(--serif); font-size: 1.3rem; font-weight: 500; color: var(--ink); }
+.hp-prog-bar { height: 4px; border-radius: 4px; background: var(--bg-sunk); overflow: hidden; }
+.hp-prog-bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; transition: width .5s cubic-bezier(.2,.7,.2,1); }
+.hp-actions { display: flex; gap: 0.5rem; align-items: center; }
+.hp-bitti { font-family: var(--serif); font-size: 1.1rem; color: var(--ok); margin: -0.5rem 0 1.5rem; }
+
+.hp-ders { margin-bottom: 2.25rem; }
+.nt:has(.nt-body[data-mod="oku"]) { max-width: 46rem; }
+.hp-grid { display: grid; gap: 0.75rem; }
+.hp-card {
+  scroll-margin-top: 10rem;
+  background: var(--bg-raise); border: 1px solid var(--line); border-radius: var(--r-l);
+  padding: 1.15rem 1.25rem 1rem; display: flex; flex-direction: column; gap: 0.75rem;
+}
+.hp-head { display: flex; flex-direction: column; gap: 0.2rem; text-align: left; cursor: default; }
+.hp-card.is-read .hp-head { cursor: pointer; }
+.hp-title { font-family: var(--serif); font-size: 1.2rem; font-weight: 500; line-height: 1.25; letter-spacing: -0.01em; color: var(--ink); }
+.hp-f { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.hp-list { list-style: none; display: grid; gap: 0.55rem; }
+.hp-list li { position: relative; padding-left: 1rem; font-size: 0.92rem; line-height: 1.55; color: var(--ink-2); }
+.hp-list li::before {
+  content: ''; position: absolute; left: 0; top: 0.62em;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: .45;
+}
+.hp-list b { color: var(--ink); font-weight: 600; }
+.hp-trap { font-size: 0.86rem; line-height: 1.5; color: var(--ink); background: var(--warn-soft); border-radius: var(--r-m); padding: 0.7rem 0.85rem; }
+.hp-trap span { display: block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warn); margin-bottom: 0.2rem; }
+.hp-trap b { font-weight: 600; }
+.hp-done {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 0.45rem;
+  font-size: 0.8rem; font-weight: 600; color: var(--accent-ink);
+  padding: 0.42rem 0.9rem; border-radius: 999px; background: var(--accent-soft);
+  transition: background .2s ease, color .2s ease;
+}
+.hp-done[aria-pressed="false"]::before { content: ''; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; box-sizing: border-box; }
+.hp-done[aria-pressed="true"] { background: var(--ok-soft); color: var(--ok); }
+.hp-done svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.hp-done:hover { filter: brightness(0.97); }
+.hp-card.is-folded { flex-direction: row; align-items: center; justify-content: space-between; padding: 0.75rem 1rem 0.75rem 1.25rem; background: transparent; }
+.hp-card.is-folded .hp-title { font-size: 1.02rem; color: var(--ink-2); }
+.hp-card.is-folded .hp-f { display: none; }
+.hp-card.is-folded .hp-done { align-self: center; flex: none; }
+
+@media (max-width: 760px) {
+  .hp-top { position: static; padding: 0.85rem 0.95rem; border-radius: var(--r-m); }
+  .hp-card { scroll-margin-top: 4.5rem; }
+  .hp-actions { width: 100%; justify-content: space-between; }
+  .hp-card { padding: 1rem; border-radius: var(--r-m); }
+  .hp-title { font-size: 1.12rem; }
+  .hp-list li { font-size: 0.9rem; }
+}
