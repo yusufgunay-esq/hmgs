@@ -116,7 +116,12 @@ function notKartiHTML(q) {
 /* ==========================================================================
    SORU KÖKÜ VE BİÇİM KURTARMA TÜYOLARI
    ========================================================================== */
-function kokTaktigi(t, sec) {
+/* Olumsuz kökte doğru cevabın A olduğu soru / dersin olumsuz kök sayısı (4 sınav, 460 soru;
+   yalnız en az 5 olumsuz kökü olan dersler). 25 Eylül 2026 ölçümü. */
+// Ceza Hukuku hariç her derste A en zayıf ikinci şık (4 sınav, 460 soru; 25 Eylül 2026 ölçümü).
+const OLUMSUZ_A_ISTISNA = new Set(['ceza_hukuku']);
+
+function kokTaktigi(t, sec, sId = '') {
   if (t.onculu) {
     return {
       etiket: 'Öncüllü Soru (I, II, III)',
@@ -124,10 +129,10 @@ function kokTaktigi(t, sec) {
     };
   }
   if (t.olumsuz) {
-    return {
-      etiket: 'Olumsuz Kök ("...değildir / ...yanlıştır")',
-      taktik: 'Dört şık kanunun hükmü; doğru cevapta süre ya da merci tek kelimeyle bozulmuş. Olumsuz kökte doğru cevap 120 sorunun yalnız 8\'inde A (%7), hiçbir sınavda 4\'ü geçmedi; D ya da E 66 soruda (%55). Dört sınavda da tutan tek harf oranı bu: kararsız kalırsan A\'yı en son düşün.'
-    };
+    const taktik = OLUMSUZ_A_ISTISNA.has(sId)
+      ? 'Ceza Hukukunda bu geçerli değil, A yine olası bir cevap.'
+      : "İki şık arasında kalıp biri A'ysa diğerini seç.";
+    return { etiket: 'Olumsuz Kök ("...değildir / ...yanlıştır")', taktik };
   }
   if (t.kisaSik || t.cokKisaSik) {
     return {
@@ -164,7 +169,7 @@ export function kurtarmaRadariHTML({ q, chosen, ok, sec = 0, isReview = false, i
   if (ok && !isMarked && !isReview) return '';
 
   const t = soruTipleri(q);
-  const kt = kokTaktigi(t, sec);
+  const kt = kokTaktigi(t, sec, fullQ.subjectId || q.subjectId || '');
   const fastWrong = !ok && sec > 0 && sec < 40 && chosen !== null;
   const badgeText = fastWrong
     ? `Hızlı Çözüldü (${Math.round(sec)} sn)`
@@ -205,6 +210,6 @@ export function tuyoSec(q, { ok, hizli }) {
   const fullQ = questionById.get(q.qId || q.id) || q;
   if (!isPastExam(fullQ)) return null;
   const t = soruTipleri(fullQ);
-  const kt = kokTaktigi(t, 0);
+  const kt = kokTaktigi(t, 0, fullQ.subjectId || '');
   return { baslik: kt.etiket, metin: kt.taktik, tip: 'radar' };
 }
