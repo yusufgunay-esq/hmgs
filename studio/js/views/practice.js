@@ -16,7 +16,7 @@ import * as seans from '../seans.js';
 import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet, buildDeadlinesSet, CONF } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
 import { kuralButtonHTML } from '../kural.js';
-import { pushStudioQueueToDrive, getActiveToken, setActiveToken } from '../vault-client.js';
+import { pushStudioQueueToDrive, getActiveToken, setActiveToken, requestSilentToken } from '../vault-client.js';
 import { tuyoSec, kurtarmaRadariHTML } from '../tuyolar.js';
 
 let S = null;   // aktif seans
@@ -1306,6 +1306,8 @@ function getAnyGoogleToken() {
 export async function pushSessionToDriveDirectly(sess) {
   if (!sess || !sess.id) return false;
   let token = getAnyGoogleToken();
+  // Jeton ~1 saatte düşüyor; eskiden burada sessizce pes ediliyordu (26 Eyl 2026).
+  if (!token) { try { token = await requestSilentToken(); } catch (_) { token = null; } }
   if (!token) return false;
   setActiveToken(token);
 
@@ -1314,7 +1316,7 @@ export async function pushSessionToDriveDirectly(sess) {
     // localStorage'daki sessions[] dizisinin tamamını gönderiyor. Takip tarafı
     // studioSessionId üzerinden idempotent çevirdiği için mükerrer kayıt olmaz.
     const s = state();
-    const ok = await pushStudioQueueToDrive(token, s.sessions || [], (s.answers || []).slice(-2000));
+    const ok = await pushStudioQueueToDrive(token, s.sessions || [], (s.answers || []).slice(-2000), s.exams || []);
     return ok;
   } catch (err) {
     console.warn('[sync] Drive kuyruk güncelleme uyarısı:', err);
