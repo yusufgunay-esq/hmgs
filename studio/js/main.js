@@ -82,6 +82,7 @@ function show(view, push = true) {
     exam.reset();
   }
 
+  if (view === 'akim' && currentView !== 'akim') akim.kapanisiKapat();
   currentView = view;
   if (typeof document !== 'undefined' && document.body) {
     document.body.setAttribute('data-view', view);
@@ -296,6 +297,11 @@ document.addEventListener('click', async e => {
     case 'flow-practice':
       if (practice.startSession({ mode: 'topic', topicId: el.dataset.topic, count: 99 })) show('practice');
       break;
+    case 'sinav-konu-coz': {
+      const qs = flow.sinavSorulari(el.dataset.i);
+      if (qs.length && practice.startSession({ questions: qs, count: qs.length, customLabel: flow.sinavKonuAdi(el.dataset.i) })) show('practice');
+      break;
+    }
     case 'flow-practice-subject':
       if (practice.startSession({ mode: 'subject', subjectId: el.dataset.subject, count: 15 })) show('practice');
       break;
