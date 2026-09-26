@@ -240,26 +240,47 @@
   .nt-body, .nt-card { animation: none; }
 }
 
-/* ---------- Oku: sınav öncesi okuma kartları (26 Eyl 2026) ---------- */
-.hp-top {
-  display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap;
-  padding: 1rem 1.2rem; margin-bottom: 1.75rem;
-  background: var(--bg-raise); border: 1px solid var(--line); border-radius: var(--r-l);
-  position: sticky; top: 4.4rem; z-index: 5;
-}
-.hp-prog { flex: 1; min-width: 12rem; display: flex; flex-direction: column; gap: 0.45rem; }
-.hp-prog-t { font-size: 0.86rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.hp-prog-t b { font-family: var(--serif); font-size: 1.3rem; font-weight: 500; color: var(--ink); }
-.hp-prog-bar { height: 4px; border-radius: 4px; background: var(--bg-sunk); overflow: hidden; }
-.hp-prog-bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; transition: width .5s cubic-bezier(.2,.7,.2,1); }
-.hp-actions { display: flex; gap: 0.5rem; align-items: center; }
-.hp-bitti { font-family: var(--serif); font-size: 1.1rem; color: var(--ok); margin: -0.5rem 0 1.5rem; }
+/* ---------- Oku: sınav öncesi okuma kartları (26 Eyl 2026) ----------
+   Bir seferde tek ders. Solda ders rehberi (telefonda üstte kayan şerit),
+   sağda o dersin kartları. 62 kart tek sayfada 28.000 px ediyordu. */
+.nt:has(.nt-body[data-mod="oku"]) { max-width: 60rem; }
+.hp-wrap { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr); gap: 3rem; align-items: start; }
 
-.hp-ders { margin-bottom: 2.25rem; }
-.nt:has(.nt-body[data-mod="oku"]) { max-width: 46rem; }
+/* rehber */
+.hp-rail { position: sticky; top: 5.5rem; max-height: calc(100vh - 7rem); display: flex; flex-direction: column; }
+.hp-rail-top { display: flex; flex-direction: column; gap: 0.5rem; padding: 0 0.7rem 1rem; }
+.hp-rail-t { font-size: 0.8rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.hp-rail-t b { font-family: var(--serif); font-size: 1.35rem; font-weight: 500; color: var(--ink); margin-right: 0.1rem; }
+.hp-prog-bar { height: 3px; border-radius: 3px; background: var(--bg-sunk); overflow: hidden; }
+.hp-prog-bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .5s var(--nt-ease); }
+.hp-toc { list-style: none; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; display: grid; gap: 1px; padding-bottom: 1rem; }
+.hp-toc::-webkit-scrollbar { display: none; }
+.hp-toc-b {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  padding: 0.44rem 0.7rem; border-radius: 8px; text-align: left;
+  font-size: 0.85rem; color: var(--ink-2); line-height: 1.3;
+  transition: background .2s var(--nt-ease), color .2s var(--nt-ease);
+}
+.hp-toc-b:hover { background: var(--bg-hover); color: var(--ink); }
+.hp-toc-b[aria-current="true"] { background: var(--bg-raise); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+.hp-toc-b:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hp-toc-s { display: none; }
+.hp-toc-c { flex: none; font-size: 0.72rem; font-weight: 500; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.hp-toc-b.is-done:not([aria-current="true"]) { color: var(--ink-3); }
+.hp-toc-b.is-done .hp-toc-c { color: var(--ok); }
+.hp-toc-c svg { width: 12px; height: 12px; display: block; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ders başlığı */
+.hp-main { min-width: 0; max-width: 42rem; animation: ntIn .35s var(--nt-ease) both; }
+.hp-dh { margin-bottom: 1.5rem; }
+.hp-dh .nt-eyebrow { margin-bottom: 0.35rem; }
+.hp-dt { font-family: var(--serif); font-weight: 500; font-size: 2rem; letter-spacing: -0.02em; line-height: 1.1; color: var(--ink); }
+.hp-dm { font-size: 0.84rem; color: var(--ink-3); margin-top: 0.4rem; font-variant-numeric: tabular-nums; }
+
+/* kartlar */
 .hp-grid { display: grid; gap: 0.75rem; }
 .hp-card {
-  scroll-margin-top: 10rem;
+  scroll-margin-top: 6rem;
   background: var(--bg-raise); border: 1px solid var(--line); border-radius: var(--r-l);
   padding: 1.15rem 1.25rem 1rem; display: flex; flex-direction: column; gap: 0.75rem;
 }
@@ -287,16 +308,52 @@
 .hp-done[aria-pressed="true"] { background: var(--ok-soft); color: var(--ok); }
 .hp-done svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .hp-done:hover { filter: brightness(0.97); }
-.hp-card.is-folded { flex-direction: row; align-items: center; justify-content: space-between; padding: 0.75rem 1rem 0.75rem 1.25rem; background: transparent; }
+.hp-card.is-folded { flex-direction: row; align-items: center; justify-content: space-between; padding: 0.7rem 1rem 0.7rem 1.25rem; background: transparent; }
 .hp-card.is-folded .hp-title { font-size: 1.02rem; color: var(--ink-2); }
 .hp-card.is-folded .hp-f { display: none; }
 .hp-card.is-folded .hp-done { align-self: center; flex: none; }
 
-@media (max-width: 760px) {
-  .hp-top { position: static; padding: 0.85rem 0.95rem; border-radius: var(--r-m); }
-  .hp-card { scroll-margin-top: 4.5rem; }
-  .hp-actions { width: 100%; justify-content: space-between; }
-  .hp-card { padding: 1rem; border-radius: var(--r-m); }
+/* ders sonu */
+.hp-end { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--line); scroll-margin-bottom: 6rem; }
+.hp-end .nt-pager { margin-top: 0; }
+.hp-end-t { font-family: var(--serif); font-size: 1.1rem; color: var(--ok); margin-bottom: 0.9rem; }
+.hp-end.is-cue .nt-next { background: var(--accent-soft); }
+.hp-end.is-cue .nt-next:hover { background: var(--bg-hover); }
+
+/* telefon ve dar ekran: rehber üstte yatay şerit */
+@media (max-width: 900px) {
+  .hp-wrap { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .hp-rail {
+    position: sticky; top: 2.95rem; z-index: 5; max-height: none;
+    margin: 0 -1rem 1.4rem; padding: 0.7rem 0 0.65rem;
+    background: var(--bg); border-bottom: 1px solid var(--line);
+  }
+  .hp-rail-top { flex-direction: row; align-items: center; gap: 0.7rem; padding: 0 1rem 0.5rem; }
+  .hp-rail-t { flex: none; font-size: 0.74rem; }
+  .hp-rail-t b { font-size: 1.05rem; }
+  .hp-rail-top .hp-prog-bar { flex: 1; }
+  .hp-toc {
+    display: flex; gap: 0.35rem; overflow-x: auto; overflow-y: hidden; padding: 0 1rem;
+    scroll-padding-inline: 1rem;
+  }
+  .hp-toc li { flex: none; }
+  .hp-toc-b {
+    width: auto; padding: 0.38rem 0.7rem; border-radius: 999px; gap: 0.4rem;
+    font-size: 0.8rem; background: var(--bg-sunk); white-space: nowrap;
+  }
+  .hp-toc-b[aria-current="true"] { background: var(--accent); color: var(--bg-raise); box-shadow: none; }
+  .hp-toc-b[aria-current="true"] .hp-toc-c { color: inherit; opacity: .75; }
+  .hp-toc-l { display: none; }
+  .hp-toc-s { display: inline; }
+  .hp-main { max-width: none; }
+  .hp-dt { font-size: 1.65rem; }
+  .hp-card { padding: 1rem; border-radius: var(--r-m); scroll-margin-top: 8.5rem; }
   .hp-title { font-size: 1.12rem; }
   .hp-list li { font-size: 0.9rem; }
+  .hp-end { scroll-margin-bottom: 5rem; }
 }
+@media (max-width: 767px) {
+  .hp-rail { top: 3.1rem; margin-inline: -0.9rem; }
+  .hp-rail-top, .hp-toc { padding-inline: 0.9rem; }
+}
+@media (prefers-reduced-motion: reduce) { .hp-main { animation: none; } }
