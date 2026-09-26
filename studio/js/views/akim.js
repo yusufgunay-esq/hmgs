@@ -47,7 +47,6 @@ let lastRun = null; // kapanış ekranı özeti
 // Giriş ekranındaki ders seçimi. Bilerek kalıcı DEĞİL (localStorage yok): unutulan
 // bir filtre ertesi gün karma akışı sessizce tek derse kilitlemesin.
 let seciliDers = new Set();
-let dersPaneliAcik = false;
 
 export function hasSession() { return !!A; }
 /** Ekrandaki soru (test ve teşhis için; salt okunur kullan). */
@@ -323,49 +322,64 @@ function landingHTML() {
     <h1 class="page">Akış</h1>
     <p class="page-sub">Her kare bir HMGS sorusu. Doğru çözüp oturttuğun kare yanar ve bir daha sönmez;
       gelmediğin gün hiçbir şey kaybolmaz.</p>
+    ${dersSeciciHTML()}
     <div class="akim-how">
       <div><b>Şıkkı seç, bahsini koy.</b> Eminim · Sanırım · Mantıkla. “Mantıkla” dediğin soru, doğru çıksa bile tekrar gelir. Emin olduğun bir yanlış, en iyi öğrenilen hatadır.</div>
       <div><b>Yanlışlar açık halka olur.</b> Birkaç soru sonra geri gelir; doğru çözünce kare yanar.</div>
       <div><b>On soru bir tur.</b> Bitirince yalnız bir satır özet, ekran kapanmaz.</div>
     </div>
-    ${dersSeciciHTML()}
     ${fullMapHTML()}
   </div>`;
 }
 
-/* ---------- ders seçici ---------- */
+/* ---------- ders seçici ----------
+   26 Eylül 2026 akşam: en çok net kaybettiren üç ders kart, geri kalanı tek
+   satırlık çipler. Aynı seçici kapanış ekranında da durur; eskiden kapanış
+   yalnız "Devam" gösteriyordu ve başka derse geçmek için sayfayı yenilemek
+   gerekiyordu. */
 
-function dersSeciciHTML() {
+const netYaz = n => `−${n.toFixed(1).replace('.', ',')}`;
+
+function dersSeciciHTML(kapanis = false) {
   const rows = dersDurumu();
   const n = seciliDers.size;
-  const baslat = n === 0 ? 'Akışı Başlat · Tüm dersler'
-    : n === 1 ? `Akışı Başlat · ${subjectName([...seciliDers][0])}` : `Akışı Başlat · ${n} ders`;
+  const secili = [...seciliDers];
+  const ad = n === 1 ? subjectName(secili[0]) : `${n} ders`;
+  const baslat = kapanis
+    ? (n ? `Devam · ${ad}` : 'Akışa devam')
+    : (n ? `Başlat · ${ad}` : 'Başlat · Bütün dersler');
+  const tik = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.4l2.9 2.8 6.1-6.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
   const kart = r => {
     const on = seciliDers.has(r.id);
-    const isabet = r.acc === null ? `${r.seen} soru` : `%${Math.round(r.acc * 100)} · ${r.seen} soru`;
-    const alt = [isabet, r.due ? `${r.due} tekrar` : '', r.unseenHmgs ? `${r.unseenHmgs} yeni HMGS` : '']
-      .filter(Boolean).join(' · ');
-    return `<button class="akim-ders${on ? ' on' : ''}${r.eksik ? ' eksik' : ''}" data-act="akim-ders" data-id="${esc(r.id)}" aria-pressed="${on}">
-      <span class="akim-ders-ad">${esc(r.name)}</span>
-      <span class="akim-ders-alt">${esc(alt)}</span>
-      <span class="akim-ders-net">−${r.kayip.toFixed(1)} net</span>
+    const meta = [r.acc === null ? `${r.seen} soru` : `%${Math.round(r.acc * 100)} isabet`,
+      r.unseenHmgs ? `${r.unseenHmgs} yeni` : '', r.due ? `${r.due} tekrar` : ''].filter(Boolean).join(' · ');
+    return `<button class="ak-kart${on ? ' on' : ''}" data-act="akim-ders" data-id="${esc(r.id)}" aria-pressed="${on}">
+      <span class="ak-kart-ust"><span class="ak-kart-ad">${esc(r.name)}</span><span class="ak-tik">${tik}</span></span>
+      <span class="ak-kart-net"><b>${netYaz(r.kayip)}</b> net</span>
+      <span class="ak-kart-meta">${esc(meta)}</span>
     </button>`;
   };
-  const eksik = rows.filter(r => r.eksik);
-  const acik = dersPaneliAcik || n > 0;
-  return `<div class="akim-ders-sec">
-    <div class="akim-ders-bas">
-      <b>Eksiğin burada</b>
-      <span>Sınavda bu derslerden beklenen net kaybı en yüksek. Dokun, yalnız onu çöz.</span>
+  const cip = r => {
+    const on = seciliDers.has(r.id);
+    return `<button class="ak-cip${on ? ' on' : ''}" data-act="akim-ders" data-id="${esc(r.id)}" aria-pressed="${on}" title="Beklenen net kaybı">
+      <span class="ak-tik">${tik}</span><span>${esc(r.name)}</span><span class="ak-cip-n">${netYaz(r.kayip)}</span>
+    </button>`;
+  };
+
+  return `<section class="ak-sec${kapanis ? ' kapanis' : ''}">
+    <div class="ak-sec-bas">
+      <span class="ak-etiket">Eksiğin burada</span>
+      ${n ? `<button class="ak-temizle" data-act="akim-ders-temizle">Seçimi kaldır</button>` : ''}
     </div>
-    <div class="akim-ders-grid">${eksik.map(kart).join('')}</div>
-    ${acik ? `<div class="akim-ders-grid">${rows.filter(r => !r.eksik).map(kart).join('')}</div>`
-      : `<button class="btn-link" data-act="akim-ders-hepsi">Bütün dersler</button>`}
-    <div class="akim-ders-alt-satir">
+    <div class="ak-kartlar">${rows.filter(r => r.eksik).map(kart).join('')}</div>
+    <span class="ak-etiket">Diğer dersler</span>
+    <div class="ak-cipler">${rows.filter(r => !r.eksik).map(cip).join('')}</div>
+    <div class="ak-basla">
       <button class="btn akim-go" data-act="akim-start">${esc(baslat)}</button>
-      ${n ? `<button class="btn-link" data-act="akim-ders-temizle">Seçimi kaldır</button>` : ''}
+      <span class="ak-basla-not">${n ? 'Yalnız seçtiğin dersler gelir.' : 'Seçmezsen bütün dersler karışık gelir.'}</span>
     </div>
-  </div>`;
+  </section>`;
 }
 
 export function toggleDers(id) {
@@ -373,8 +387,10 @@ export function toggleDers(id) {
   if (seciliDers.has(id)) seciliDers.delete(id); else seciliDers.add(id);
   render();
 }
-export function dersHepsi() { dersPaneliAcik = true; render(); }
+export function dersHepsi() { render(); }
 export function dersTemizle() { seciliDers = new Set(); render(); }
+/** Menüden Akış'a gelindiğinde eski kapanış özeti yerine giriş ekranı açılsın. */
+export function kapanisiKapat() { if (!A) lastRun = null; }
 /** Giriş ekranındaki seçimle akışı başlatır (seçim yoksa karma akış). */
 export function startSecili() { return start({ dersler: [...seciliDers] }); }
 /** Konular ekranından tek derslik akış (seçim, kapanıştaki "Devam" için de tutulur). */
@@ -439,9 +455,7 @@ function closingHTML(run) {
     </div>
     ${calHTML}
 
-    <div class="btn-row" style="margin:1.25rem 0 0.5rem">
-      <button class="btn akim-go" data-act="akim-start">Akışa Devam Et</button>
-    </div>
+    ${dersSeciciHTML(true)}
     <button class="btn-link" data-act="go-today">Bugün ekranına dön</button>
     <p class="hint" style="margin:0.75rem 0 1.25rem">Bu akışın çözümleri çalışma kaydına (Takip) yazıldı. ${coverageLine()}</p>
     ${fullMapHTML(run.litIds)}
