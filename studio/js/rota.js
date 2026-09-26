@@ -43,6 +43,7 @@ import { questionById, pastExamList, pastExamQuestions, aiQuestions, tierOf, top
 import { state, todayKey, lastExam, EXAM_DATE } from './store.js';
 import { dueQuestions, leechQuestions, karmaWeights, isDeadlinesQuestion, BOXES } from './engine.js';
 import { denemeLabel, arsivLabel } from './labels.js';
+import { HAP } from './hap-data.js';
 
 /* ---------- ayarlar (ölçekler, sabit takvim değil) ---------- */
 
@@ -548,9 +549,20 @@ export function rota(opts = {}) {
     plan: 0, yapilan: c.akis,
     cta: 'Akışa gir', launch: { tur: 'akis' }
   };
+  // ---- okuma kartları (26 Eylül 2026, kullanıcı kararı) ----
+  // Son günlerde gün, dört sınavın en çok sorduğu konuların okuma kartlarıyla
+  // açılır; soru çözmeye ondan sonra geçilir. Okundu kaydı S.hap'te.
+  const hapOkunan = HAP.filter(h => (S.hap || {})[h.id]).length;
+  const hap = D <= 4 ? {
+    id: 'hap', tur: 'hap', baslik: 'Önce oku: sınav kartları',
+    neden: 'Dört sınavın en çok sorduğu konular, sınav sırasıyla. Her kartta sınanan kural ve kurulan tuzak var; okudukça işaretle, sonra soruya geç.',
+    plan: HAP.length, yapilan: Math.min(hapOkunan, HAP.length),
+    birim: 'kart', cta: hapOkunan ? 'Okumaya devam et' : 'Okumaya başla', launch: { tur: 'hap' }
+  } : null;
+
   // ---- sıra ----
-  // Deneme ilk sırada ama kilit değil: satırdan istediğin adımı açabilirsin.
-  [denemeAdimi, tekrar, tekrarBilgi, ...konular, kuyruk, sure].filter(Boolean).forEach(a => adimlar.push(a));
+  // Okuma kartları ve deneme ilk sırada ama kilit değil: satırdan istediğin adımı açabilirsin.
+  [hap, denemeAdimi, tekrar, tekrarBilgi, ...konular, kuyruk, sure].filter(Boolean).forEach(a => adimlar.push(a));
   adimlar.push(akis);
   if (sonGun) {
     adimlar.push({ id: 'yarin', tur: 'bilgi', bilgi: true, baslik: 'Yarın sınav',
@@ -564,7 +576,7 @@ export function rota(opts = {}) {
     if (!simdi && !a.bitti && !a.bilgi && !a.istege) simdi = a;
   }
 
-  const zorunlu = adimlar.filter(a => !a.bilgi && !a.istege && !a.sinirsiz && a.tur !== 'deneme');
+  const zorunlu = adimlar.filter(a => !a.bilgi && !a.istege && !a.sinirsiz && a.tur !== 'deneme' && a.tur !== 'hap');
   const toplamPlan = zorunlu.reduce((s, a) => s + a.plan, 0);
   const toplamYapilan = zorunlu.reduce((s, a) => s + Math.min(a.plan, a.yapilan), 0);
 
