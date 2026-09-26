@@ -3253,3 +3253,28 @@ button.rv-stat.clickable:hover {
   .read .sd-blok { margin-bottom: 1.8rem; }
   .read .sd-olay { padding: 0.7rem 0.85rem; }
 }
+
+/* ============================================================
+   AKIŞ · DERS SEÇİCİ (26 Eylül 2026)
+   ============================================================ */
+.akim-ders-sec { margin: 1.25rem 0 1.75rem; display: grid; gap: 0.7rem; }
+.akim-ders-bas { display: grid; gap: 0.15rem; }
+.akim-ders-bas b { font-size: 0.95rem; color: var(--ink); }
+.akim-ders-bas span { font-size: 0.85rem; color: var(--ink-3); }
+.akim-ders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.5rem; }
+.akim-ders {
+  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; gap: 0.15rem 0.6rem;
+  text-align: left; padding: 0.65rem 0.8rem; border-radius: var(--r-m);
+  background: var(--bg-raise); border: 1px solid var(--line-strong); color: var(--ink);
+  font: inherit; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.akim-ders:hover { background: var(--bg-hover); }
+.akim-ders.eksik { border-color: var(--warn); background: var(--warn-soft); }
+.akim-ders.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.akim-ders-ad { font-weight: 600; font-size: 0.92rem; }
+.akim-ders-alt { grid-column: 1; font-size: 0.78rem; color: var(--ink-3); }
+.akim-ders-net { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+.akim-ders.eksik .akim-ders-net { color: var(--warn); font-weight: 600; }
+.akim-ders-alt-satir { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 0.4rem; }
+.akim-ders-sec > .btn-link { justify-self: start; }
+@media (max-width: 767px) { .akim-ders-grid { grid-template-columns: 1fr; } .akim-ders-alt-satir .akim-go { width: 100%; } }
