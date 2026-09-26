@@ -467,7 +467,7 @@ export function pick(key, conf = 'think') {
 
   const row = recordAnswer(q, key, ms, 'flow', {
     usedElim: A.elimUsed, askedGemini: A.geminiAsked, rawMs: t.rawMs, idleMs: t.idleMs,
-    logicGuess: CONF[c].logic
+    logicGuess: CONF[c].logic, ...elimFlags(q)
   });
   row.conf = c;
   const sched = scheduleAfterAnswer(q.id, row.ok, CONF[c].logic);
@@ -485,7 +485,7 @@ export function dontKnow() {
   A.armed = null;
   stopTick();
 
-  const row = recordAnswer(q, null, ms, 'flow', { usedElim: A.elimUsed, askedGemini: A.geminiAsked, rawMs: t.rawMs, idleMs: t.idleMs });
+  const row = recordAnswer(q, null, ms, 'flow', { usedElim: A.elimUsed, askedGemini: A.geminiAsked, rawMs: t.rawMs, idleMs: t.idleMs, ...elimFlags(q) });
   const sched = scheduleAfterAnswer(q.id, false);
   save();
   finishAnswer(q, null, row, sched, ms, before);
@@ -520,6 +520,11 @@ export function verdictOf(row, sched, entry) {
   if (sched && sched.kind === 'mezun') {
     const g = entry && entry.gap != null ? `${entry.gap} soru önce yanlış yapmıştın. ` : '';
     return { head: 'Oturdu', sub: `${g}Bu sefer doğru: kare yandı, tekrar sırasından çıktı.`, tone: 'win' };
+  }
+  if (row.elimTrap) {
+    return row.ok
+      ? { head: 'Doğru, ama doğru şıkkı çizmiştin', sub: 'Sonradan döndün. Sınavda çizdiğin şıkka dönmeyebilirsin; çizmeden önce bir kez daha oku.', tone: 'hyper' }
+      : { head: 'Doğru şıkkı çizmişsin', sub: `Doğru cevap ${row.correctKey}, onu elemiştin. Açıklamada ${row.correctKey} şıkkının neden doğru olduğuna bak.`, tone: 'hyper' };
   }
   const c = row.conf;
   if (c === 'hint') {
@@ -733,6 +738,7 @@ export function next() {
 
   // Soru bazlı sinyalleri sıfırla
   A.elimUsed = false;
+  A.elimNudged = false;
   A.geminiAsked = false;
   A.geminiAskedPreAnswer = false;
   A.answered = false;
@@ -874,6 +880,20 @@ function finalizeRun() {
 
 /* ---------- şık / öncül eleme (görsel, cevap kaydı değil) ---------- */
 
+/** Cevap anındaki eleme durumu (şıklar DOM'da çizili tutulur). 26 Eylül 2026:
+ *  eskiden akışta yalnız "eleme yapıldı mı" yazılıyordu; hangi şıkkın çizildiği
+ *  kaybolduğu için "doğru şıkkı eledim mi" sorusu yalnız denemede ölçülebiliyordu. */
+function struckKeys() {
+  return $$opts().filter(b => b.classList.contains('struck-manual') || b.classList.contains('struck-auto'))
+    .map(b => b.dataset.key).filter(Boolean);
+}
+function elimFlags(q) {
+  const el = struckKeys();
+  if (!el.length) return {};
+  const left = (q.options || []).map(o => o.key).filter(k => !el.includes(k));
+  return { eliminatedOptions: el, elimTrap: el.includes(q.correct), dilemma5050: left.length === 2 };
+}
+
 export function eliminateOption(key) {
   if (!A || A.answered) return;
   A.elimUsed = true;
@@ -882,7 +902,13 @@ export function eliminateOption(key) {
     $$opts().forEach(b => b.classList.remove('armed'));
     const bet = $('#akim-bet'); if (bet) bet.hidden = true;
   }
-  toggleOption('#view-akim', key);
+  const on = toggleOption('#view-akim', key);
+  // 25 Eylül denemesi: doğru şıkkı elediği 9 sorunun 6'sında A, B, C art arda
+  // çizilip D/E'ye gidilmişti. Üçüncü çizgide bir kez dürt, soru başına bir kez.
+  if (on && !A.elimNudged && $$opts().filter(b => b.classList.contains('struck-manual')).length === 3) {
+    A.elimNudged = true;
+    toast('3 şık çizdin. Çizdiklerine bir kez daha bak.');
+  }
 }
 
 export function eliminatePremise(numeral) {
