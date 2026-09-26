@@ -205,7 +205,7 @@ function rotaHTML(r) {
     const no = sirali.indexOf(s) + 1;
     const kalan = s.plan - s.yapilan;
     kicker = s.sinirsiz ? 'Sırada' : `Sırada · ${no > 0 ? no : 1} / ${Math.max(1, sirali.length)}${s.tur === 'konu' ? ' · konu onarımı' : ''}`;
-    title = s.tur === 'deneme' || s.sinirsiz ? s.baslik : `${s.baslik} · ${kalan} soru`;
+    title = s.tur === 'deneme' || s.sinirsiz ? s.baslik : `${s.baslik} · ${kalan} ${s.birim || 'soru'}`;
     why = s.neden;
     cta = (s.topicId ? `<button class="btn btn-2" data-act="go-flow-topic" data-topic="${esc(s.topicId)}">Önce konuyu oku</button>` : '')
       + `<button class="btn" data-act="rota-go" data-step="${esc(s.id)}">${esc(s.cta)}</button>`
@@ -269,6 +269,7 @@ function sinavKarti(r) {
       <p class="hero-why">Bugün soru çözme; bildiğin yeterli. Aşağıdakiler dışında yapılacak iş yok.</p>
       <div class="rota">
         <div class="rota-row todo"><span class="rota-dot"></span><div class="rota-main"><div class="rota-name">Saat 10.00'dan önce binada ol</div><div class="rota-meta">10.00'dan sonra binaya alınmıyor (PGM ilanı). Sınav 10.15'te başlıyor.</div></div><div class="rota-count"></div><div class="rota-act"></div></div>
+        <div class="rota-row todo"><span class="rota-dot"></span><div class="rota-main"><div class="rota-name">Sabah son bakış: sayılar</div><div class="rota-meta">Notlar içinde Sayılar sekmesi, "Kendini sına". En fazla 20 dakika; yeni konu açma.</div></div><div class="rota-count"></div><div class="rota-act"><button class="btn btn-2 btn-s" data-view="notlar">Aç</button></div></div>
         <div class="rota-row todo"><span class="rota-dot"></span><div class="rota-main"><div class="rota-name">Kimlik ve sınava giriş belgesi</div><div class="rota-meta">Çıkmadan önce bir kez daha kontrol et.</div></div><div class="rota-count"></div><div class="rota-act"></div></div>
         <div class="rota-row todo"><span class="rota-dot"></span><div class="rota-main"><div class="rota-name">120 soru · 155 dakika</div><div class="rota-meta">Soru başına ~75 saniye. Takıldığını işaretle geç, ikinci turda dön; boş bırakma.</div></div><div class="rota-count"></div><div class="rota-act"></div></div>
       </div>
