@@ -18,7 +18,8 @@
 import {
   esc, rich, $,
   groupLegalRefs, topicHeading, topicShort, shortRef, isCitation, citationParts, richBlock } from '../ui.js';
-import { SUBJECTS, subjectName, topicsOf, topicById, questionsOfTopic, V3_TYPES } from '../data.js';
+import { SUBJECTS, subjectName, topicsOf, topicById, questionsOfTopic, questionById, V3_TYPES } from '../data.js';
+import { SINAV_KONULARI } from '../sinav-konulari.js';
 import { markTopicRead, save, state } from '../store.js';
 import { topicMastery, MASTERY_LABEL } from '../engine.js';
 import { kitapPaneliHTML, ozetEtiketiHTML, kitapVar } from '../kitap.js';
@@ -26,7 +27,7 @@ import { DERSLER } from '../notlar-data.js';
 import { openDers as notlarAc } from './notlar.js';
 
 let cur = { subjectId: 'medeni_hukuk', topicId: null };
-const ui = { menu: false, toc: false, q: '' };
+const ui = { menu: false, toc: false, q: '', sinav: false, sinavTum: true };
 let bagli = false;
 
 /* Stüdyo ders kimliği → Notlar ders kimliği */
@@ -48,7 +49,7 @@ export function open(topicId) {
   const t = topicById.get(topicId);
   if (!t) return false;
   cur = { subjectId: t.subjectId, topicId: t.id };
-  ui.toc = false;
+  ui.toc = false; ui.sinav = false;
   render();
   window.scrollTo({ top: 0 });
   return true;
@@ -60,6 +61,7 @@ export function setSubject(subjectId) {
   const ilkOkunmamis = list.find(t => !okundu(t.id));
   cur.topicId = (ilkOkunmamis || list[0] || {}).id || null;
   ui.menu = false; ui.q = '';
+  if (ui.sinav) ui.sinavTum = false;
   render();
 }
 
@@ -75,17 +77,17 @@ export function render() {
   const t = cur.topicId ? topicById.get(cur.topicId) : null;
 
   // Konu okunmuş sayılır; kenar listesindeki işaret ve sayaç bunu anında göstersin.
-  if (t) { markTopicRead(t.id); save(); }
+  if (t && !ui.sinav) { markTopicRead(t.id); save(); }
 
   host.innerHTML = `
     <div class="wrap">
-      <div class="flow-layout${ui.toc ? ' toc-open' : ''}">
+      <div class="flow-layout${ui.toc ? ' toc-open' : ''}${ui.sinav ? ' sinav' : ''}">
         ${sideHTML(list, t)}
-        <div class="read">${t ? topicHTML(t, list) : '<p class="hint">Bu derste henüz konu yok.</p>'}</div>
+        <div class="read">${ui.sinav ? sinavHTML() : t ? topicHTML(t, list) : '<p class="hint">Bu derste henüz konu yok.</p>'}</div>
       </div>
     </div>`;
 
-  if (t) mountVisual(t);
+  if (t && !ui.sinav) mountVisual(t);
 }
 
 /* ---------- kenar: ders paneli + konu listesi ---------- */
@@ -99,6 +101,10 @@ function sideHTML(list, t) {
 
   return `
     <aside class="flow-side">
+      <div class="fl-mod" role="tablist">
+        <button role="tab" aria-selected="${!ui.sinav}" class="${ui.sinav ? '' : 'on'}" data-fl="mod-oku">Konular</button>
+        <button role="tab" aria-selected="${ui.sinav}" class="${ui.sinav ? 'on' : ''}" data-fl="mod-sinav">Sınavda en çok</button>
+      </div>
       <button class="fl-subj" data-fl="menu" aria-expanded="${ui.menu}">
         <span class="fl-subj-name">${esc(s ? s.name : subjectName(cur.subjectId))}</span>
         <span class="fl-subj-meta">${s ? `${s.examQ} soru · ` : ''}${list.length} konu</span>
@@ -121,7 +127,7 @@ function sideHTML(list, t) {
           ${gorunen.map(x => {
             const n = list.indexOf(x) + 1;
             const lab = MASTERY_LABEL[topicMastery(x.id).state];
-            const on = t && x.id === t.id;
+            const on = !ui.sinav && t && x.id === t.id;
             return `<a href="#" data-act="flow-topic" data-topic="${esc(x.id)}"
               class="${on ? 'on' : ''}${okundu(x.id) ? ' is-read' : ''}" title="${esc(topicHeading(x.title))}">
               <span class="n">${n}</span><span class="tt">${esc(x.sade && x.sade.baslik ? x.sade.baslik : topicShort(x.title))}</span><span class="dot ${lab.dot}" title="${esc(lab.txt)}"></span>
@@ -144,6 +150,65 @@ function menuHTML() {
       </button>`;
     }).join('')}
   </div>`;
+}
+
+/* ---------- sınavda en çok sorulanlar ----------
+   Dört sınavın 460 sorusu elle konulara ayrıldı (sinav-konulari.js). Kart
+   sayıyı, kaç sınavda geldiğini ve kaçını çözdüğünü gösterir; "Çöz" yalnız o
+   konunun sınav sorularını açar, görmediklerin önce gelir. */
+
+const SINAVLAR = ['2024_09', '2025_05', '2025_09', '2026_04'];
+const tamId = k => 'hmgs_' + k;
+
+export function sinavSorulari(i) {
+  const k = SINAV_KONULARI[Number(i)];
+  if (!k) return [];
+  const gorulen = new Set(state().answers.map(a => a.qId));
+  const qs = k.q.map(x => questionById.get(tamId(x))).filter(Boolean);
+  return [...qs.filter(q => !gorulen.has(q.id)), ...qs.filter(q => gorulen.has(q.id))];
+}
+export function sinavKonuAdi(i) { return (SINAV_KONULARI[Number(i)] || {}).ad || 'Sınav konusu'; }
+
+function sinavHTML() {
+  const gorulen = new Set(state().answers.map(a => a.qId));
+  const tum = ui.sinavTum;
+  const satirlar = SINAV_KONULARI.map((k, i) => {
+    const sinav = SINAVLAR.map(p => k.q.some(x => x.startsWith(p)));
+    return { ...k, i, n: k.q.length, sinav, kac: sinav.filter(Boolean).length,
+      cozulen: k.q.filter(x => gorulen.has(tamId(x))).length };
+  })
+    .filter(k => tum || k.d === cur.subjectId)
+    .sort((a, b) => b.n - a.n || b.kac - a.kac);
+  const liste = tum ? satirlar.slice(0, 24) : satirlar;
+  const enCok = Math.max(1, ...liste.map(k => k.n));
+
+  const kart = (k, sira) => `
+    <article class="sk-kart">
+      <div class="sk-ust">
+        <span class="sk-sira">${sira + 1}</span>
+        ${tum ? `<span class="sk-ders">${esc(subjectName(k.d))}</span>` : ''}
+      </div>
+      <h3 class="sk-ad">${esc(k.ad)}</h3>
+      <div class="sk-olcu">
+        <span class="sk-n"><b>${k.n}</b> soru</span>
+        <span class="sk-bar"><i style="width:${Math.round((k.n / enCok) * 100)}%"></i></span>
+      </div>
+      <div class="sk-alt">
+        <span class="sk-sinav" title="Hangi sınavlarda geldi">${k.sinav.map(v => `<i class="${v ? 'on' : ''}"></i>`).join('')}<span>${k.kac} sınavda</span></span>
+        <span class="sk-coz-n">${k.cozulen === k.n ? 'hepsini gördün' : k.cozulen ? `${k.cozulen}/${k.n} görüldü` : ''}</span>
+        <button class="btn btn-s${k.cozulen === k.n ? ' btn-2' : ''}" data-act="sinav-konu-coz" data-i="${k.i}">${k.cozulen === k.n ? 'Yeniden çöz' : 'Çöz'}</button>
+      </div>
+    </article>`;
+
+  const s = SUBJECTS.find(x => x.id === cur.subjectId);
+  return `
+    <p class="fl-eyebrow">Dört sınav · 460 soru</p>
+    <h2>Sınavda en çok sorulanlar</h2>
+    <div class="sk-filtre" role="tablist">
+      <button role="tab" class="${tum ? 'on' : ''}" aria-selected="${tum}" data-fl="sinav-tum" data-v="1">Bütün dersler</button>
+      <button role="tab" class="${tum ? '' : 'on'}" aria-selected="${!tum}" data-fl="sinav-tum" data-v="0">${esc(s ? s.name : subjectName(cur.subjectId))}</button>
+    </div>
+    <div class="sk-grid">${liste.map(kart).join('') || '<p class="hint">Bu dersten sınavda soru gelmedi.</p>'}</div>`;
 }
 
 /* ---------- okuma alanı ---------- */
@@ -329,6 +394,9 @@ function bagla(host) {
     if (fl === 'menu') { ui.menu = !ui.menu; render(); }
     else if (fl === 'ders') { setSubject(el.dataset.id); scrollTo({ top: 0 }); }
     else if (fl === 'toc') { ui.toc = !ui.toc; render(); }
+    else if (fl === 'mod-oku') { ui.sinav = false; render(); }
+    else if (fl === 'mod-sinav') { ui.sinav = true; ui.menu = false; render(); scrollTo({ top: 0 }); }
+    else if (fl === 'sinav-tum') { ui.sinavTum = el.dataset.v === '1'; render(); }
     else if (fl === 'notlar') {
       notlarAc(el.dataset.id);
       document.querySelector('.nav [data-view="notlar"]')?.click();
