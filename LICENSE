@@ -19,6 +19,24 @@ Yazılı izin olmaksızın bu eserin tamamının veya bir parçasının:
   · ticari veya ticari olmayan herhangi bir ortamda yayınlanması veya barındırılması,
   · tersine mühendisliğe tabi tutulması
 KESİNLİKLE YASAKTIR.
+
+--------------------------------------------------------------------------------
+AÇIK HÜKÜM — ÇATALLAMA (FORK) İSTİSNASI
+--------------------------------------------------------------------------------
+Bu depo, GitHub Hizmet Şartları'nın her kullanıcıya tanıdığı görüntüleme ve
+çatallama (fork) hakkı kapsamında herkese açıktır; bu hak işbu lisans ile
+sınırlandırılamaz. Buna göre:
+
+  (a) GitHub arayüzü kullanılarak oluşturulan bir çatal bu lisansı İHLAL ETMEZ;
+
+  (b) ancak bu depodan veya bir çataldan alınan kodun kopyalanıp bağımsız bir
+      depo, proje veya ürün olarak yeniden yayınlanması, dağıtılması ya da hak
+      sahibine atıf yapılmaksızın sahiplenilmesi bu lisansı İHLAL EDER ve hak
+      sahibine hukuki yollara başvurma hakkı verir.
+
+Bu istisna, deponun açık olmasının zorunlu bir sonucudur; kod üzerinde hiçbir
+kullanım, kopyalama veya türetme hakkı tanımaz.
+
 --------------------------------------------------------------------------------
 MAKİNE ÖĞRENMESİ VE VERİ MADENCİLİĞİ (TDM) REZERVİ
 --------------------------------------------------------------------------------
