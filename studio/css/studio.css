@@ -3203,3 +3203,53 @@ button.rv-stat.clickable:hover {
   }
 }
 
+
+/* ==========================================================================
+   KONULAR · SADE OKUMA (26 Eylül 2026)
+   topics.js → t.sade: giriş cümlesi, numaralı bloklar, örnek olay,
+   "Sınavda dikkat" ve "Akılda kalsın". Madde künyesi yok.
+   ========================================================================== */
+.read .sd-giris {
+  font-family: var(--sans); font-size: 1rem; line-height: 1.6; color: var(--ink-2);
+  margin: 0 0 1.6rem; max-width: 60ch;
+}
+.read .sd-blok { margin-bottom: 2.2rem; }
+.read .sd-blok h3, .read h3.sd-h {
+  display: flex; align-items: baseline; gap: 0.6rem;
+  font-family: var(--sans); font-size: 1.05rem; font-weight: 650; letter-spacing: -0.01em;
+  color: var(--ink); margin: 0 0 0.6rem; line-height: 1.35;
+}
+.read h3.sd-h { font-size: 0.98rem; color: var(--accent-ink); }
+.read .sd-no {
+  flex: none; display: inline-grid; place-items: center;
+  width: 1.5rem; height: 1.5rem; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-ink);
+  font-size: 0.78rem; font-weight: 700; transform: translateY(-1px);
+}
+.read .sd-olay {
+  margin: 0.9rem 0 0; padding: 0.8rem 1rem;
+  border-left: 3px solid var(--ok); background: var(--ok-soft); border-radius: 0 10px 10px 0;
+}
+.read .sd-olay .lbl, .read .sd-akil .lbl {
+  display: block; font-family: var(--sans); font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.3rem;
+}
+.read .sd-olay .lbl { color: var(--ok); }
+.read .sd-olay p { font-family: var(--sans); font-size: 0.95rem; line-height: 1.6; margin: 0; }
+.read .sd-tuzak ul { margin: 0; padding-left: 1.1rem; }
+.read .sd-tuzak li { font-family: var(--sans); font-size: 0.92rem; line-height: 1.55; margin-bottom: 0.35rem; }
+.read .sd-tuzak li:last-child { margin-bottom: 0; }
+.read .sd-akil {
+  margin: 1.4rem 0 0; padding: 0.9rem 1rem; border-radius: 12px;
+  background: var(--accent-soft); border: 1px solid var(--line);
+}
+.read .sd-akil .lbl { color: var(--accent-ink); }
+.read .sd-akil p { font-family: var(--sans); font-size: 1rem; font-weight: 600; line-height: 1.5; margin: 0; color: var(--ink); }
+.read .sd-blok .rb-row { grid-template-columns: minmax(6rem, 30%) 1fr; }
+.read .sd-blok .rb-v { color: var(--ink); }
+@media (max-width: 767px) {
+  .read .sd-blok .rb-row { grid-template-columns: 1fr; gap: 0.1rem; }
+  .read .rb-row { grid-template-columns: minmax(5.5rem, 34%) 1fr; }
+  .read .sd-blok { margin-bottom: 1.8rem; }
+  .read .sd-olay { padding: 0.7rem 0.85rem; }
+}
