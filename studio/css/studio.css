@@ -1823,6 +1823,10 @@ body.in-session #view-akim.on {
 }
 .exam-map button.answered { background: var(--accent); color: #fff; }
 .exam-map button.marked { background: var(--warn-soft); color: var(--warn); box-shadow: inset 0 0 0 1px var(--warn); }
+/* Kuşkulu + işaretli: dolgu cevaplı gibi kalır, kuşku yalnız sarı çerçeve. Böylece
+   sarı dolgulu kare yalnız "kuşkulu VE boş" demek; boşlar kaybolmuyor. */
+.exam-map button.answered.marked { background: var(--accent); color: #fff; box-shadow: inset 0 0 0 2px var(--warn); }
+.exam-map button.blank:not(.marked) { box-shadow: inset 0 0 0 1px var(--line-strong); }
 .exam-map button.now { outline: 2px solid var(--ink); outline-offset: 1px; }
 
 .result-hero { text-align: center; padding: 2.5rem 1.5rem; }
