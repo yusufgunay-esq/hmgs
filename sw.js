@@ -4,7 +4,7 @@
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-const VERSION = 'hmgs-v85';
+const VERSION = 'hmgs-v86';
 const SHELL = VERSION + '-shell';
 
 // Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
