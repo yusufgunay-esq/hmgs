@@ -1477,17 +1477,118 @@ export function flowFeed(count = FLOW_BATCH, scope = 'core', opts = {}) {
 }
 
 /**
+ * Akış girişindeki ders seçicisi için ders durumu. Yalnız OKUR.
+ * "Eksik" ölçüsü karma motorunun kendi ölçüsüdür (karmaWeights.netRiskte):
+ * sınavdaki soru sayısı × (hedef isabet − Bayes'le yumuşatılmış isabet), yani
+ * o dersten sınavda beklenen net kaybı. Ham isabet değil: 4 soruda 1 doğru
+ * "%25" diye en üste çıkmasın.
+ */
+export function dersDurumu() {
+  const dueBy = new Map();
+  for (const d of dueQuestions()) dueBy.set(d.q.subjectId, (dueBy.get(d.q.subjectId) || 0) + 1);
+  const rows = karmaWeights().filter(r => r.pool > 0).map(r => ({
+    id: r.id, name: r.name, examQ: r.examQ, seen: r.seen,
+    acc: r.seen >= 5 ? r.acc : null,
+    kayip: r.netRiskte, unseenHmgs: r.unseenHmgs, due: dueBy.get(r.id) || 0
+  }));
+  const sirali = [...rows].sort((a, b) => b.kayip - a.kayip);
+  const eksik = new Set(sirali.slice(0, 3).map(r => r.id));
+  return sirali.map(r => ({ ...r, eksik: eksik.has(r.id) }));
+}
+
+/**
+ * DERS FİLTRELİ AKIŞ (26 Eylül 2026, kullanıcı: "şu an sadece Medeni çözmek istiyorum").
+ * Karma motorunun ders payı, açlık tabanı ve edinim bloğu burada anlamsız: dersi
+ * kullanıcı seçti. Geri kalan kurallar AYNEN korunur, çünkü onlar ders seçiminden
+ * bağımsız doğru: vadesi gelen tekrarlar aynı payla (dueShare) ve aynı öncelikle
+ * (dueQuestions) gelir; yeni malzeme aynı katman sırasıyla (secByTier: görülmemiş
+ * çıkmış → deneme → HMGS benzeri → vadesi gelmiş HMGS → hâkimlik en son).
+ * Birden çok ders seçilirse pay sınav ağırlığıyla (examQ) bölünür ve dersler
+ * harmanlanır. HMGS havuzu biterse ileri havuza düşer; akış boş kalmaz.
+ * @param {string[]} subjectIds
+ * @param {Set<string>} excludeIds  kuyrukta zaten bekleyenler
+ */
+export function flowFeedDers(count = FLOW_BATCH, subjectIds = [], scope = 'core', excludeIds = new Set()) {
+  const ids = subjectIds.filter(id => SUBJECTS.some(s => s.id === id));
+  if (!ids.length) return { questions: [], due: 0 };
+  const secili = new Set(ids);
+  const seenIds = new Set(state().answers.map(a => a.qId));
+  const used = new Set(excludeIds);
+
+  const dueAll = dueQuestions().filter(d => secili.has(d.q.subjectId) && !used.has(d.q.id)
+    && (d.srs.lapses || 0) < SRS_LEECH);
+  const due = dueAll.slice(0, Math.floor(count * dueShare(dueAll, false)));
+  due.forEach(d => used.add(d.q.id));
+
+  const sayac = {
+    hedef: scope === 'core' ? KARMA_TIER_MIX_CORE : KARMA_TIER_MIX,
+    t3Yedek: scope === 'core',
+    alindi: { 1: 0, 2: 0, 3: 0, 4: 0 }, toplam: Math.max(1, count - due.length)
+  };
+  const adaylar = sid => {
+    let c = candidatesOf(sid, used, scope);
+    if (!c.length && scope === 'core') c = candidatesOf(sid, used, 'all');
+    return c;
+  };
+  // Pay: sınav ağırlığıyla orantılı, kalan slot sırayla dağıtılır.
+  const kalan = count - due.length;
+  const agirlik = ids.map(id => ({ id, weight: (SUBJECTS.find(s => s.id === id) || {}).examQ || 1 }));
+  const quota = ids.length === 1 ? new Map([[ids[0], kalan]]) : allocate(agirlik, kalan);
+  const yeni = new Map();
+  let butce = kalan;
+  for (const id of ids) {
+    const want = Math.min(quota.get(id) || 0, butce);
+    if (!want) continue;
+    const c = secByTier(adaylar(id), want, sayac, seenIds);
+    c.forEach(q => used.add(q.id));
+    butce -= c.length;
+    yeni.set(id, c);
+  }
+  // Payını dolduramayan dersin açığı, adayı kalan derslerden kapanır.
+  for (let tur = 0; butce > 0 && tur < 3; tur++) {
+    let eklendi = 0;
+    for (const id of ids) {
+      if (butce <= 0) break;
+      const ek = secByTier(adaylar(id), 1, sayac, seenIds);
+      if (!ek.length) continue;
+      used.add(ek[0].id); butce--; eklendi++;
+      yeni.set(id, (yeni.get(id) || []).concat(ek));
+    }
+    if (!eklendi) break;
+  }
+
+  let out;
+  if (ids.length > 1) {
+    const groups = due.map(d => ({ subjectId: d.q.subjectId, items: [d.q], block: false }))
+      .concat([...yeni].map(([subjectId, items]) => ({ subjectId, items, block: false })));
+    out = interleave(groups);
+  } else {
+    // Tek derste interleave hepsini art arda dizer; tekrarları yeni sorulara yay.
+    const n = yeni.get(ids[0]) || [];
+    const d = due.map(x => x.q);
+    out = [];
+    const adim = d.length ? Math.max(1, Math.floor(n.length / d.length)) : Infinity;
+    let i = 0;
+    for (const q of n) { out.push(q); if (++i % adim === 0 && d.length) out.push(d.shift()); }
+    out.push(...d);
+  }
+  return { questions: out.slice(0, count), due: due.length };
+}
+
+/**
  * Yanlış yapılan sorudan sonra aynı kuralın bir kardeşini döndürür.
  * Tercih sırası: aynı konu (topicId) → aynı ders. Yakın zamanda sorulanlar
  * (excludeIds) ve sorunun kendisi dışlanır. Aday yoksa null (pekiştirme yok,
  * uydurma yok).
  */
-export function flowReinforce(q, excludeIds = new Set(), scope = 'core') {
+export function flowReinforce(q, excludeIds = new Set(), scope = 'core', opts = {}) {
   if (!q) return null;
   // Ders payı tavanı (bkz. FLOW_REINFORCE_MAX): bu ders son pencerede zaten
   // çok yer kapladıysa pekiştirme verilmez, akış kota düzenine geri döner.
+  // Ders filtreli akışta (opts.dersFiltresi) tavan yok: dersi kullanıcı seçti,
+  // tavan orada her yanlıştan sonraki pekiştirmeyi keserdi.
   const sonPencere = state().answers.slice(-FLOW_REINFORCE_WINDOW);
-  if (sonPencere.filter(a => a.subjectId === q.subjectId).length > FLOW_REINFORCE_MAX) return null;
+  if (!opts.dersFiltresi && sonPencere.filter(a => a.subjectId === q.subjectId).length > FLOW_REINFORCE_MAX) return null;
   const skip = new Set(excludeIds);
   skip.add(q.id);
   // 19 Eylül 2026 düzeltmesi. Eskiden havuz her zaman 'all' idi ve katman
