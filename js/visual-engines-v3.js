@@ -83,12 +83,17 @@ window.HMGSV3 = (function () {
 .hv3 .hv3-fsr{display:grid;grid-template-columns:1.5fr repeat(calc(var(--fs-cols) - 1),1fr);gap:1px;background:var(--hv3-line);min-width:460px}
 .hv3 .hv3-fsr>*{background:var(--hv3-surface);padding:11px 13px;font-size:13px;display:flex;align-items:center}
 .hv3 .hv3-fsh>*{background:var(--hv3-raise);font-size:11.5px;font-weight:600;color:var(--hv3-faint);text-transform:uppercase;letter-spacing:.03em}
-.hv3 .hv3-fsname{font-weight:600}
+.hv3 .hv3-fsname{font-weight:600;flex-direction:column;align-items:flex-start!important;justify-content:center;line-height:1.4}
+.hv3 .hv3-fsname .hv3-fssub{display:block;color:var(--hv3-faint);font-weight:500;font-size:12px;margin-top:2px}
 .hv3 .hv3-fscell{font:inherit;font-size:13px;width:100%;justify-content:center;border:1px dashed var(--hv3-line2);border-radius:9px;background:var(--hv3-raise);color:var(--hv3-faint);cursor:pointer;padding:8px 6px;margin:3px;transition:all .15s}
 .hv3 .hv3-fscell:hover:not([disabled]){border-color:var(--hv3-accent);color:var(--hv3-accent-ink)}
 .hv3 .hv3-fscell.active{border-style:solid;border-color:var(--hv3-accent);background:var(--hv3-accent-soft);color:var(--hv3-accent-ink)}
-.hv3 .hv3-fscell.ok{border-style:solid;border-color:var(--hv3-green-ink);background:var(--hv3-green-soft);color:var(--hv3-green-ink);font-weight:600;cursor:default}
-.hv3 .hv3-fscell.no{border-style:solid;border-color:var(--hv3-red-ink);background:var(--hv3-red-soft);color:var(--hv3-red-ink);font-weight:600;cursor:default}
+.hv3 .hv3-fscell.ok{border-style:solid;border-color:var(--hv3-green-ink);background:var(--hv3-green-soft);color:var(--hv3-green-ink);font-weight:600;cursor:pointer}
+.hv3 .hv3-fscell.no{border-style:solid;border-color:var(--hv3-red-ink);background:var(--hv3-red-soft);color:var(--hv3-red-ink);font-weight:600;cursor:pointer}
+.hv3 .hv3-fslog{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.hv3 .hv3-fslog .hv3-askfb{margin:0;opacity:.72;transition:opacity .2s}
+.hv3 .hv3-fslog .hv3-askfb.new{opacity:1;animation:hv3fade .3s ease}
+.hv3 .hv3-fslh{font-size:11.5px;font-weight:600;color:var(--hv3-faint);margin-bottom:3px}
 .hv3 .hv3-fspool{margin-top:13px;background:var(--hv3-raise);border:1px solid var(--hv3-line);border-radius:14px;padding:13px 15px;animation:hv3fade .25s}
 .hv3 .hv3-fspoolq{font-size:13.5px;font-weight:600;margin-bottom:10px}
 .hv3 .hv3-fspoolc{display:flex;flex-wrap:wrap;gap:7px}
@@ -121,7 +126,11 @@ window.HMGSV3 = (function () {
 .hv3 .hv3-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px}
 .hv3 .hv3-chip{background:var(--hv3-surface);border:1px solid var(--hv3-line2);border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:450;cursor:grab;user-select:none;transition:all .15s}
 .hv3 .hv3-chip.placed{opacity:.3;cursor:default;border-color:var(--hv3-line)}
-.hv3 .hv3-bins{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.hv3 .hv3-chip.sel{border-color:var(--hv3-accent);background:var(--hv3-accent-soft);transform:translateY(-1px)}
+.hv3 .hv3-bins.armed .hv3-bin{cursor:pointer;border-color:var(--hv3-accent)}
+.hv3 .hv3-drop .hv3-dwhy{font-weight:450;font-size:12px;line-height:1.5;margin-top:5px;padding-top:5px;border-top:1px solid rgba(127,127,127,.18);color:var(--hv3-ink);opacity:.85}
+.hv3 .hv3-drop.last{animation:hv3fade .3s ease;box-shadow:0 0 0 1.5px currentColor inset}
+.hv3 .hv3-bins{display:grid;grid-template-columns:repeat(var(--bins-cols,3),minmax(0,1fr));gap:11px}
 .hv3 .hv3-bin{background:var(--hv3-raise);border:1.5px dashed var(--hv3-line2);border-radius:16px;padding:15px;min-height:120px;transition:all .18s}
 .hv3 .hv3-bin.over{border-color:var(--hv3-accent);border-style:solid;background:var(--hv3-accent-soft)}
 .hv3 .hv3-bin h4{font-size:13px;font-weight:600;margin-bottom:9px;line-height:1.35}
@@ -261,7 +270,11 @@ window.HMGSV3 = (function () {
 body.hv3-scroll-lock{overflow:hidden}
 
 @media(max-width:600px){
-  .hv3 .hv3-bins{grid-template-columns:1fr}
+  .hv3 .hv3-fsr{min-width:0}
+  .hv3 .hv3-fsr>*{padding:9px 8px}
+  .hv3 .hv3-fscell{font-size:12.5px;margin:2px 0;line-height:1.35}
+  .hv3 .hv3-bins{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .hv3 .hv3-bin{padding:11px;min-height:90px}
   .hv3 .hv3-qopts{grid-template-columns:1fr}
   .hv3 .hv3-gtr{grid-template-columns:1fr!important}
   .hv3 .hv3-gth{display:none}
@@ -485,28 +498,45 @@ body.hv3-scroll-lock{overflow:hidden}
   }
 
   /* ---------- 4) DRAG_CLASSIFY ---------- */
+  /* drag_classify — sürükle-bırak, dokunmatikte "dokun-seç, kutuya dokun".
+     items[].why varsa yerleştirmeden sonra o öğeye özgü gerekçe gösterilir. */
   function dragClassify(root, vd) {
     const bins = vd.bins || [], items = vd.items || [];
     let dragIdx = null, ok = 0;
     const binName = {}; bins.forEach(b => binName[b.id] = b.title);
+    const cols = Math.min(Math.max(bins.length, 1), 3);
     root.innerHTML =
       (vd.title ? `<div class="hv3-h">${vd.title}</div>` : '') +
-      `<div class="hv3-hint">Kalan olaylar</div>
+      `<div class="hv3-hint">${vd.hint || 'Her kartı doğru kutuya taşı (ya da karta dokun, sonra kutuya).'}</div>
        <div class="hv3-chips" data-el="chips"></div>
-       <div class="hv3-bins">${bins.map(b => `<div class="hv3-bin" data-bin="${b.id}"><h4>${b.title}<br><span>${b.sub || ''}</span></h4><div data-drop="${b.id}"></div></div>`).join('')}</div>
-       <div class="hv3-score" data-el="score"></div>`;
+       <div class="hv3-bins" data-el="bins" style="--bins-cols:${cols}">${bins.map(b => `<div class="hv3-bin" data-bin="${b.id}"><h4>${b.title}<br><span>${b.sub || ''}</span></h4><div data-drop="${b.id}"></div></div>`).join('')}</div>
+       <div class="hv3-score" data-el="score"></div>
+       ${vd.trap ? `<div class="hv3-trap"><b>Sınav tuzağı:</b> ${vd.trap}</div>` : ''}`;
     const chipsEl = root.querySelector('[data-el=chips]');
+    const binsEl = root.querySelector('[data-el=bins]');
     items.forEach((it, idx) => {
-      const c = document.createElement('div'); c.className = 'hv3-chip'; c.draggable = true; c.textContent = it.t;
-      c.addEventListener('dragstart', e => { dragIdx = idx; e.dataTransfer.effectAllowed = 'move'; });
+      const c = document.createElement('div'); c.className = 'hv3-chip'; c.draggable = true; c.innerHTML = it.t;
+      c.setAttribute('role', 'button'); c.tabIndex = 0;
+      c.addEventListener('dragstart', e => { dragIdx = idx; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(idx)); } catch (_) {} });
+      c.addEventListener('click', () => select(idx));
       c.dataset.idx = idx; chipsEl.appendChild(c);
     });
     root.querySelectorAll('.hv3-bin').forEach(bin => {
       bin.addEventListener('dragover', e => { e.preventDefault(); bin.classList.add('over'); });
       bin.addEventListener('dragleave', () => bin.classList.remove('over'));
       bin.addEventListener('drop', e => { e.preventDefault(); bin.classList.remove('over'); drop(bin.dataset.bin); });
+      bin.addEventListener('click', () => { if (dragIdx !== null) drop(bin.dataset.bin); });
     });
     updScore();
+    function select(idx) {
+      const chip = chipsEl.querySelector(`[data-idx="${idx}"]`);
+      if (!chip || chip.classList.contains('placed')) return;
+      const same = dragIdx === idx;
+      chipsEl.querySelectorAll('.hv3-chip').forEach(x => x.classList.remove('sel'));
+      dragIdx = same ? null : idx;
+      if (!same) chip.classList.add('sel');
+      binsEl.classList.toggle('armed', dragIdx !== null);
+    }
     function drop(binId) {
       if (dragIdx === null) return;
       const it = items[dragIdx], chip = chipsEl.querySelector(`[data-idx="${dragIdx}"]`);
@@ -514,11 +544,14 @@ body.hv3-scroll-lock{overflow:hidden}
       const correct = it.bin === binId;
       const d = document.createElement('div');
       d.className = 'hv3-drop ' + (correct ? 'hv3-ok' : 'hv3-no');
-      d.textContent = (correct ? '✓ ' : '✗ ') + it.t + (correct ? '' : ` → ${binName[it.bin]}`);
+      d.innerHTML = `<div>${(correct ? '✓ ' : '✗ ') + it.t + (correct ? '' : ` → ${binName[it.bin]}`)}</div>` +
+        (it.why ? `<div class="hv3-dwhy">${it.why}</div>` : '');
+      root.querySelectorAll('.hv3-drop.last').forEach(x => x.classList.remove('last'));
+      d.classList.add('last');
       root.querySelector(`[data-drop="${binId}"]`).appendChild(d);
-      chip.classList.add('placed');
+      chip.classList.remove('sel'); chip.classList.add('placed');
       if (correct) ok++;
-      dragIdx = null; updScore();
+      dragIdx = null; binsEl.classList.remove('armed'); updScore();
     }
     function updScore() {
       const placed = chipsEl.querySelectorAll('.placed').length;
@@ -543,9 +576,9 @@ body.hv3-scroll-lock{overflow:hidden}
       const v = +slider.value;
       root.querySelector('[data-el=val]').textContent = v.toLocaleString('tr-TR');
       root.querySelector('[data-el=th]').innerHTML = thresholds.map(t => {
-        const mode = t.mode || 'gain', reached = v >= t.at;
+        const mode = t.mode || 'gain', reached = mode === 'lose' ? v > t.at : v >= t.at; /* süre, son gün bitene kadar içindedir */
         const active = mode === 'gain' ? reached : !reached;
-        const txt = mode === 'gain' ? (reached ? '✓ artık mümkün' : '· henüz erken') : (reached ? '✗ süre doldu' : '✓ süre içinde');
+        const txt = (reached ? t.after : t.before) || (mode === 'gain' ? (reached ? '✓ artık mümkün' : '· henüz erken') : (reached ? '✗ süre doldu' : '✓ süre içinde'));
         const col = active ? 'var(--hv3-green-ink)' : 'var(--hv3-red-ink)';
         const bg = active ? 'var(--hv3-green-soft)' : 'var(--hv3-red-soft)';
         return `<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 13px;border-radius:10px;background:${bg}"><span style="font-size:13.5px;font-weight:500">${t.label}<small style="display:block;color:var(--hv3-faint);font-weight:500;margin-top:1px">${t.law || ''} · ${t.at} ${unit}</small></span><span style="font-size:12.5px;font-weight:600;color:${col};white-space:nowrap">${txt}</span></div>`;
@@ -1400,8 +1433,8 @@ body.hv3-scroll-lock{overflow:hidden}
       `<div class="hv3-hint">${vd.hint || 'Boş hücreye dokun, sonra doğru değeri seç.'}</div>
        <div class="hv3-fs" data-el="grid"></div>
        <div class="hv3-fspool" data-el="pool" style="display:none"></div>
-       <div class="hv3-askfb" data-el="fb" style="display:none"></div>
-       <div class="hv3-score" data-el="score"></div>` +
+       <div class="hv3-score" data-el="score"></div>
+       <div class="hv3-fslog" data-el="fb"></div>` +
       (vd.caption ? `<div class="hv3-heir-caption">${vd.caption}</div>` : '');
 
     const gridEl = root.querySelector('[data-el=grid]');
@@ -1418,17 +1451,17 @@ body.hv3-scroll-lock{overflow:hidden}
         (headers.length ? `<div class="hv3-fsr hv3-fsh">${headers.map(h => `<div>${h}</div>`).join('')}</div>` : '') +
         rows.map((r, ri) => `
           <div class="hv3-fsr">
-            <div class="hv3-fsname">${r.label || ''}${r.sub ? ` <span style="color:var(--hv3-faint);font-weight:500">· ${r.sub}</span>` : ''}</div>
+            <div class="hv3-fsname">${r.label || ''}${r.sub ? `<span class="hv3-fssub">${r.sub}</span>` : ''}</div>
             ${(r.slots || []).map((s, si) => {
               const k = ri + '-' + si, picked = state[k];
               if (picked === undefined) return `<button class="hv3-fscell" data-k="${k}" type="button">dokun…</button>`;
               const okc = picked === s.answer;
-              return `<button class="hv3-fscell ${okc ? 'ok' : 'no'}" data-k="${k}" type="button" disabled>${okc ? '✓ ' : '✗ '}${picked}${okc ? '' : ` <span style="opacity:.75">→ ${s.answer}</span>`}</button>`;
+              return `<button class="hv3-fscell ${okc ? 'ok' : 'no'}" data-k="${k}" data-done="1" type="button">${okc ? '✓ ' : '✗ '}${picked}${okc ? '' : ` <span style="opacity:.75">→ ${s.answer}</span>`}</button>`;
             }).join('')}
           </div>`).join('');
 
-      gridEl.querySelectorAll('.hv3-fscell:not([disabled])').forEach(b => {
-        b.addEventListener('click', () => openPool(b.dataset.k));
+      gridEl.querySelectorAll('.hv3-fscell').forEach(b => {
+        b.addEventListener('click', () => b.dataset.done ? focusLog(b.dataset.k) : openPool(b.dataset.k));
       });
     }
 
@@ -1460,15 +1493,28 @@ body.hv3-scroll-lock{overflow:hidden}
       drawGrid();
       poolEl.style.display = 'none'; poolEl.innerHTML = '';
       active = null;
-      fbEl.style.display = '';
-      fbEl.className = 'hv3-askfb ' + (okc ? 'ok' : 'no');
-      fbEl.innerHTML = `<b>${okc ? '✓ Doğru' : '✗ Değil'}</b> — ${slot.why || (okc ? 'Kural bu.' : 'Doğrusu: ' + slot.answer)}`;
+      /* Çözümler üst üste yazılmaz: her cevap kendi kaydını alır, en yenisi üstte. */
+      fbEl.querySelectorAll('.hv3-askfb.new').forEach(x => x.classList.remove('new'));
+      const entry = document.createElement('div');
+      entry.className = 'hv3-askfb new ' + (okc ? 'ok' : 'no');
+      entry.dataset.k = k;
+      const lbl = (rows[ri].label || '') + (headers[si + 1] ? ' · ' + headers[si + 1] : '');
+      entry.innerHTML = `<div class="hv3-fslh">${lbl}</div><b>${okc ? '✓ Doğru' : '✗ Değil'}</b> — ${slot.why || (okc ? 'Kural bu.' : 'Doğrusu: ' + slot.answer)}`;
+      fbEl.prepend(entry);
       updScore();
       try {
         window.dispatchEvent(new CustomEvent('hv3-slot-commit', {
           detail: { ok: okc, val: v, answer: slot.answer, label: rows[ri].label, sub: rows[ri].sub }
         }));
       } catch (e) {}
+    }
+
+    function focusLog(k) {
+      const e = fbEl.querySelector(`[data-k="${k}"]`);
+      if (!e) return;
+      fbEl.querySelectorAll('.hv3-askfb.new').forEach(x => x.classList.remove('new'));
+      e.classList.add('new');
+      e.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
     function updScore() {
@@ -1495,8 +1541,8 @@ body.hv3-scroll-lock{overflow:hidden}
          ...ilgili kalıbın kendi alanları }  */
   function predictThenExplore(root, vd) {
     const p = vd.predict || {};
+    /* Başlık simülatöre aittir; iç kalıp kendi başlığını çizer (çift başlık olmasın). */
     root.innerHTML =
-      (vd.title ? `<div class="hv3-h">${vd.title}</div>` : '') +
       `<div class="hv3-ask" data-el="ask"></div>
        <div data-el="inner" style="display:none"></div>`;
     const askEl = root.querySelector('[data-el=ask]');
