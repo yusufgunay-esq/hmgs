@@ -43,7 +43,9 @@ let reviewOpen = false;
 export function startSmart() {
   const s = state();
   const seen = new Map((s.answers || []).map(a => [a.qId, new Date(a.at || 0).getTime()]));
-  const { questions, shortfall, stats } = buildAlgorithmicExamSet(seen);
+  const lastOk = new Map((s.answers || []).map(a => [a.qId, !!a.ok]));
+  const lastWrong = new Set([...lastOk].filter(([, ok]) => !ok).map(([id]) => id));
+  const { questions, shortfall, stats } = buildAlgorithmicExamSet(seen, lastWrong);
   const label = `Akıllı Deneme (${stats.unseen} yeni soru)`;
   return beginExam(questions, {
     shortfall,
@@ -424,6 +426,13 @@ export function eliminateOption(key) {
     currentSet.delete(key);
   } else {
     currentSet.add(key);
+    // 25 Eylül: doğru şıkkı elediği 9 sorunun 6'sı "A, B, C art arda çizildi".
+    // Üçüncü çizgide soru başına bir kez dürt (sınav alışkanlığı, bugünlük eğitim).
+    E.nudged = E.nudged || new Set();
+    if (currentSet.size === 3 && !E.nudged.has(E.i)) {
+      E.nudged.add(E.i);
+      toast('3 şık çizdin. Çizdiklerine bir kez daha bak.');
+    }
   }
   toggleOption('#view-exam', key);
 }
