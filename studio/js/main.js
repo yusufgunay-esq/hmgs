@@ -373,6 +373,7 @@ document.addEventListener('click', async e => {
     case 'exam-pick':   exam.pick(el.dataset.key); break;
     case 'exam-clear':  exam.clear(); break;
     case 'exam-mark':   exam.mark(); break;
+    case 'exam-next-blank': exam.nextBlank(); break;
     case 'exam-goto':   exam.goto(Number(el.dataset.i)); break;
     case 'exam-prev':   exam.prev(); break;
     case 'exam-next':   exam.next(); break;
