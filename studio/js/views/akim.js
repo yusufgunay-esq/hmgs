@@ -32,7 +32,7 @@ import { subjectName, topicById, tierOf } from '../data.js';
 import { recordAnswer, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
 import * as seans from '../seans.js';
 import {
-  scheduleAfterAnswer, flowFeed, flowReinforce, flowMilestone, hmgsCoverage,
+  scheduleAfterAnswer, flowFeed, flowFeedDers, dersDurumu, flowReinforce, flowMilestone, hmgsCoverage,
   hmgsMap, hmgsMapRow, tileState, answersSincePrev, calibration, CONF,
   FLOW_REFILL_AT, FLOW_REINFORCE_DELAY, FLOW_BATCH
 } from '../engine.js';
@@ -44,6 +44,10 @@ import { buildGeminiPrompt, queueSessionForTakip, pushSessionToDriveDirectly, pu
 let A = null;       // aktif akış seansı
 let tick = null;    // süre sayacı
 let lastRun = null; // kapanış ekranı özeti
+// Giriş ekranındaki ders seçimi. Bilerek kalıcı DEĞİL (localStorage yok): unutulan
+// bir filtre ertesi gün karma akışı sessizce tek derse kilitlemesin.
+let seciliDers = new Set();
+let dersPaneliAcik = false;
 
 export function hasSession() { return !!A; }
 /** Ekrandaki soru (test ve teşhis için; salt okunur kullan). */
@@ -59,13 +63,18 @@ export function currentQuestion() { return A && A.queue[0] || null; }
  */
 export function start(opts = {}) {
   const scope = opts.scope || 'core';
+  // Ders filtresi yalnız açıkça verilirse uygulanır (giriş ekranı). Bugün rotası
+  // ve diğer kapılar filtresiz, yani karma akış hiç değişmedi.
+  const dersler = Array.isArray(opts.dersler) ? opts.dersler.filter(Boolean) : [];
   // Oturum boyu edinim-bloğu hafızası: sonu olmayan kuyruk buildKarmaSet'i
   // her dolumda yeniden çağırır ve motor "cevaplanmış" sayıya bakar — bir
   // bloğun soruları kuyrukta bekleyip henüz cevaplanmadıysa motor kendi
   // başına dersi hâlâ "taze" sanır ve ikinci bir blok verir (ölçüldü, 18
   // Eylül 2026). Bu Set'i biriktirip her çağrıya geri vermek bunu keser.
   const blockedSubjects = new Set();
-  const f = flowFeed(FLOW_BATCH, scope, { blockedSubjects });
+  const f = dersler.length
+    ? flowFeedDers(FLOW_BATCH, dersler, scope)
+    : flowFeed(FLOW_BATCH, scope, { blockedSubjects });
   (f.blockedThisCall || []).forEach(id => blockedSubjects.add(id));
   // usedIds = şu an KUYRUKTA olan sorular. Eskiden son 50 cevap ve oturumda
   // cevaplanan her soru da buradaydı; tekrar politikası v3'te (soru sayacı)
@@ -76,7 +85,9 @@ export function start(opts = {}) {
 
   A = {
     scope,
-    label: opts.label || 'Akış',
+    dersler,
+    label: opts.label || (dersler.length === 1 ? `Akış · ${subjectName(dersler[0])}`
+      : dersler.length ? `Akış · ${dersler.length} ders` : 'Akış'),
     hedef: Number(opts.hedef) || 0,   // Bugün rotasının bu akışa verdiği pay (0 = yok)
     hedefTamam: false,
     queue: [],            // sıradaki sorular (baş = şu anki)
@@ -317,10 +328,57 @@ function landingHTML() {
       <div><b>Yanlışlar açık halka olur.</b> Birkaç soru sonra geri gelir; doğru çözünce kare yanar.</div>
       <div><b>On soru bir tur.</b> Bitirince yalnız bir satır özet, ekran kapanmaz.</div>
     </div>
-    <button class="btn akim-go" data-act="akim-start">Akışı Başlat</button>
+    ${dersSeciciHTML()}
     ${fullMapHTML()}
   </div>`;
 }
+
+/* ---------- ders seçici ---------- */
+
+function dersSeciciHTML() {
+  const rows = dersDurumu();
+  const n = seciliDers.size;
+  const baslat = n === 0 ? 'Akışı Başlat · Tüm dersler'
+    : n === 1 ? `Akışı Başlat · ${subjectName([...seciliDers][0])}` : `Akışı Başlat · ${n} ders`;
+  const kart = r => {
+    const on = seciliDers.has(r.id);
+    const isabet = r.acc === null ? `${r.seen} soru` : `%${Math.round(r.acc * 100)} · ${r.seen} soru`;
+    const alt = [isabet, r.due ? `${r.due} tekrar` : '', r.unseenHmgs ? `${r.unseenHmgs} yeni HMGS` : '']
+      .filter(Boolean).join(' · ');
+    return `<button class="akim-ders${on ? ' on' : ''}${r.eksik ? ' eksik' : ''}" data-act="akim-ders" data-id="${esc(r.id)}" aria-pressed="${on}">
+      <span class="akim-ders-ad">${esc(r.name)}</span>
+      <span class="akim-ders-alt">${esc(alt)}</span>
+      <span class="akim-ders-net">−${r.kayip.toFixed(1)} net</span>
+    </button>`;
+  };
+  const eksik = rows.filter(r => r.eksik);
+  const acik = dersPaneliAcik || n > 0;
+  return `<div class="akim-ders-sec">
+    <div class="akim-ders-bas">
+      <b>Eksiğin burada</b>
+      <span>Sınavda bu derslerden beklenen net kaybı en yüksek. Dokun, yalnız onu çöz.</span>
+    </div>
+    <div class="akim-ders-grid">${eksik.map(kart).join('')}</div>
+    ${acik ? `<div class="akim-ders-grid">${rows.filter(r => !r.eksik).map(kart).join('')}</div>`
+      : `<button class="btn-link" data-act="akim-ders-hepsi">Bütün dersler</button>`}
+    <div class="akim-ders-alt-satir">
+      <button class="btn akim-go" data-act="akim-start">${esc(baslat)}</button>
+      ${n ? `<button class="btn-link" data-act="akim-ders-temizle">Seçimi kaldır</button>` : ''}
+    </div>
+  </div>`;
+}
+
+export function toggleDers(id) {
+  if (!id) return;
+  if (seciliDers.has(id)) seciliDers.delete(id); else seciliDers.add(id);
+  render();
+}
+export function dersHepsi() { dersPaneliAcik = true; render(); }
+export function dersTemizle() { seciliDers = new Set(); render(); }
+/** Giriş ekranındaki seçimle akışı başlatır (seçim yoksa karma akış). */
+export function startSecili() { return start({ dersler: [...seciliDers] }); }
+/** Konular ekranından tek derslik akış (seçim, kapanıştaki "Devam" için de tutulur). */
+export function startDers(id) { if (!id) return false; seciliDers = new Set([id]); return start({ dersler: [id] }); }
 
 /** "3 kaçış · toplam 2 dk 10 sn" gibi bir süreyi dk/sn olarak yazar. */
 function fmtDkSn(ms) {
@@ -727,7 +785,7 @@ export function next() {
 
   // Yanlıştan sonra aynı kuraldan kardeş soru kısa gecikmeyle geri gelir.
   if (done && lastLog && !lastLog.ok) {
-    const r = flowReinforce(done, A.usedIds, A.scope);
+    const r = flowReinforce(done, A.usedIds, A.scope, { dersFiltresi: A.dersler.length > 0 });
     if (r) {
       A.queue.splice(Math.min(FLOW_REINFORCE_DELAY, A.queue.length), 0, r);
       A.usedIds.add(r.id);
@@ -747,7 +805,9 @@ export function next() {
 
 function refill() {
   if (A.queue.length >= FLOW_REFILL_AT) return;
-  const f = flowFeed(FLOW_BATCH, A.scope, { blockedSubjects: A.blockedSubjects });
+  const f = A.dersler.length
+    ? flowFeedDers(FLOW_BATCH, A.dersler, A.scope, A.usedIds)
+    : flowFeed(FLOW_BATCH, A.scope, { blockedSubjects: A.blockedSubjects });
   (f.blockedThisCall || []).forEach(id => A.blockedSubjects.add(id));
   for (const q of f.questions) {
     if (!A.usedIds.has(q.id)) { A.queue.push(q); A.usedIds.add(q.id); }
