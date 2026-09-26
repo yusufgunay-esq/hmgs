@@ -124,7 +124,7 @@ function sideHTML(list, t) {
             const on = t && x.id === t.id;
             return `<a href="#" data-act="flow-topic" data-topic="${esc(x.id)}"
               class="${on ? 'on' : ''}${okundu(x.id) ? ' is-read' : ''}" title="${esc(topicHeading(x.title))}">
-              <span class="n">${n}</span><span class="tt">${esc(topicShort(x.title))}</span><span class="dot ${lab.dot}" title="${esc(lab.txt)}"></span>
+              <span class="n">${n}</span><span class="tt">${esc(x.sade && x.sade.baslik ? x.sade.baslik : topicShort(x.title))}</span><span class="dot ${lab.dot}" title="${esc(lab.txt)}"></span>
             </a>`;
           }).join('') || '<p class="hint fl-empty">Eşleşen konu yok.</p>'}
         </nav>
@@ -160,8 +160,70 @@ function seritHTML(sid) {
   </div>`;
 }
 
+/* ---------- madde temizliği ----------
+   HMGS kanun maddesinin numarasını sormuyor; okurken göz de takılmasın.
+   Sayılar (süre, yeter sayı, tutar) kalır, yalnız "m. 12" türü künye gider. */
+const MADDE_PAREN = /\s*\((?:[^()]*?(?:\bm\.|\bmd\.|\bmadde|sayılı|\bsk\b)\s*\d[^()]*|[A-ZÇĞİÖŞÜ]{2,6}\s*\d[\d\/]*)\)/g;
+const MADDE_ONEK = /(?:\d{3,4}\s*sayılı\s*[^,.;]{0,40}?\s*)?(?:(?<![A-Za-zÇĞİÖŞÜçğıöşü])[A-ZÇĞİÖŞÜ]{2,6}\s+)?(?<![A-Za-zçğıöşü])(?:[mM]\.|md\.|madde)\s*\d[\dIVX\/.,\-–&\s]*(?:ve\s*\d[\d\/]*\s*)?(?:uyarınca|gereğince|hükmüne göre|hükmü gereği|kapsamında|uyarinca|’(?:ye|ya|e|a)\s*göre|'(?:ye|ya|e|a)\s*göre)\s*,?\s*/g;
+const MADDE_CIPLAK = /\s*[,;]?\s*(?<![A-Za-zÇĞİÖŞÜçğıöşü])(?:[A-ZÇĞİÖŞÜ]{2,6}\s+)?(?<![A-Za-zçğıöşü])[mM]d?\.\s*\d[\dIVX\/\-–]*(?:[.,]\d+)*(?:\s*(?:&|ve|,)\s*(?:[mM]\.\s*)?\d[\dIVX\/\-–]*)*(?:['’][a-zçğıöşü]{1,4})?/g;
+function maddesiz(s) {
+  let out = String(s || '')
+    .replace(/`[^`]*\bm\.\s*\d[^`]*`/g, '')
+    .replace(MADDE_PAREN, '')
+    .replace(MADDE_ONEK, '')
+    .replace(MADDE_CIPLAK, '')
+    .replace(/\(\s*[,;&]?\s*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .replace(/^[\s,;:]+/, '')
+    .replace(/(^|[.!?]\s+)([a-zçğıöşü])/g, (m, a, b) => a + b.toLocaleUpperCase('tr'))
+    .trim();
+  return out;
+}
+/** "TMK m. 8 & m. 28 — Hak Ehliyeti" → "Hak Ehliyeti"; yalnız künyeyse boş. */
+function refBaslik(ref) {
+  const parca = String(ref || '').split(/\s+[—–]\s+/);
+  const kuyruk = parca.length > 1 ? parca.slice(1).join(' – ') : '';
+  const b = maddesiz(kuyruk || (/\bm\.\s*\d/.test(parca[0]) ? '' : parca[0]));
+  return b.replace(/^[-–—:\s]+/, '');
+}
+const temizBaslik = title => maddesiz(topicHeading(title)).replace(/\s*[-–—:]\s*$/, '');
+
+/* ---------- sade okuma (topics.js → t.sade) ----------
+   sade = { giris, bloklar:[{ b, m, o }], tuzak:[...], akil }
+   b başlık · m anlatım (richBlock) · o örnek olay */
+function sadeHTML(t, list, i, qs) {
+  const S = t.sade;
+  return `
+    <p class="fl-eyebrow">${esc(subjectName(t.subjectId))} · Konu ${i + 1} / ${list.length}</p>
+    <h2>${esc(S.baslik || temizBaslik(t.title))}</h2>
+    ${S.giris ? `<p class="sd-giris">${rich(S.giris)}</p>` : ''}
+    ${seritHTML(t.subjectId)}
+    ${(S.bloklar || []).map((k, n) => `
+      <section class="sd-blok">
+        <h3><span class="sd-no">${n + 1}</span>${esc(k.b)}</h3>
+        ${richBlock(k.m || '')}
+        ${k.o ? `<div class="sd-olay"><span class="lbl">Örnek olay</span><p>${rich(k.o)}</p></div>` : ''}
+      </section>`).join('')}
+    <div class="visual-slot" id="visual-slot" data-v3="true"></div>
+    ${(S.tuzak || []).length ? `<div class="trap sd-tuzak">
+      <div class="lbl">Sınavda dikkat</div>
+      <ul>${S.tuzak.map(x => `<li>${rich(x)}</li>`).join('')}</ul>
+    </div>` : ''}
+    ${S.akil ? `<div class="sd-akil"><span class="lbl">Akılda kalsın</span><p>${rich(S.akil)}</p></div>` : ''}
+    <div class="flow-end">
+      ${qs.length
+        ? `<button class="btn" data-act="flow-practice" data-topic="${esc(t.id)}">Bu konunun ${qs.length} sorusunu çöz</button>`
+        : `<button class="btn btn-2" data-act="flow-practice-subject" data-subject="${esc(t.subjectId)}">${esc(subjectName(t.subjectId))} sorularını çöz</button>`}
+    </div>
+    ${pagerHTML(list, i)}`;
+}
+
 function topicHTML(t, list) {
   const qs = questionsOfTopic(t.id);
+  if (t.sade && Array.isArray(t.sade.bloklar)) {
+    return sadeHTML(t, list, list.findIndex(x => x.id === t.id), qs);
+  }
   const m = topicMastery(t.id);
   const lab = MASTERY_LABEL[m.state];
   const isV3 = V3_TYPES.has(t.visualType);
@@ -169,8 +231,7 @@ function topicHTML(t, list) {
 
   return `
     <p class="fl-eyebrow">${esc(subjectName(t.subjectId))} · Konu ${i + 1} / ${list.length}</p>
-    <h2>${esc(topicHeading(t.title))}</h2>
-    <div class="basisline">${esc(groupLegalRefs(t.legalBasis) || '')}</div>
+    <h2>${esc(temizBaslik(t.title))}</h2>
 
     ${seritHTML(t.subjectId)}
 
@@ -184,9 +245,9 @@ function topicHTML(t, list) {
     ${kitapVar(t.subjectId) ? ozetEtiketiHTML(t.subjectId) : ''}
     ${(t.chunks || []).map(c => `
       <section>
-        ${c.legalRef ? `<div class="ref">${esc(shortRef(c.legalRef))}</div>` : ''}
-        ${richBlock(c.text || '')}
-        ${c.detail ? detailHTML(c.detail) : ''}
+        ${refBaslik(c.legalRef) ? `<h3 class="sd-h">${esc(refBaslik(c.legalRef))}</h3>` : ''}
+        ${richBlock(maddesiz(c.text || ''))}
+        ${c.detail ? detailHTML(maddesiz(c.detail)) : ''}
       </section>`).join('')}
 
     <div class="visual-slot" id="visual-slot" data-v3="${isV3}"></div>
@@ -195,7 +256,7 @@ function topicHTML(t, list) {
     ${(t.examTraps || []).map(tr => `
       <div class="trap">
         <div class="lbl">Sınav tuzağı</div>
-        <p>${rich(typeof tr === 'string' ? tr : (tr.text || tr.trap || tr.title || ''))}</p>
+        <p>${rich(maddesiz(typeof tr === 'string' ? tr : (tr.desc || tr.text || tr.trap || tr.title || '')))}</p>
       </div>`).join('')}
 
     ${t.interactiveCase ? caseHTML(t.interactiveCase) : ''}
@@ -226,14 +287,14 @@ function caseHTML(c) {
         <span class="hint">göster</span>
       </button>
       <div style="display:none">
-        <p>${rich(c.scenario || '')}</p>
-        ${c.question ? `<p><strong>${rich(c.question)}</strong></p>` : ''}
+        <p>${rich(maddesiz(c.scenario || ''))}</p>
+        ${c.question ? `<p><strong>${rich(maddesiz(c.question))}</strong></p>` : ''}
         <div class="reveal-box" style="margin:0.5rem 0 0">
           <button data-act="reveal">
             <span>${esc(c.solutionTitle || 'Çözüm')}</span>
             <span class="hint">göster</span>
           </button>
-          <div style="display:none">${rich(c.solutionText || '')}</div>
+          <div style="display:none">${rich(maddesiz(c.solutionText || ''))}</div>
         </div>
       </div>
     </div>`;
@@ -305,6 +366,7 @@ function mountVisual(t) {
   if (!t.visualData) { slot.remove(); return; }
 
   const isV3 = V3_TYPES.has(t.visualType);
+  if (t.sade && !isV3) { slot.remove(); return; }
 
   if (isV3 && window.HMGSV3 && typeof window.HMGSV3.render === 'function') {
     slot.classList.add('hv3-host');
