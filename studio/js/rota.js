@@ -44,6 +44,7 @@ import { state, todayKey, lastExam, EXAM_DATE } from './store.js';
 import { dueQuestions, leechQuestions, karmaWeights, isDeadlinesQuestion, BOXES } from './engine.js';
 import { denemeLabel, arsivLabel } from './labels.js';
 import { HAP } from './hap-data.js';
+import { denemeAraligi } from './koc.js';
 
 /* ---------- ayarlar (ölçekler, sabit takvim değil) ---------- */
 
@@ -450,9 +451,13 @@ export function rota(opts = {}) {
   const ex = lastExam();
   const denemeBugun = (S.exams || []).some(e => gunOf(e.at) === today);
   const yas = ex ? gunFarki(gunOf(ex.at), today) : Infinity;
-  // Her gün bir tam deneme (kullanıcı kararı, 23 Eylül 2026 akşam). Saate
-  // bağlı değil: geç kalkılan gün deneme yanmaz, 10:15 yalnız öneri.
-  const denemeGerek = !opts.examActive && D >= 1;
+  // Tam deneme sıklığı sınava kalan güne göre kademelidir (koc.js
+  // denemeAraligi): uzakta haftada bir, yaklaştıkça sıklaşır, son hafta her
+  // gün. "Her gün tam deneme" yalnız son haftanın kuralıydı; 5 aylık ufukta
+  // her gün 120 soru öğrenmeyi bitirir — deneme ölçer, öğretmez. Saate bağlı
+  // değil: geç kalkılan gün deneme yanmaz, 10:15 yalnız öneri.
+  const denemeAra = denemeAraligi(D);
+  const denemeGerek = !opts.examActive && D >= 1 && yas >= denemeAra;
   let denemeAdimi = null;
   if (denemeBugun) {
     const e = (S.exams || []).filter(x => gunOf(x.at) === today).slice(-1)[0];

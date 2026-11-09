@@ -41,6 +41,7 @@ studio/js/gen/kira.js
 studio/js/gen/miras.js
 studio/js/kitap.js
 studio/js/kitaplar.js
+studio/js/koc.js
 studio/js/kural.js
 studio/js/legacy-adapt.js
 studio/js/main.js
