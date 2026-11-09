@@ -4,7 +4,7 @@
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-const VERSION = 'hmgs-v64';
+const VERSION = 'hmgs-v78';
 const SHELL = VERSION + '-shell';
 
 // Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
@@ -23,6 +23,7 @@ const PRECACHE = [
   './js/visual-engines-v3.js',
   './studio/css/studio.css',
   './studio/css/studio-mobile.css',
+  './studio/css/notlar.css',
   './studio/js/main.js',
   './studio/js/data.js',
   './studio/js/labels.js',
@@ -40,6 +41,10 @@ const PRECACHE = [
   './studio/js/kitap.js',
   './studio/js/kitaplar.js',
   './studio/js/tuyolar.js',
+  './studio/js/notlar-data.js',
+  './studio/js/hap-data.js',
+  './studio/js/not-eslesme.js',
+  './studio/js/views/notlar.js',
   './studio/js/views/today.js',
   './studio/js/views/odevler.js',
   './studio/js/views/flow.js',

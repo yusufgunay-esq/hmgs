@@ -13273,7 +13273,7 @@ const QUESTIONS_AI_DATA = [
     "topicId": "tpc_medeni_003",
     "topicTitle": "3. Sınırlı Ehliyetsizler (Ayırt Etme Gücüne Sahip Küçük ve Kısıtlılar - TMK m. 16)",
     "qNumber": 36,
-    "stem": "4721 sayılı Türk Medeni Kanunu'na göre özgürlüğü bağlayıcı bir cezaya hükümlü olan ergin, en az ne kadar süreli bir cezaya hükümlü olursa kısıtlanır?",
+    "stem": "4721 sayılı Türk Medeni Kanunu'na göre, ceza infaz kurumunda bulunan hükümlü bir erginin kendi isteği bulunmasa dahi kişiliğinin veya malvarlığının korunması amacıyla vesayet makamınca kısıtlanabilmesi için kesinleşmiş hapis cezasının toplam süresi en az ne kadar olmalıdır?",
     "options": [
       {
         "key": "A",
@@ -13296,9 +13296,9 @@ const QUESTIONS_AI_DATA = [
         "text": "Beş yıl"
       }
     ],
-    "correct": "B",
-    "explanation": "Doğru cevap: B. 4721 sayılı TMK m. 407 uyarınca bir yıl veya daha uzun süreli özgürlüğü bağlayıcı bir cezaya hükümlü olan her ergin kısıtlanır. Ceza infaz kurumu yetkilileri bu durumu vesayet makamına bildirmekle yükümlüdür.\n• A şıkkı: Altı aylık ceza kısıtlama sebebi değildir.\n• C şıkkı: İki yıl, kanunun aradığı sınırın üzerindedir; kısıtlama bir yıllık cezayla başlar.\n• D şıkkı: Üç yıl, kanunun aradığı sınırın üzerindedir.\n• E şıkkı: Beş yıl, kanunun aradığı sınırın üzerindedir.",
-    "legalBasis": "4721 sayılı TMK m. 407",
+    "correct": "E",
+    "explanation": "Doğru cevap: E. 4721 sayılı TMK m. 407 (7499 sayılı Kanun değişikliği) uyarınca toplam beş yıl veya daha fazla kesinleşmiş hapis cezasının infazı amacıyla ceza infaz kurumunda bulunan ergin bir kişi, isteği bulunmasa dahi kişiliğinin veya malvarlığının korunması bakımından zorunlu görülmesi hâlinde vesayet makamınca kısıtlanabilir. Hükümlünün kendi isteğiyle kısıtlanmasında veya kendisine kayyım atanmasında ise ceza süresi sınırı aranmaz (eski metindeki bir yıl şartı yürürlükten kalkmıştır).\n• A şıkkı: Altı aylık ceza istek dışı kısıtlama sebebi değildir.\n• B şıkkı: Bir yıl, 12 Mart 2024 öncesi mülga kanunun aradığı sınırdı; güncel kanunda istek dışı kısıtlama için en az beş yıl şartı aranır.\n• C şıkkı: İki yıl kanuni sınırın altındadır.\n• D şıkkı: Üç yıl kanuni sınırın altındadır.",
+    "legalBasis": "4721 sayılı TMK m. 407 (7499 sk m. 10)",
     "difficulty": "orta",
     "source": "ai_hmgs_benzeri",
     "category": "HMGS Benzeri (AI)",

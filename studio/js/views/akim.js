@@ -1,4 +1,7 @@
-/* ==========================================================================
+/* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
+   بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+   رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ
+   ==========================================================================
    views/akim.js — AKIŞ MODU: SONU OLMAYAN SORU AKIŞI
    ----------------------------------------------------------------------
    practice.js'ten farkı: seans özeti ekranı YOK. Tek soru → cevap → anında
@@ -29,7 +32,7 @@ import { subjectName, topicById, tierOf } from '../data.js';
 import { recordAnswer, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
 import * as seans from '../seans.js';
 import {
-  scheduleAfterAnswer, flowFeed, flowReinforce, flowMilestone, hmgsCoverage,
+  scheduleAfterAnswer, flowFeed, flowFeedDers, dersDurumu, flowReinforce, flowMilestone, hmgsCoverage,
   hmgsMap, hmgsMapRow, tileState, answersSincePrev, calibration, CONF,
   FLOW_REFILL_AT, FLOW_REINFORCE_DELAY, FLOW_BATCH
 } from '../engine.js';
@@ -41,6 +44,9 @@ import { buildGeminiPrompt, queueSessionForTakip, pushSessionToDriveDirectly, pu
 let A = null;       // aktif akış seansı
 let tick = null;    // süre sayacı
 let lastRun = null; // kapanış ekranı özeti
+// Giriş ekranındaki ders seçimi. Bilerek kalıcı DEĞİL (localStorage yok): unutulan
+// bir filtre ertesi gün karma akışı sessizce tek derse kilitlemesin.
+let seciliDers = new Set();
 
 export function hasSession() { return !!A; }
 /** Ekrandaki soru (test ve teşhis için; salt okunur kullan). */
@@ -56,13 +62,18 @@ export function currentQuestion() { return A && A.queue[0] || null; }
  */
 export function start(opts = {}) {
   const scope = opts.scope || 'core';
+  // Ders filtresi yalnız açıkça verilirse uygulanır (giriş ekranı). Bugün rotası
+  // ve diğer kapılar filtresiz, yani karma akış hiç değişmedi.
+  const dersler = Array.isArray(opts.dersler) ? opts.dersler.filter(Boolean) : [];
   // Oturum boyu edinim-bloğu hafızası: sonu olmayan kuyruk buildKarmaSet'i
   // her dolumda yeniden çağırır ve motor "cevaplanmış" sayıya bakar — bir
   // bloğun soruları kuyrukta bekleyip henüz cevaplanmadıysa motor kendi
   // başına dersi hâlâ "taze" sanır ve ikinci bir blok verir (ölçüldü, 18
   // Eylül 2026). Bu Set'i biriktirip her çağrıya geri vermek bunu keser.
   const blockedSubjects = new Set();
-  const f = flowFeed(FLOW_BATCH, scope, { blockedSubjects });
+  const f = dersler.length
+    ? flowFeedDers(FLOW_BATCH, dersler, scope)
+    : flowFeed(FLOW_BATCH, scope, { blockedSubjects });
   (f.blockedThisCall || []).forEach(id => blockedSubjects.add(id));
   // usedIds = şu an KUYRUKTA olan sorular. Eskiden son 50 cevap ve oturumda
   // cevaplanan her soru da buradaydı; tekrar politikası v3'te (soru sayacı)
@@ -73,7 +84,9 @@ export function start(opts = {}) {
 
   A = {
     scope,
-    label: opts.label || 'Akış',
+    dersler,
+    label: opts.label || (dersler.length === 1 ? `Akış · ${subjectName(dersler[0])}`
+      : dersler.length ? `Akış · ${dersler.length} ders` : 'Akış'),
     hedef: Number(opts.hedef) || 0,   // Bugün rotasının bu akışa verdiği pay (0 = yok)
     hedefTamam: false,
     queue: [],            // sıradaki sorular (baş = şu anki)
@@ -200,6 +213,7 @@ export function render() {
     </div>`;
 
   if (!A.answered) {
+    /* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ · بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ · رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ */
     A.armed = null;
     A.qStart = performance.now();
     seans.qBegin();
@@ -308,15 +322,79 @@ function landingHTML() {
     <h1 class="page">Akış</h1>
     <p class="page-sub">Her kare bir HMGS sorusu. Doğru çözüp oturttuğun kare yanar ve bir daha sönmez;
       gelmediğin gün hiçbir şey kaybolmaz.</p>
+    ${dersSeciciHTML()}
     <div class="akim-how">
       <div><b>Şıkkı seç, bahsini koy.</b> Eminim · Sanırım · Mantıkla. “Mantıkla” dediğin soru, doğru çıksa bile tekrar gelir. Emin olduğun bir yanlış, en iyi öğrenilen hatadır.</div>
       <div><b>Yanlışlar açık halka olur.</b> Birkaç soru sonra geri gelir; doğru çözünce kare yanar.</div>
       <div><b>On soru bir tur.</b> Bitirince yalnız bir satır özet, ekran kapanmaz.</div>
     </div>
-    <button class="btn akim-go" data-act="akim-start">Akışı Başlat</button>
     ${fullMapHTML()}
   </div>`;
 }
+
+/* ---------- ders seçici ----------
+   26 Eylül 2026 akşam: en çok net kaybettiren üç ders kart, geri kalanı tek
+   satırlık çipler. Aynı seçici kapanış ekranında da durur; eskiden kapanış
+   yalnız "Devam" gösteriyordu ve başka derse geçmek için sayfayı yenilemek
+   gerekiyordu. */
+
+const netYaz = n => `−${n.toFixed(1).replace('.', ',')}`;
+
+function dersSeciciHTML(kapanis = false) {
+  const rows = dersDurumu();
+  const n = seciliDers.size;
+  const secili = [...seciliDers];
+  const ad = n === 1 ? subjectName(secili[0]) : `${n} ders`;
+  const baslat = kapanis
+    ? (n ? `Devam · ${ad}` : 'Akışa devam')
+    : (n ? `Başlat · ${ad}` : 'Başlat · Bütün dersler');
+  const tik = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.4l2.9 2.8 6.1-6.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  const kart = r => {
+    const on = seciliDers.has(r.id);
+    const meta = [r.acc === null ? `${r.seen} soru` : `%${Math.round(r.acc * 100)} isabet`,
+      r.unseenHmgs ? `${r.unseenHmgs} yeni` : '', r.due ? `${r.due} tekrar` : ''].filter(Boolean).join(' · ');
+    return `<button class="ak-kart${on ? ' on' : ''}" data-act="akim-ders" data-id="${esc(r.id)}" aria-pressed="${on}">
+      <span class="ak-kart-ust"><span class="ak-kart-ad">${esc(r.name)}</span><span class="ak-tik">${tik}</span></span>
+      <span class="ak-kart-net"><b>${netYaz(r.kayip)}</b> net</span>
+      <span class="ak-kart-meta">${esc(meta)}</span>
+    </button>`;
+  };
+  const cip = r => {
+    const on = seciliDers.has(r.id);
+    return `<button class="ak-cip${on ? ' on' : ''}" data-act="akim-ders" data-id="${esc(r.id)}" aria-pressed="${on}" title="Beklenen net kaybı">
+      <span class="ak-tik">${tik}</span><span>${esc(r.name)}</span><span class="ak-cip-n">${netYaz(r.kayip)}</span>
+    </button>`;
+  };
+
+  return `<section class="ak-sec${kapanis ? ' kapanis' : ''}">
+    <div class="ak-sec-bas">
+      <span class="ak-etiket">Eksiğin burada</span>
+      ${n ? `<button class="ak-temizle" data-act="akim-ders-temizle">Seçimi kaldır</button>` : ''}
+    </div>
+    <div class="ak-kartlar">${rows.filter(r => r.eksik).map(kart).join('')}</div>
+    <span class="ak-etiket">Diğer dersler</span>
+    <div class="ak-cipler">${rows.filter(r => !r.eksik).map(cip).join('')}</div>
+    <div class="ak-basla">
+      <button class="btn akim-go" data-act="akim-start">${esc(baslat)}</button>
+      <span class="ak-basla-not">${n ? 'Yalnız seçtiğin dersler gelir.' : 'Seçmezsen bütün dersler karışık gelir.'}</span>
+    </div>
+  </section>`;
+}
+
+export function toggleDers(id) {
+  if (!id) return;
+  if (seciliDers.has(id)) seciliDers.delete(id); else seciliDers.add(id);
+  render();
+}
+export function dersHepsi() { render(); }
+export function dersTemizle() { seciliDers = new Set(); render(); }
+/** Menüden Akış'a gelindiğinde eski kapanış özeti yerine giriş ekranı açılsın. */
+export function kapanisiKapat() { if (!A) lastRun = null; }
+/** Giriş ekranındaki seçimle akışı başlatır (seçim yoksa karma akış). */
+export function startSecili() { return start({ dersler: [...seciliDers] }); }
+/** Konular ekranından tek derslik akış (seçim, kapanıştaki "Devam" için de tutulur). */
+export function startDers(id) { if (!id) return false; seciliDers = new Set([id]); return start({ dersler: [id] }); }
 
 /** "3 kaçış · toplam 2 dk 10 sn" gibi bir süreyi dk/sn olarak yazar. */
 function fmtDkSn(ms) {
@@ -377,9 +455,7 @@ function closingHTML(run) {
     </div>
     ${calHTML}
 
-    <div class="btn-row" style="margin:1.25rem 0 0.5rem">
-      <button class="btn akim-go" data-act="akim-start">Akışa Devam Et</button>
-    </div>
+    ${dersSeciciHTML(true)}
     <button class="btn-link" data-act="go-today">Bugün ekranına dön</button>
     <p class="hint" style="margin:0.75rem 0 1.25rem">Bu akışın çözümleri çalışma kaydına (Takip) yazıldı. ${coverageLine()}</p>
     ${fullMapHTML(run.litIds)}
@@ -463,7 +539,7 @@ export function pick(key, conf = 'think') {
 
   const row = recordAnswer(q, key, ms, 'flow', {
     usedElim: A.elimUsed, askedGemini: A.geminiAsked, rawMs: t.rawMs, idleMs: t.idleMs,
-    logicGuess: CONF[c].logic
+    logicGuess: CONF[c].logic, ...elimFlags(q)
   });
   row.conf = c;
   const sched = scheduleAfterAnswer(q.id, row.ok, CONF[c].logic);
@@ -481,7 +557,7 @@ export function dontKnow() {
   A.armed = null;
   stopTick();
 
-  const row = recordAnswer(q, null, ms, 'flow', { usedElim: A.elimUsed, askedGemini: A.geminiAsked, rawMs: t.rawMs, idleMs: t.idleMs });
+  const row = recordAnswer(q, null, ms, 'flow', { usedElim: A.elimUsed, askedGemini: A.geminiAsked, rawMs: t.rawMs, idleMs: t.idleMs, ...elimFlags(q) });
   const sched = scheduleAfterAnswer(q.id, false);
   save();
   finishAnswer(q, null, row, sched, ms, before);
@@ -516,6 +592,11 @@ export function verdictOf(row, sched, entry) {
   if (sched && sched.kind === 'mezun') {
     const g = entry && entry.gap != null ? `${entry.gap} soru önce yanlış yapmıştın. ` : '';
     return { head: 'Oturdu', sub: `${g}Bu sefer doğru: kare yandı, tekrar sırasından çıktı.`, tone: 'win' };
+  }
+  if (row.elimTrap) {
+    return row.ok
+      ? { head: 'Doğru, ama doğru şıkkı çizmiştin', sub: 'Sonradan döndün. Sınavda çizdiğin şıkka dönmeyebilirsin; çizmeden önce bir kez daha oku.', tone: 'hyper' }
+      : { head: 'Doğru şıkkı çizmişsin', sub: `Doğru cevap ${row.correctKey}, onu elemiştin. Açıklamada ${row.correctKey} şıkkının neden doğru olduğuna bak.`, tone: 'hyper' };
   }
   const c = row.conf;
   if (c === 'hint') {
@@ -718,7 +799,7 @@ export function next() {
 
   // Yanlıştan sonra aynı kuraldan kardeş soru kısa gecikmeyle geri gelir.
   if (done && lastLog && !lastLog.ok) {
-    const r = flowReinforce(done, A.usedIds, A.scope);
+    const r = flowReinforce(done, A.usedIds, A.scope, { dersFiltresi: A.dersler.length > 0 });
     if (r) {
       A.queue.splice(Math.min(FLOW_REINFORCE_DELAY, A.queue.length), 0, r);
       A.usedIds.add(r.id);
@@ -729,6 +810,7 @@ export function next() {
 
   // Soru bazlı sinyalleri sıfırla
   A.elimUsed = false;
+  A.elimNudged = false;
   A.geminiAsked = false;
   A.geminiAskedPreAnswer = false;
   A.answered = false;
@@ -737,7 +819,9 @@ export function next() {
 
 function refill() {
   if (A.queue.length >= FLOW_REFILL_AT) return;
-  const f = flowFeed(FLOW_BATCH, A.scope, { blockedSubjects: A.blockedSubjects });
+  const f = A.dersler.length
+    ? flowFeedDers(FLOW_BATCH, A.dersler, A.scope, A.usedIds)
+    : flowFeed(FLOW_BATCH, A.scope, { blockedSubjects: A.blockedSubjects });
   (f.blockedThisCall || []).forEach(id => A.blockedSubjects.add(id));
   for (const q of f.questions) {
     if (!A.usedIds.has(q.id)) { A.queue.push(q); A.usedIds.add(q.id); }
@@ -870,6 +954,20 @@ function finalizeRun() {
 
 /* ---------- şık / öncül eleme (görsel, cevap kaydı değil) ---------- */
 
+/** Cevap anındaki eleme durumu (şıklar DOM'da çizili tutulur). 26 Eylül 2026:
+ *  eskiden akışta yalnız "eleme yapıldı mı" yazılıyordu; hangi şıkkın çizildiği
+ *  kaybolduğu için "doğru şıkkı eledim mi" sorusu yalnız denemede ölçülebiliyordu. */
+function struckKeys() {
+  return $$opts().filter(b => b.classList.contains('struck-manual') || b.classList.contains('struck-auto'))
+    .map(b => b.dataset.key).filter(Boolean);
+}
+function elimFlags(q) {
+  const el = struckKeys();
+  if (!el.length) return {};
+  const left = (q.options || []).map(o => o.key).filter(k => !el.includes(k));
+  return { eliminatedOptions: el, elimTrap: el.includes(q.correct), dilemma5050: left.length === 2 };
+}
+
 export function eliminateOption(key) {
   if (!A || A.answered) return;
   A.elimUsed = true;
@@ -878,7 +976,13 @@ export function eliminateOption(key) {
     $$opts().forEach(b => b.classList.remove('armed'));
     const bet = $('#akim-bet'); if (bet) bet.hidden = true;
   }
-  toggleOption('#view-akim', key);
+  const on = toggleOption('#view-akim', key);
+  // 25 Eylül denemesi: doğru şıkkı elediği 9 sorunun 6'sında A, B, C art arda
+  // çizilip D/E'ye gidilmişti. Üçüncü çizgide bir kez dürt, soru başına bir kez.
+  if (on && !A.elimNudged && $$opts().filter(b => b.classList.contains('struck-manual')).length === 3) {
+    A.elimNudged = true;
+    toast('3 şık çizdin. Çizdiklerine bir kez daha bak.');
+  }
 }
 
 export function eliminatePremise(numeral) {

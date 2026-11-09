@@ -75,7 +75,7 @@
       <!-- Sınav Sayacı / Rozet -->
       <div id="countdownBadge" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300">
         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span id="countdownText">27 Eylül 2026</span>
+        <span id="countdownText">25 Nisan 2027</span>
       </div>
     </div>
   </header>
@@ -97,7 +97,7 @@
         <div class="flex-1">
           <div class="flex items-center gap-2.5 mb-2.5 flex-wrap">
             <span class="text-xs font-mono font-semibold px-2.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-              27 Eylül Odaklı
+              25 Nisan Odaklı
             </span>
             <span class="text-xs font-mono text-slate-400">
               19 Günlük Okuma Planı
@@ -220,12 +220,12 @@
 
   <script>
     try {
-      const examDate = new Date('2026-09-27T10:15:00');
+      const examDate = new Date('2027-04-25T10:15:00');
       const now = new Date();
       const diffTime = examDate - now;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays > 0) {
-        document.getElementById('countdownText').textContent = `HMGS: ${diffDays} gün kaldı (27 Eylül 2026)`;
+        document.getElementById('countdownText').textContent = `HMGS: ${diffDays} gün kaldı (25 Nisan 2027)`;
       }
     } catch(e) {}
   </script>

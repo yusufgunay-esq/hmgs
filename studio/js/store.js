@@ -13,8 +13,8 @@
 const KEY = 'hmgs_studio_v1';
 const SCHEMA = 1;
 
-/** Sınav: 2026-HMGS/2 */
-export const EXAM_DATE = new Date('2026-09-27T10:15:00');
+/** Sınav: 2027-HMGS/1 (Nisan 2027, Pazar). Saat 10:15 önceki dönemle aynı varsayım. */
+export const EXAM_DATE = new Date('2027-04-25T10:15:00');
 /** 120 soru, yanlış cezası yok → net = doğru sayısı. Baraj 70 puan = 84 doğru. */
 export const EXAM_TOTAL = 120;
 export const PASS_CORRECT = 84;
@@ -153,6 +153,9 @@ export function recordAnswer(q, chosen, ms, mode, flags = {}) {
     logicGuess: !!flags.logicGuess,
     attentionError: false,
     usedElim: !!flags.usedElim,
+    elimTrap: !!flags.elimTrap,
+    dilemma5050: !!flags.dilemma5050,
+    eliminatedOptions: Array.isArray(flags.eliminatedOptions) && flags.eliminatedOptions.length ? flags.eliminatedOptions : undefined,
     askedGemini: !!flags.askedGemini,
     ms: Math.max(0, Math.round(ms)),
     // rawMs: soru ekranda kaldığı toplam süre. idleMs: bunun boşa geçen
@@ -171,6 +174,9 @@ export function recordAnswer(q, chosen, ms, mode, flags = {}) {
   if (row.rawMs === undefined) delete row.rawMs;
   if (row.idleMs === undefined) delete row.idleMs;
   if (row.set === undefined) delete row.set;
+  if (row.elimTrap === false) delete row.elimTrap;
+  if (row.dilemma5050 === false) delete row.dilemma5050;
+  if (row.eliminatedOptions === undefined) delete row.eliminatedOptions;
   S.answers.push(row);
   return row;
 }
@@ -198,6 +204,35 @@ export function markLastAnswerAttention(flag = true) {
   last.attentionError = !!flag;
   save();
   return last;
+}
+
+/**
+ * Deneme sinavindaki belirli bir sorunun yanlis cevabini dikkat hatasi olarak etiketler veya kaldirir.
+ * @param {string} qId
+ * @param {boolean} flag
+ * @param {string} [examAt]
+ */
+export function markExamAnswerAttention(qId, flag = true, examAt = null) {
+  if (!S.answers.length) return null;
+  for (let i = S.answers.length - 1; i >= 0; i--) {
+    const a = S.answers[i];
+    if (a.qId === qId && a.mode === 'exam') {
+      if (!examAt || !a.at || a.at.startsWith(examAt.slice(0, 10)) || Math.abs(new Date(a.at) - new Date(examAt)) < 3600000) {
+        a.attentionError = !!flag;
+        save();
+        return a;
+      }
+    }
+  }
+  for (let i = S.answers.length - 1; i >= 0; i--) {
+    const a = S.answers[i];
+    if (a.qId === qId && a.mode === 'exam') {
+      a.attentionError = !!flag;
+      save();
+      return a;
+    }
+  }
+  return null;
 }
 
 
@@ -288,6 +323,219 @@ export function importTakipExams(list) {
  */
 export function saveSession(result) {
   S.sessions.push(result);
+}
+
+/**
+ * Veritabaninda soru cevap anahtarlari veya icerikleri guncellendiginde,
+ * kullanicinin gecmis cevaplarini (S.answers), aralikli tekrarini (S.srs) ve
+ * tamamlanmis deneme sonuclarini (S.exams) geriye donuk olarak otomatik duzeltir.
+ *
+ * Ornegin: Deneme 1 Soru 5'te kullanicinin verdigi dogru cevap
+ * ('A') eski hatali cevap anahtari ('C') yuzunden yanlis sayilmissa; bu fonksiyon
+ * soruyu dogruya ceker, neti 63'ten 64'e yukseltir, yanlisi 54'ten 53'e dusurur,
+ * puani yeniden hesaplar ve durumu kalici olarak kaydeder.
+ *
+ * @param {Map<string, object>} questionMap
+ * @returns {boolean} Degisiklik yapildiysa true
+ */
+export function reconcilePastData(questionMap) {
+  if (!questionMap || typeof questionMap.get !== 'function' || !questionMap.size) return false;
+  let changed = false;
+
+  // 1. Ham cevap gunlugu (S.answers)
+  if (Array.isArray(S.answers)) {
+    for (const a of S.answers) {
+      if (!a.qId || !questionMap.has(a.qId)) continue;
+      const q = questionMap.get(a.qId);
+      if (q && q.correct) {
+        if (a.correctKey !== q.correct) {
+          a.correctKey = q.correct;
+          const wasOk = a.ok;
+          a.ok = (a.chosen === q.correct);
+          if (a.ok !== wasOk) changed = true;
+        }
+      }
+    }
+  }
+
+  // 2. SRS Tekrar durumu (S.srs)
+  if (S.srs && typeof S.srs === 'object') {
+    for (const [qId, cur] of Object.entries(S.srs)) {
+      if (!questionMap.has(qId)) continue;
+      const q = questionMap.get(qId);
+      const ansList = (S.answers || []).filter(a => a.qId === qId);
+      if (ansList.length > 0 && ansList.every(a => a.ok)) {
+        if (cur.lapses > 0 || cur.box === 0) {
+          cur.box = 4;
+          cur.lapses = 0;
+          cur.dueN = null;
+          cur.dueAt = null;
+          delete cur.dropped;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  // 3. Tamamlanan denemeler (S.exams)
+  if (Array.isArray(S.exams)) {
+    for (const ex of S.exams) {
+      if (!ex) continue;
+      const reviewMap = new Map();
+      if (Array.isArray(ex.review)) {
+        ex.review.forEach(r => {
+          if (r && r.qId) reviewMap.set(r.qId, r);
+        });
+      }
+
+      if (Array.isArray(ex.map)) {
+        let recalcNeeded = false;
+
+        // Incelemedeki sorularin dogrulugunu ve iceriklerini guncelle
+        for (const [qId, r] of reviewMap.entries()) {
+          if (!questionMap.has(qId)) continue;
+          const q = questionMap.get(qId);
+          if (!q) continue;
+
+          if (q.explanation && r.explanation !== q.explanation) r.explanation = q.explanation;
+          if (q.legalBasis && r.legalBasis !== q.legalBasis) r.legalBasis = q.legalBasis;
+          if (q.stem && r.stem !== q.stem) r.stem = q.stem;
+          if (Array.isArray(q.options) && r.options !== q.options) r.options = q.options;
+
+          if (q.correct && r.correct !== q.correct) {
+            r.correct = q.correct;
+            const nowOk = (r.chosen !== null && r.chosen === q.correct);
+            if (r.ok !== nowOk) {
+              r.ok = nowOk;
+              recalcNeeded = true;
+            }
+          }
+        }
+
+        // Harita uzerindeki kovalari (b) guncelle ve metrik farklarini uygula
+        for (let i = 0; i < ex.map.length; i++) {
+          const m = ex.map[i];
+          if (!m || !m.qId || !questionMap.has(m.qId)) continue;
+          const q = questionMap.get(m.qId);
+          const r = reviewMap.get(m.qId);
+          const oldB = m.b;
+
+          if (r) {
+            if (r.ok && (oldB === 'kavram' || oldB === 'eksik')) {
+              // Eskiden yanlis sayilan soru artik dogru!
+              const newB = r.doubt ? 'sans' : 'ok';
+              m.b = newB;
+              r.bucket = newB;
+
+              ex.correct = (ex.correct || 0) + 1;
+              ex.wrong = Math.max(0, (ex.wrong || 0) - 1);
+              ex.net = ex.correct;
+              const totalQ = ex.total || ex.map.length || 120;
+              ex.points = Math.round((ex.correct / totalQ) * 1000) / 10;
+              ex.pass = (ex.correct >= 84);
+
+              if (oldB === 'kavram') ex.kavram = Math.max(0, (ex.kavram || 0) - 1);
+              if (oldB === 'eksik') ex.eksik = Math.max(0, (ex.eksik || 0) - 1);
+              if (newB === 'sans') ex.sans = (ex.sans || 0) + 1;
+
+              if (Array.isArray(ex.wrongIds)) {
+                ex.wrongIds = ex.wrongIds.filter(id => id !== m.qId);
+              }
+              if (newB === 'ok' && Array.isArray(ex.repeatIds)) {
+                ex.repeatIds = ex.repeatIds.filter(id => id !== m.qId);
+              }
+
+              if (q && q.subjectId && ex.bySubject && ex.bySubject[q.subjectId]) {
+                ex.bySubject[q.subjectId].correct = (ex.bySubject[q.subjectId].correct || 0) + 1;
+                ex.bySubject[q.subjectId].wrong = Math.max(0, (ex.bySubject[q.subjectId].wrong || 0) - 1);
+              }
+              const tid = q.topicId || `__untagged__${q.subjectId}`;
+              if (ex.byTopic && ex.byTopic[tid]) {
+                ex.byTopic[tid].correct = (ex.byTopic[tid].correct || 0) + 1;
+              }
+
+              recalcNeeded = true;
+            } else if (!r.ok && (oldB === 'ok' || oldB === 'sans') && r.chosen !== null) {
+              // Eskiden dogru sayilan soru artik yanlis
+              const newB = r.doubt ? 'eksik' : 'kavram';
+              m.b = newB;
+              r.bucket = newB;
+
+              ex.correct = Math.max(0, (ex.correct || 0) - 1);
+              ex.wrong = (ex.wrong || 0) + 1;
+              ex.net = ex.correct;
+              const totalQ = ex.total || ex.map.length || 120;
+              ex.points = Math.round((ex.correct / totalQ) * 1000) / 10;
+              ex.pass = (ex.correct >= 84);
+
+              if (oldB === 'sans') ex.sans = Math.max(0, (ex.sans || 0) - 1);
+              if (newB === 'kavram') ex.kavram = (ex.kavram || 0) + 1;
+              if (newB === 'eksik') ex.eksik = (ex.eksik || 0) + 1;
+
+              if (Array.isArray(ex.wrongIds) && !ex.wrongIds.includes(m.qId)) {
+                ex.wrongIds.push(m.qId);
+              }
+              if (Array.isArray(ex.repeatIds) && !ex.repeatIds.includes(m.qId)) {
+                ex.repeatIds.push(m.qId);
+              }
+
+              if (q && q.subjectId && ex.bySubject && ex.bySubject[q.subjectId]) {
+                ex.bySubject[q.subjectId].correct = Math.max(0, (ex.bySubject[q.subjectId].correct || 0) - 1);
+                ex.bySubject[q.subjectId].wrong = (ex.bySubject[q.subjectId].wrong || 0) + 1;
+              }
+              const tid = q.topicId || `__untagged__${q.subjectId}`;
+              if (ex.byTopic && ex.byTopic[tid]) {
+                ex.byTopic[tid].correct = Math.max(0, (ex.byTopic[tid].correct || 0) - 1);
+              }
+
+              recalcNeeded = true;
+            }
+          } else if (oldB === 'kavram' || oldB === 'eksik') {
+            const ans = (S.answers || []).filter(a => a.qId === m.qId);
+            const lastAns = ans.length ? ans[ans.length - 1] : null;
+            if (lastAns && lastAns.chosen === q.correct) {
+              m.b = 'ok';
+              ex.correct = (ex.correct || 0) + 1;
+              ex.wrong = Math.max(0, (ex.wrong || 0) - 1);
+              ex.net = ex.correct;
+              const totalQ = ex.total || ex.map.length || 120;
+              ex.points = Math.round((ex.correct / totalQ) * 1000) / 10;
+              ex.pass = (ex.correct >= 84);
+
+              if (oldB === 'kavram') ex.kavram = Math.max(0, (ex.kavram || 0) - 1);
+              if (oldB === 'eksik') ex.eksik = Math.max(0, (ex.eksik || 0) - 1);
+
+              if (Array.isArray(ex.wrongIds)) {
+                ex.wrongIds = ex.wrongIds.filter(id => id !== m.qId);
+              }
+              if (Array.isArray(ex.repeatIds)) {
+                ex.repeatIds = ex.repeatIds.filter(id => id !== m.qId);
+              }
+
+              if (q && q.subjectId && ex.bySubject && ex.bySubject[q.subjectId]) {
+                ex.bySubject[q.subjectId].correct = (ex.bySubject[q.subjectId].correct || 0) + 1;
+                ex.bySubject[q.subjectId].wrong = Math.max(0, (ex.bySubject[q.subjectId].wrong || 0) - 1);
+              }
+              recalcNeeded = true;
+            }
+          }
+        }
+
+        if (recalcNeeded) {
+          // Temiz dogrulari (doubt olmayan ok'lari) review dizisinden kaldir:
+          if (Array.isArray(ex.review)) {
+            ex.review = ex.review.filter(r => !(r.ok && !r.doubt));
+          }
+          changed = true;
+        }
+      }
+    }
+  }
+
+  if (changed) {
+    save();
+  }
+  return changed;
 }
 
 /* ---------- türetilmiş okumalar ---------- */

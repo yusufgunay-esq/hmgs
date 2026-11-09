@@ -12,7 +12,7 @@
 
 import { $, $$, toast } from './ui.js';
 import { initData, initDataAsync, populateData, topicById, questionById } from './data.js';
-import { load, save, daysLeft, state, getSettings, updateSettings, importTakipExams } from './store.js';
+import { load, save, daysLeft, state, getSettings, updateSettings, importTakipExams, reconcilePastData } from './store.js';
 import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress, requestSilentToken, fetchVaultFromDrive } from './vault-client.js';
 import { applySrsPolicy } from './engine.js';
 import { kuralToggle } from './kural.js';
@@ -26,10 +26,11 @@ import * as flow from './views/flow.js';
 import * as progress from './views/progress.js';
 import * as pratik from './views/pratik.js';
 import * as akim from './views/akim.js';
+import * as notlar from './views/notlar.js';
 import { rota, adimSorulari, kagitSorulari, konuSetSorulari } from './rota.js';
 
 
-const VIEWS = ['today', 'odevler', 'flow', 'akim', 'practice', 'pratik', 'exam', 'progress'];
+const VIEWS = ['today', 'odevler', 'flow', 'notlar', 'akim', 'practice', 'pratik', 'exam', 'progress'];
 let currentView = 'today';
 let lastAction = null;
 
@@ -81,6 +82,7 @@ function show(view, push = true) {
     exam.reset();
   }
 
+  if (view === 'akim' && currentView !== 'akim') akim.kapanisiKapat();
   currentView = view;
   if (typeof document !== 'undefined' && document.body) {
     document.body.setAttribute('data-view', view);
@@ -100,6 +102,7 @@ function show(view, push = true) {
     if (view === 'pratik') pratik.render();
     if (view === 'exam') exam.render();
     if (view === 'progress') progress.render();
+    if (view === 'notlar') notlar.render();
   } catch (err) {
     console.error(`[studio] view render hatası (${view}):`, err);
     const host = $('#view-' + view);
@@ -294,6 +297,11 @@ document.addEventListener('click', async e => {
     case 'flow-practice':
       if (practice.startSession({ mode: 'topic', topicId: el.dataset.topic, count: 99 })) show('practice');
       break;
+    case 'sinav-konu-coz': {
+      const qs = flow.sinavSorulari(el.dataset.i);
+      if (qs.length && practice.startSession({ questions: qs, count: qs.length, customLabel: flow.sinavKonuAdi(el.dataset.i) })) show('practice');
+      break;
+    }
     case 'flow-practice-subject':
       if (practice.startSession({ mode: 'subject', subjectId: el.dataset.subject, count: 15 })) show('practice');
       break;
@@ -339,7 +347,11 @@ document.addEventListener('click', async e => {
     case 'continue-flow': if (akim.start()) show('akim'); else show('today'); break;
 
     /* --- akış modu --- */
-    case 'akim-start':         akim.start(); break;
+    case 'akim-start':         akim.startSecili(); break;
+    case 'akim-ders':          akim.toggleDers(el.dataset.id); break;
+    case 'akim-ders-hepsi':    akim.dersHepsi(); break;
+    case 'akim-ders-temizle':  akim.dersTemizle(); break;
+    case 'akim-ders-start':    if (akim.startDers(el.dataset.subject)) show('akim'); break;
     case 'akim-quit':          akim.quit(); break;
     case 'akim-pick':          akim.arm(el.dataset.key); break;
     case 'akim-conf':          akim.commit(el.dataset.conf); break;
@@ -371,26 +383,41 @@ document.addEventListener('click', async e => {
     case 'exam-pick':   exam.pick(el.dataset.key); break;
     case 'exam-clear':  exam.clear(); break;
     case 'exam-mark':   exam.mark(); break;
+    case 'exam-next-blank': exam.nextBlank(); break;
     case 'exam-goto':   exam.goto(Number(el.dataset.i)); break;
     case 'exam-prev':   exam.prev(); break;
     case 'exam-next':   exam.next(); break;
     case 'exam-finish': exam.finish(false); break;
     case 'exam-export-stats': exam.exportStats(); break;
     case 'exam-filter': exam.setFilter(el.dataset.f); break;
-    case 'exam-open-review': exam.openReview(); break;
+    case 'exam-open-review': {
+      const examId = el.dataset.examId;
+      exam.openReview(examId);
+      show('exam');
+      break;
+    }
     case 'exam-back': exam.backToList(); break;
     case 'rv-goto': exam.rvGoto(Number(el.dataset.no)); break;
     case 'rv-prev': exam.rvPrev(); break;
     case 'rv-next': exam.rvNext(); break;
     case 'rv-analyze': exam.rvAnalyze(); break;
+    case 'rv-toggle-attention': exam.rvToggleAttention(); break;
     case 'exam-review-wrong': {
-      // Tekrar havuzu yalnız yanlış ve boşlar değil: kuşkuluyken bulunan
-      // doğrular da buraya girer (net gerçek değil, soru oturmamış).
-      const ids = exam.repeatIdsOfLast();
-      const qs = ids.map(id => questionById.get(id)).filter(Boolean);
-      if (!qs.length) { toast('Son denemede tekrar edilecek soru yok.'); break; }
-      const ok = practice.startSession({ questions: qs, customLabel: `Deneme tekrarı · ${qs.length} soru` });
-      if (ok) { show('practice'); break; }
+      const examId = el.dataset.examId;
+      const qs = exam.getRepeatQuestionsForExam(examId);
+      if (!qs.length) {
+        toast('Bu denemede tekrar edilecek soru bulunamadı.');
+        break;
+      }
+      const ex = examId ? exam.getExamById(examId) : exam.activeResult();
+      const examTitle = ex ? (ex.label || 'Deneme') : 'Deneme';
+      const dateStr = ex && ex.at ? new Date(ex.at).toLocaleDateString('tr-TR') : '';
+      const customLabel = `Deneme Tekrarı · ${examTitle}${dateStr ? ' (' + dateStr + ')' : ''} · ${qs.length} soru`;
+      const ok = practice.startSession({ questions: qs, customLabel });
+      if (ok) {
+        show('practice');
+        break;
+      }
       toast('Tekrar seansı kurulamadı.');
       break;
     }
@@ -528,10 +555,11 @@ document.addEventListener('keydown', e => {
     else if (e.key === 'ArrowRight') { exam.next(); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { exam.prev(); e.preventDefault(); }
   } else if (currentView === 'exam' && exam.reviewing()) {
-    // Çözüm ekranı: oklar soru değiştirir, G analiz istemini kopyalar.
+    // Çözüm ekranı: oklar soru değiştirir, G analiz istemini kopyalar, D dikkat hatasını işaretler.
     if (e.key === 'ArrowRight') { exam.rvNext(); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { exam.rvPrev(); e.preventDefault(); }
     else if (k === 'G') { exam.rvAnalyze(); e.preventDefault(); }
+    else if (k === 'D') { exam.rvToggleAttention(); e.preventDefault(); }
   }
 });
 
@@ -625,6 +653,10 @@ function rotaBaslat(adim) {
   const L = adim.launch || {};
   let ok = false;
   switch (L.tur) {
+    case 'hap':
+      notlar.openHap();
+      show('notlar');
+      return;
     case 'deneme-devam':
     case 'deneme-sayfa':
       show('exam'); return;
@@ -686,6 +718,13 @@ async function boot() {
 
     const rep = await initDataAsync();
 
+    // Veritabanindaki soru ve cevap anahtari duzeltmelerini gecmis verilere geriye donuk uygula
+    try {
+      reconcilePastData(questionById);
+    } catch (e) {
+      console.warn('[reconcile]', e);
+    }
+
     const d = daysLeft();
     const cd = $('#countdown');
     if (cd) cd.innerHTML = d > 0 ? `Sınava <b>${d} gün</b>` : '<b>Sınav günü</b>';
@@ -706,8 +745,12 @@ async function boot() {
 
     // Arka planda Drive'daki güncel ilerlemeyi sessizce birleştir
     syncStudioProgress(false).then(res => {
-      if (res) { try { if (applySrsPolicy() > 0) save(); } catch (e) {} }
+      if (res) {
+        try { reconcilePastData(questionById); } catch (e) {}
+        try { if (applySrsPolicy() > 0) save(); } catch (e) {}
+      }
       if (res && currentView === 'progress') progress.render($('#view-progress'));
+      if (res && currentView === 'exam') exam.render();
     }).catch(() => {});
 
     // Oturum açıksa kütüphaneyi de arka planda sessizce kontrol et ve güncelle
@@ -716,6 +759,7 @@ async function boot() {
         fetchVaultFromDrive(token).then(v => {
           if (v && Array.isArray(v.questions) && v.questions.length >= (questionById.size || 0)) {
             populateData(v);
+            try { reconcilePastData(questionById); } catch (e) {}
             if (currentView === 'exam') exam.render();
           }
         }).catch(() => {});

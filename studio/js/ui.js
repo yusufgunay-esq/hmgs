@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    ui.js — RENDER YARDIMCILARI
    Inline onclick YOK. Tüm etkileşim data-act + event delegation ile.
    ========================================================================== */
@@ -265,7 +265,7 @@ function normalizeWrappedLines(raw) {
  *  Dizi zorunluluğu ("I", sonra "II", sonra "III"…) cümle içi yanlış
  *  yakalamayı eler: "I. Dünya Savaşı" tek başına dizi kurmaz. */
 function capaBul(metin) {
-  const re = new RegExp(`(^|[\\s(])(${ROMAN_ALT})\\.\\s+`, 'g');
+  const re = new RegExp(`(^|[\\s(;:])(${ROMAN_ALT})\\.\\s+`, 'g');
   const aday = [];
   let m;
   while ((m = re.exec(metin))) {
@@ -285,7 +285,7 @@ function capaBul(metin) {
  * premiseHTML hepsini tek madde sayıyordu; yalnız bir öncül tıklanabiliyordu.
  * Bu yedek, gömülü diziyi satırlara böler.
  *
- * KAPSAMI DAR TUTULDU (bilinçli): yalnız premise'te 2'den az tıklanabilir
+ * KAPSAMI DAR TUTULDU (bilinçli): yalnız premise'te eksik tıklanabilir
  * öncül varken çalışır — yani yalnız ZATEN BOZUK olan yeri onarır, sağlam
  * sorulara dokunmaz. Metin eklenmez/çıkarılmaz; rakamlar I.'dan başlayıp
  * ARDIŞIK gitmek zorundadır, dizi kurulamazsa olduğu gibi bırakılır.
@@ -293,10 +293,10 @@ function capaBul(metin) {
 function splitEmbeddedItems(premise) {
   if (!premise) return premise;
   const tikl = premise.split('\n').filter(l => ITEM_LINE_RE.test(l.trim())).length;
-  if (tikl >= 2) return premise;
   const metin = premise.replace(/\s+/g, ' ').trim();
   const sec = capaBul(metin);
   if (sec.length < 2) return premise;
+  if (tikl >= sec.length) return premise;
   /* BAŞ ve SON artığı KORUNUR: diziden önceki metin (lead) ve son öncülden
      sonraki metin atılırsa sorudan parça kaybolur (ölçüm: 45 soru). Lead ve
      kuyruk kendi satırı olarak bırakılır; premiseHTML onları öncül olmayan
@@ -393,6 +393,10 @@ function askParcala(metin) {
 /** Soru kökünü öncül ve asıl soru olarak ikiye ayırır. */
 export function splitStem(stem) {
   let raw = (stem || '').trim().replace(/\/[ \t]*\n[ \t]*/g, '/');
+  if (/(?:^|\s)II\.\s+/.test(raw)) {
+    raw = raw.replace(/([:;,])\s*(I\.\s+)/g, '$1\n$2');
+    raw = raw.replace(/([.!?])\s+(I\.\s+[A-ZÇĞİÖŞÜ])/g, '$1\n$2');
+  }
   raw = normalizeWrappedLines(raw);
   const lines = raw.split(/\n+/).map(x => x.trim()).filter(Boolean);
 

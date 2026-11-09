@@ -42,9 +42,9 @@ export function planGunu(today = todayKey()) {
   return n >= 1 ? n : null;
 }
 
-/** Kalan gün (sınav 27 Eyl). */
+/** Kalan gün (sınav 25 Nisan 2027). */
 export function kalanGun(today = todayKey()) {
-  return Math.max(0, gunFarki(today, '2026-09-27'));
+  return Math.max(0, gunFarki(today, '2027-04-25'));
 }
 
 /** Günlük soru hedefi: kalan iş ÷ kalan gün, 30–90 arası kelepçeli. */

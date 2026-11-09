@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    views/progress.js — İLERLEME: GERÇEK VERİ, SÜSLEME YOK
    Deneme net geçmişi, hız eğilimi, ders kırılımı ve veri bütünlüğü raporu.
    Kural: hesaplanamayan metrik gösterilmez, "–" yazılır. Uydurma yok.
@@ -299,24 +299,33 @@ function examHistory(exams) {
       <div style="position:absolute;left:0;right:0;bottom:${(PASS_CORRECT / maxNet) * 100}%;border-top:1px dashed var(--no);opacity:0.5"></div>
       ${exams.map(e => {
         const h = Math.max(3, (e.net / maxNet) * 100);
-        return `<div title="${esc(new Date(e.at).toLocaleDateString('tr-TR'))} · ${e.net} net"
+        return `<div title="${esc(new Date(e.at).toLocaleDateString('tr-TR'))} · ${esc(e.label || 'Deneme')} · ${e.net} net (İncelemek için tıkla)"
+          data-act="exam-open-review" data-exam-id="${esc(e.id)}"
           style="flex:1;min-width:1.1rem;max-width:3.5rem;height:${h}%;border-radius:5px 5px 0 0;
-          background:${e.pass ? 'var(--ok)' : 'var(--accent)'};position:relative">
+          background:${e.pass ? 'var(--ok)' : 'var(--accent)'};position:relative;cursor:pointer">
           <span style="position:absolute;top:-1.15rem;left:0;right:0;text-align:center;font-size:0.7rem;font-weight:700;color:var(--ink-2)">${e.net}</span>
         </div>`;
       }).join('')}
     </div>
-    <p class="hint" style="margin-bottom:1rem">Kesikli çizgi: ${PASS_CORRECT} net barajı. En iyi: ${best} net.</p>
+    <p class="hint" style="margin-bottom:1rem">Kesikli çizgi: ${PASS_CORRECT} net barajı. En iyi: ${best} net. Sütunlara veya butonlara tıklayarak deneme çözümlerine gidebilirsiniz.</p>
     <table class="tbl">
-      <thead><tr><th>Tarih</th><th class="num">Net</th><th class="num">Puan</th><th class="num">Boş</th><th class="num">Süre</th></tr></thead>
+      <thead><tr><th>Tarih</th><th>Sınav</th><th class="num">Net</th><th class="num">Puan</th><th class="num">Boş</th><th class="num">Süre</th><th style="text-align:right">İşlem</th></tr></thead>
       <tbody>
-        ${exams.slice().reverse().map(e => `<tr>
+        ${exams.slice().reverse().map(e => {
+          const wrongN = (e.repeatIds || e.wrongIds || []).length || e.wrong || 0;
+          return `<tr>
           <td>${esc(new Date(e.at).toLocaleDateString('tr-TR'))}</td>
+          <td><span style="font-weight:600;color:var(--ink)">${esc(e.label || 'Deneme Sınavı')}</span></td>
           <td class="num" style="font-weight:700;color:${e.pass ? 'var(--ok)' : 'var(--no)'}">${e.net}</td>
           <td class="num">${e.points}</td>
           <td class="num" style="${e.blank ? 'color:var(--warn)' : ''}">${e.blank}</td>
           <td class="num">${fmtClock(e.durationMs)}</td>
-        </tr>`).join('')}
+          <td style="text-align:right;white-space:nowrap">
+            <button class="btn btn-2 btn-s" data-act="exam-open-review" data-exam-id="${esc(e.id)}" style="margin-right:0.35rem;padding:0.25rem 0.6rem;font-size:0.75rem">Çözümler</button>
+            ${wrongN ? `<button class="btn btn-s" data-act="exam-review-wrong" data-exam-id="${esc(e.id)}" style="padding:0.25rem 0.6rem;font-size:0.75rem">Yanlışları Çöz (${wrongN})</button>` : ''}
+          </td>
+        </tr>`;
+        }).join('')}
       </tbody>
     </table>
   </div>`;

@@ -27,6 +27,7 @@ const ARSIV_ALIAS = {
   hmgs_2025_mayis: 'Arşiv Sınavı 2',
   hmgs_2025_eylul: 'Arşiv Sınavı 3',
   hmgs_2026_nisan: 'Arşiv Sınavı 4',
+  hmgs_2026_eylul: 'Arşiv Sınavı 5',
 };
 
 // ---- DİNAMİK KASA METADATASI (Google Drive kasasından gelir) ------------
