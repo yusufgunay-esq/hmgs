@@ -11,7 +11,7 @@
 
 import { esc, rich, richBlock, stripEmoji, splitStem, fmtSec, emptyState, groupLegalRefs, $, toast } from '../ui.js';
 import { subjectName, questionsOf, questionsOfTopic, questionsOfTopics, shuffle, topicById, pastExamQuestions, aiQuestions, isCoreTarget, QUESTIONS, tierOf, TIER_REAL, TIER_DENEME, TIER_AI, TIER_ADV, aiModelRank } from '../data.js';
-import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
+import { recordAnswer, markLastAnswerLogic, markLastAnswerAttention, save, saveSession, state, TARGET_SEC, examDateLabel } from '../store.js';
 import * as seans from '../seans.js';
 import { scheduleAfterAnswer, reScheduleAsLogic, dueQuestions, unseenQuestions, buildKarmaSet, buildDeadlinesSet, CONF } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim.js';
@@ -1418,7 +1418,7 @@ export function buildGeminiPrompt(q, stateArg = {}) {
   };
 
   const L = [];
-  L.push('HMGS 2026/2 (27 Eylül 2026) hukuk sınavına çalışıyorum. Aşağıdaki soruda takıldım.');
+  L.push(`HMGS (${examDateLabel()}) hukuk sınavına çalışıyorum. Aşağıdaki soruda takıldım.`);
   L.push('');
   L.push(`Ders: ${subjectName(q.subjectId)}`);
   if (topic) L.push(`Konu: ${String(topic.title || '').replace(/^\s*\d+\.\s*/, '')}`);
