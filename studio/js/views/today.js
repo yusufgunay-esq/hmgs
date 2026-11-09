@@ -9,11 +9,12 @@
 
 import { esc, $, pct } from '../ui.js';
 import { subjectName, topicById, aiQuestions, pastExamQuestions } from '../data.js';
-import { daysLeft, streak, lastExam, PASS_CORRECT, state } from '../store.js';
+import { daysLeft, streak, lastExam, PASS_CORRECT, state, examDateLabel } from '../store.js';
 import { nextAction, srsSummary, allSubjectMastery,
   MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions,
   examGap, worstExamSubjects, answerQualitySignals } from '../engine.js';
 import { rota } from '../rota.js';
+import { koc } from '../koc.js';
 import { active as examActive } from './exam.js';
 
 export function render() {
@@ -21,6 +22,7 @@ export function render() {
   if (!host) return;
 
   const r = rota({ examActive: examActive() });
+  const k = koc();
   const srs = srsSummary();
   const d = daysLeft();
   const st = streak();
@@ -50,7 +52,7 @@ export function render() {
   if (r.D >= 0 && r.D <= 4) {
     host.innerHTML = `
     <div class="wrap">
-      ${rotaHTML(r)}
+      ${rotaHTML(r, k)}
       <div class="grid grid-3" style="margin-top:1.25rem">
         <div class="metric">
           <div class="metric-k">Sınava kalan</div>
@@ -84,13 +86,13 @@ export function render() {
 
   host.innerHTML = `
     <div class="wrap">
-      ${rotaHTML(r)}
+      ${rotaHTML(r, k)}
 
       <div class="grid grid-3" style="margin-top:1.25rem">
         <div class="metric">
           <div class="metric-k">Sınava kalan</div>
           <div class="metric-v">${d}<span style="font-size:0.85rem;font-weight:600"> gün</span></div>
-          <div class="metric-n">27 Eylül 2026 · 2026-HMGS/2</div>
+          <div class="metric-n">HMGS · ${examDateLabel()}</div>
         </div>
         <div class="metric">
           <div class="metric-k">Bugün çözülen</div>
@@ -186,7 +188,7 @@ export function render() {
  */
 const GUN_ADI = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 
-function rotaHTML(r) {
+function rotaHTML(r, k) {
   if (r.kart && (r.kart.tur === 'sinav' || r.kart.tur === 'bitti')) return sinavKarti(r);
 
   const s = r.simdi;
@@ -232,6 +234,9 @@ function rotaHTML(r) {
 
   const gunAdi = GUN_ADI[new Date(r.today + 'T12:00:00Z').getUTCDay()];
   const yuzde = r.toplamPlan ? Math.min(100, Math.round((r.toplamYapilan / r.toplamPlan) * 100)) : 0;
+  // Bugün bitmemiş tam deneme varsa koç "hedef 20" derken kahraman 120 soruluk
+  // deneme öneriyor olabilir; çelişkiyi saklamak yerine tek satırla açıklıyoruz.
+  const denemeVar = (r.adimlar || []).some(a => a.tur === 'deneme' && !a.bitti);
 
   return `
     <div class="hero rota-hero">
@@ -239,6 +244,8 @@ function rotaHTML(r) {
       <div class="hero-title">${esc(title)}</div>
       <p class="hero-why">${esc(why)}</p>
       <div class="hero-main-cta">${cta}</div>
+
+      ${kocHTML(k, denemeVar)}
 
       <div class="rota">
         <div class="rota-head">
@@ -252,12 +259,91 @@ function rotaHTML(r) {
     </div>`;
 }
 
+/**
+ * KOÇ · GÜNÜN HEDEFİ — rota kahramanının içinde, rota listesinin üstünde.
+ * Hedef bir ÖNERİDİR: akışı kilitlemez, kısıtlamaz. Hedef aşılırsa abartılı
+ * kutlama yok, yalnız "hedef tamam · akış açık" satırı.
+ */
+function kocHTML(k, denemeVar) {
+  if (!k || !k.D) return '';
+  const hedef = k.hedef || 0;
+  const done = k.todayDone || 0;
+  const kalan = Math.max(0, hedef - done);
+  const yuzde = hedef ? Math.min(100, Math.round((done / hedef) * 100)) : 0;
+  const tamam = hedef > 0 && done >= hedef;
+  const unseen = (k.unseenReal || 0) + (k.unseenDeneme || 0);
+  const pencere = Math.max(1, Math.min(k.D, 14));
+  const ham = (k.yeniGun || 0) + (k.tekrarGun || 0);
+  const sonHafta = k.sonHafta === true;
+  const yeniN = k.yeniGun || 0;
+  const tekrarN = k.tekrarGun || 0;
+  const uyari = !tamam && k.eksik > 0
+    ? `<div class="koc-not">Bugünkü tempoyla günde ~${k.eksik} soru eksik kalıyor; akşam bir blok daha.</div>`
+    : '';
+  // Sıfır gürültüsü: "+ ~0 tekrar" yazmak satırı bilgisiz şişiriyor.
+  const malzeme = `kalan ${unseen} çekirdek soru · sınava ${k.D} gün.`;
+  let why;
+  if (sonHafta) {
+    why = `Son hafta: yeni soru kovalanmaz · hedef son tempoyu korumak için · yanlışlar ve sayılar.`;
+  } else if (yeniN && tekrarN) {
+    why = `Günde ~${yeniN} yeni + ~${tekrarN} tekrar · ${malzeme}`;
+  } else if (yeniN) {
+    why = `Günde ~${yeniN} yeni · ${malzeme}`;
+  } else if (tekrarN) {
+    why = `Günde yalnız tekrar · ${malzeme}`;
+  } else {
+    why = `Kalan ${unseen} çekirdek soru · sınava ${k.D} gün.`;
+  }
+  // Deneme günü çelişkisi: hedef deneme dışı çalışma içindir, sayı şişirilmez.
+  const denemeNotu = denemeVar
+    ? `<div class="koc-exam">Bugün tam deneme var (120 soru) · bu hedef deneme dışı çalışma içindir.</div>`
+    : '';
+  const mathLines = sonHafta
+    ? [
+        `Son hafta: yeni soru 0; hedef = tempo × 1,15 → 10'a yuvarlanınca ${hedef}.${k.tempo > 0 ? '' : ' Tempo henüz ölçülmedi, taban 40.'}`,
+        `Vadesi gelen ${k.dueCount} tekrar bilgi olarak duruyor (${pencere} güne yayılırsa günde ~${k.tekrarGun}); hedefe eklenmiyor.`,
+        `Son 7 günün temposu günde ~${k.tempo} soru${k.tempoGun ? ` (${k.tempoGun} aktif gün)` : ' (henüz ölçüm yok)'} · tam deneme ${k.denemeAraligi} günde bir.`,
+        `Bu bir öneri; akışı kilitlemez. Hedefi aşarsan akış açık kalır.`
+      ]
+    : [
+        `Kalan çekirdek malzeme ${k.unseenReal} + ${k.unseenDeneme} = ${unseen} soru. Sınava ${k.D} gün, haftada 6 çalışma günü → ${k.workDays} gün → günde ~${k.yeniGun} yeni soru.`,
+        `Vadesi gelen ${k.dueCount} tekrar, ${pencere} güne yayılırsa günde ~${k.tekrarGun}.`,
+        `${k.yeniGun} + ${k.tekrarGun} = ${ham}; 10'a yuvarlanınca hedef ${hedef}.`,
+        `Son 7 günün temposu günde ~${k.tempo} soru${k.tempoGun ? ` (${k.tempoGun} aktif gün)` : ' (henüz ölçüm yok)'} · tam deneme ${k.denemeAraligi} günde bir.`,
+        `Bu bir öneri; akışı kilitlemez. Hedefi aşarsan akış açık kalır.`
+      ];
+
+  return `
+    <div class="koc">
+      <div class="koc-head">
+        <span class="koc-k">Koç · günün hedefi</span>
+        ${tamam ? '<span class="koc-done">hedef tamam · akış açık</span>' : ''}
+      </div>
+      <div class="koc-main">
+        <div class="koc-num">${hedef}</div>
+        <div class="koc-side">
+          <div class="koc-line">bugün ${done} yapıldı · kalan ${kalan}</div>
+          <div class="track koc-track"><i style="width:${yuzde}%"></i></div>
+        </div>
+      </div>
+      <div class="koc-why">${why}</div>
+      ${denemeNotu}
+      ${uyari}
+      <details class="koc-det">
+        <summary>bu sayı nasıl çıkıyor</summary>
+        <div class="koc-math">
+          ${mathLines.map(l => `<div>${l}</div>`).join('')}
+        </div>
+      </details>
+    </div>`;
+}
+
 /** Sınav günü ve sonrası: soru yok, yalnız yapılacaklar. */
 function sinavKarti(r) {
   if (r.kart.tur === 'bitti') {
     return `
     <div class="hero rota-hero">
-      <div class="hero-kicker">27 Eylül 2026</div>
+      <div class="hero-kicker">${examDateLabel()}</div>
       <div class="hero-title">Geçmiş olsun</div>
       <p class="hero-why" style="margin-bottom:0">Sınav bitti. Bu ekranın işi de bitti; emeğin kâğıtta.</p>
     </div>`;
