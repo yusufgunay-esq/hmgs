@@ -13,8 +13,22 @@
 const KEY = 'hmgs_studio_v1';
 const SCHEMA = 1;
 
-/** Sınav: 2026-HMGS/2 */
-export const EXAM_DATE = new Date('2026-09-27T10:15:00');
+/** Sınav: 2027-HMGS/1 (Nisan 2027, Pazar). Saat 10:15 önceki dönemle aynı varsayım. */
+export const EXAM_DATE = new Date('2027-04-25T10:15:00');
+
+const TR_MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+/**
+ * Sınav tarihinin okunur hâli: "25 Nisan 2027".
+ * Arayüzde sınav tarihi YALNIZ buradan türetilir; sabit metin yazılmaz.
+ * `toLocaleDateString('tr-TR')`'ye bırakılmadı: Node/jsdom dil verisi her
+ * ortamda aynı olmadığı için ay adı elle yazılıyor.
+ */
+export function examDateLabel() {
+  return `${EXAM_DATE.getDate()} ${TR_MONTHS[EXAM_DATE.getMonth()]} ${EXAM_DATE.getFullYear()}`;
+}
+
 /** 120 soru, yanlış cezası yok → net = doğru sayısı. Baraj 70 puan = 84 doğru. */
 export const EXAM_TOTAL = 120;
 export const PASS_CORRECT = 84;
