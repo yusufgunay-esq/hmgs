@@ -1126,26 +1126,36 @@ function secKatman(list, want, sayac) {
  *   dersin T1'i bitince o dersin payı T2'ye, T2 de bitince T3'e geçer, diğer
  *   derslerde T1 sürerken. Yanlışlar tekrar bloğundan (setin en çok %45'i)
  *   araya serpilir.
- *   tüm havuz ('all'):  görülmemiş (her katman) → vadesi gelmiş
+ *   tüm havuz ('all'):  görülmemiş (katmanlar KARMA_TIER_MIX oranıyla
+ *                       KARIŞARAK) → vadesi gelmiş (aynı oranla)
+ *   'all' kapsamı kullanıcının bilinçli "Tüm Havuz Karma" seçimidir; orada
+ *   katman sırası değil, ölçülmüş katman ORANI geçerlidir. (26 Eylül 2026:
+ *   aşamalı sıra eklenirken 'all' de sıraya bağlanmış ve KARMA_TIER_MIX
+ *   fiilen ölü kalmıştı — test yakaladı, ikisi ayrıldı.)
  * Her aşamanın İÇİNDE katman payı secKatman ile (küresel açık giderme) korunur.
  * Vadesi gelmiş tekrarın asıl yeri yine setin tekrar bloğudur;
  * buraya yalnız o bloğa sığmayanlar düşer.
  */
-function secByTier(list, want, sayac, seenIds = new Set()) {
+function secByTier(list, want, sayac, seenIds = new Set(), scope = 'core') {
   if (want <= 0 || !list.length) return [];
   const gor = q => seenIds.has(q.id);
   const hmgs = q => tierOf(q) !== TIER_ADV;
   const t = q => tierOf(q);
-  const asamalar = [
-    q => !gor(q) && t(q) === TIER_REAL,
-    q => !gor(q) && t(q) === TIER_DENEME,
-    q => !gor(q) && t(q) === TIER_AI,
-    q => gor(q) && t(q) === TIER_REAL,
-    q => gor(q) && t(q) === TIER_DENEME,
-    q => gor(q) && t(q) === TIER_AI,
-    q => !gor(q) && t(q) === TIER_ADV,
-    q => gor(q) && t(q) === TIER_ADV
-  ];
+  const asamalar = scope === 'all'
+    ? [
+      q => !gor(q),
+      q => gor(q)
+    ]
+    : [
+      q => !gor(q) && t(q) === TIER_REAL,
+      q => !gor(q) && t(q) === TIER_DENEME,
+      q => !gor(q) && t(q) === TIER_AI,
+      q => gor(q) && t(q) === TIER_REAL,
+      q => gor(q) && t(q) === TIER_DENEME,
+      q => gor(q) && t(q) === TIER_AI,
+      q => !gor(q) && t(q) === TIER_ADV,
+      q => gor(q) && t(q) === TIER_ADV
+    ];
   const out = [];
   for (const asama of asamalar) {
     if (out.length >= want) break;
@@ -1373,7 +1383,7 @@ export function buildKarmaSet(count = 20, scope = 'core', opts = {}) {
        bitişik ve yeterince uzun kalıyor. */
     if (block) { want = Math.max(want, blokPay.get(r.id) || 0); blocksLeft--; blockedThisCall.push(r.id); }
     want = Math.min(want, butce);
-    const cands = secByTier(candidatesOf(r.id, used, scope), want, sayac, seenIds);
+    const cands = secByTier(candidatesOf(r.id, used, scope), want, sayac, seenIds, scope);
     cands.forEach(q => used.add(q.id));
     butce -= cands.length;
     if (cands.length < want) deficit += want - cands.length;
@@ -1392,7 +1402,7 @@ export function buildKarmaSet(count = 20, scope = 'core', opts = {}) {
       if (butce <= 0) break;
       // İnce havuz kuralı tamamlamada da geçerli (sınav ufku açıkken).
       if (r.thin && !endgame()) continue;
-      const ek = secByTier(candidatesOf(r.id, used, scope), 1, sayac, seenIds);
+      const ek = secByTier(candidatesOf(r.id, used, scope), 1, sayac, seenIds, scope);
       if (!ek.length) continue;
       ek.forEach(q => used.add(q.id));
       butce -= ek.length; eklendi += ek.length;
@@ -1539,7 +1549,7 @@ export function flowFeedDers(count = FLOW_BATCH, subjectIds = [], scope = 'core'
   for (const id of ids) {
     const want = Math.min(quota.get(id) || 0, butce);
     if (!want) continue;
-    const c = secByTier(adaylar(id), want, sayac, seenIds);
+    const c = secByTier(adaylar(id), want, sayac, seenIds, scope);
     c.forEach(q => used.add(q.id));
     butce -= c.length;
     yeni.set(id, c);
@@ -1549,7 +1559,7 @@ export function flowFeedDers(count = FLOW_BATCH, subjectIds = [], scope = 'core'
     let eklendi = 0;
     for (const id of ids) {
       if (butce <= 0) break;
-      const ek = secByTier(adaylar(id), 1, sayac, seenIds);
+      const ek = secByTier(adaylar(id), 1, sayac, seenIds, scope);
       if (!ek.length) continue;
       used.add(ek[0].id); butce--; eklendi++;
       yeni.set(id, (yeni.get(id) || []).concat(ek));

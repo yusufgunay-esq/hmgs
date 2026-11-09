@@ -9,7 +9,7 @@
 
 import { esc, $, pct } from '../ui.js';
 import { subjectName, topicById, aiQuestions, pastExamQuestions } from '../data.js';
-import { daysLeft, streak, lastExam, PASS_CORRECT, state } from '../store.js';
+import { daysLeft, streak, lastExam, PASS_CORRECT, state, examDateLabel } from '../store.js';
 import { nextAction, srsSummary, allSubjectMastery,
   MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions,
   examGap, worstExamSubjects, answerQualitySignals } from '../engine.js';
@@ -90,7 +90,7 @@ export function render() {
         <div class="metric">
           <div class="metric-k">Sınava kalan</div>
           <div class="metric-v">${d}<span style="font-size:0.85rem;font-weight:600"> gün</span></div>
-          <div class="metric-n">27 Eylül 2026 · 2026-HMGS/2</div>
+          <div class="metric-n">HMGS · ${examDateLabel()}</div>
         </div>
         <div class="metric">
           <div class="metric-k">Bugün çözülen</div>
@@ -257,7 +257,7 @@ function sinavKarti(r) {
   if (r.kart.tur === 'bitti') {
     return `
     <div class="hero rota-hero">
-      <div class="hero-kicker">27 Eylül 2026</div>
+      <div class="hero-kicker">${examDateLabel()}</div>
       <div class="hero-title">Geçmiş olsun</div>
       <p class="hero-why" style="margin-bottom:0">Sınav bitti. Bu ekranın işi de bitti; emeğin kâğıtta.</p>
     </div>`;
