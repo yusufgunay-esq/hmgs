@@ -3368,3 +3368,32 @@ button.rv-stat.clickable:hover {
   .flow-layout.sinav .fl-toc-toggle, .flow-layout.sinav .fl-toc-wrap { display: none; }
   .sk-filtre { display: grid; width: 100%; }
 }
+
+/* ---------- KOÇ · GÜNÜN HEDEFİ (koc.js) ----------
+   Rotanın içinde, rota listesinin üstünde kompakt blok. Hedef bir öneridir;
+   hedef aşılınca kutlama yok, yalnız "hedef tamam · akış açık" satırı. */
+.koc {
+  margin: 0.9rem 0 0.1rem; padding: 0.9rem 1.05rem 0.95rem;
+  background: var(--bg-sunk); border: 1px solid var(--line); border-radius: var(--r-m);
+}
+.koc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+.koc-k { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.koc-done { font-size: 0.78rem; font-weight: 600; color: var(--ok); }
+.koc-main { display: flex; align-items: center; gap: 1rem; margin-top: 0.45rem; }
+.koc-num { font-family: var(--serif); font-size: 2rem; font-weight: 600; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 2.2rem; }
+.koc-side { flex: 1; min-width: 0; }
+.koc-line { font-size: 0.82rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.koc-track { margin-top: 0.4rem; height: 4px; }
+.koc-why { font-size: 0.78rem; color: var(--ink-3); margin-top: 0.55rem; line-height: 1.5; }
+.koc-not { font-size: 0.78rem; color: var(--warn); margin-top: 0.35rem; line-height: 1.5; }
+.koc-exam { font-size: 0.78rem; color: var(--ink-3); margin-top: 0.35rem; line-height: 1.5; }
+.koc-det { margin-top: 0.5rem; }
+.koc-det summary { font-size: 0.74rem; color: var(--ink-3); cursor: pointer; }
+.koc-math { font-size: 0.76rem; color: var(--ink-3); line-height: 1.55; margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.3rem; }
+
+@media (max-width: 767px) {
+  .koc { padding: 0.85rem 0.95rem 0.9rem; }
+  .koc-main { gap: 0.7rem; }
+  .koc-num { font-size: 1.7rem; }
+  .koc-head { flex-direction: column; gap: 0.2rem; }
+}
