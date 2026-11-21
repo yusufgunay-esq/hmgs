@@ -10,22 +10,10 @@
 
 ## Bu Depo Nedir?
 
-2026‑HMGS/2 (27 Eylül 2026) Hukuk Mesleklerine Giriş Sınavı hazırlığı için geliştirilmiş kişisel çalışma platformunun **yalnızca arayüz kabuğudur**.
+Hukuk Mesleklerine Giriş Sınavı (HMGS) hazırlığı için geliştirilmiş kişisel çalışma platformudur.
 
 * **Takip Portalı:** Çalışma kaydı, hedef takibi, deneme ve gelişim grafiği
 * **HMGS Stüdyo:** Konu anlatımı, interaktif simülatörler, vaka üreteçleri
-
----
-
-## Veri İzolasyonu ve Mimari Sınırlar
-
-Bu depo **sıfır veri** ilkesiyle yayınlanır. Aşağıdaki bileşenlerin hiçbiri işbu depoda yer almaz:
-
-* Soru bankası ve konu anlatımı içerikleri
-* Kitap envanteri ve kişisel çalışma kayıtları
-* Sınav taramaları, OCR çıktıları ve şahsi notlar
-
-Söz konusu veriler harici ve güvenli konumlarda muhafaza edilmekte olup; uygulamaya yalnızca çalışma anında, yetkilendirilmiş erişim vasıtasıyla dinamik olarak aktarılmaktadır. Bu depoda yer alan kaynak kodlar bağımsız bir ticari ürün teşkil etmeyip, veriden arındırılmış bir arayüz kabuğundan ibarettir.
 
 ---
 
@@ -62,4 +50,4 @@ kesin bir surette menedilmiştir. Söz konusu fikri hak rezervleri (AB) 2019/790
 
 ---
 
-<sub>All rights reserved. This repository contains an unlicensed, source-available user-interface shell distributed with zero data. Incorporation of this codebase as a dependency or library in any third-party software is strictly prohibited.</sub>
+<sub>All rights reserved. This repository contains unlicensed, source-available software. Incorporation of this codebase as a dependency or library in any third-party software is strictly prohibited.</sub>

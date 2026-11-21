@@ -1,9 +1,5 @@
 /* ==========================================================================
-   vault-client.js — HMGS STÜDYO SIFIR-VERİ İSTEMCİ & GİZLİ KASA MOTORU
-   - GitHub'da 0 soru ve 0 konu barındırır.
-   - Soru ve konu kütüphanesi kullanıcının şahsi Google Drive'ından (hmgs_vault.json)
-     güvenle çekilir ve telefonun IndexedDB yerel veritabanına kalıcı yazılır.
-   - İlk indirmeden sonra %100 çevrimdışı (offline / PWA) çalışır.
+   vault-client.js — Veri senkronizasyon ve çevrimdışı önbellek istemcisi
    ========================================================================== */
 /* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme

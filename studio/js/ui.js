@@ -48,7 +48,7 @@ export function richBlock(s) {
   let raw = String(s ?? '').trim();
   if (!raw) return '';
 
-  // 1. Heceleme / Tire birleştirme (OCR ve satır sonu bozulmalarını düzeltir)
+  // 1. Heceleme / Tire birleştirme (satır sonu tirelerini birleştirir)
   raw = raw.replace(/([a-zçğıöşüA-ZÇĞİÖŞÜ]+)-\s+([a-zçğıöşüA-ZÇĞİÖŞÜ]+)/g, '$1$2');
 
   // 2. Satır içi veya bitişik A), B), C), D), E) şık tahlillerini bağımsız satırlara taşı
@@ -212,12 +212,8 @@ const ROMAN_SEQ = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 const ROMAN_ALT = 'I{1,3}|IV|V|VI{0,3}|VII|VIII|IX|X';
 
 /**
- * Kaynak PDF/OCR aktarımında satır sonları sayfa genişliğine göre düşmüş
- * oluyor — bazen tam kelime/cümle sınırında, bazen ortasında (ör. "...C
- * lehine bir\nipotek tesis etmiştir." — "bir" ile "ipotek" aynı cümlenin
- * parçası ama kaynakta ayrı satırda). premiseHTML her satırı ayrı bir
- * paragraf olarak bastığından bu kazara bölünme ekranda öncülü ikiye
- * bölünmüş gösteriyordu.
+ * Satır sonları sayfa genişliğine göre düşmüş metinlerde cümle içi
+ * kırılmaları birleştirir; madde/öncül sınırlarını korur.
  *
  * ÜÇ KURAL (sırayla):
  *  1. ÇIPLAK MADDE SATIRI birleştirilir: "II." + altındaki metin → "II. metin".

@@ -44,8 +44,7 @@ rm -f "$tmp"
 if [ "$bad" -ne 0 ]; then
     echo ""
     echo "  PUSH ENGELLENDI."
-    echo "  Bu depo PUBLIC. Yukaridaki dosyalar kisisel/telifli veri iceriyor olabilir."
-    echo "  Guvenli yayin yolu: HMGS_Yayinla.bat (git kullanmaz, API ile kabuk gonderir)."
+    echo "  Yukaridaki dosyalar yayin beyaz listesinde (.githooks/allowlist.txt) yer almiyor."
     exit 1
 fi
 exit 0

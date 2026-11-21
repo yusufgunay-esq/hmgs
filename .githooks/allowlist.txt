@@ -1,7 +1,5 @@
 # HMGS YAYIN BEYAZ LISTESI (allowlist)
-# Bu listeye yazili olmayan HICBIR dosya bu depoya commit/push edilemez.
-# Icerik: GitHub Pages'te yayinlanan arayuz kabugu + .nojekyll + LICENSE/README.md/robots.txt
-# Kural: soru bankasi, sinav taramasi, kisisel not, takip verisi ASLA buraya girmez.
+# Yalnizca bu listedeki dosyalar depoya commit/push edilebilir.
 .nojekyll
 LICENSE
 README.md

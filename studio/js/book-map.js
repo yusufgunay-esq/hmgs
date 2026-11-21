@@ -1,36 +1,15 @@
 /* ==========================================================================
-   book-map.js — KONU → FİZİKSEL KİTAP SAYFASI EŞLEMESİ
-   Kaynak: "Benim fiziksel soru bankalarımın içindekiler kısımları.md"
-   (kullanıcının elindeki kitapların içindekiler dökümü, 1 Ağu 2026).
-
-   Amaç: deneme sonucunda zayıf çıkan konu → "kitapta hangi sayfaya bak" cevabı.
-   Bu dosya İÇERİK ÜRETMEZ, sadece iki var olan kaynağı (topics.js'teki 124
-   konu başlığı ile içindekiler dökümündeki bölüm/sayfa aralığı) birbirine
-   işaretler. Eşleme konu başlığındaki madde numarasına göre yapıldı; kesin
-   sayfa değil, kitaptaki bölüm aralığıdır — kullanıcı o aralığı taramalı.
-
-   Kural (KONU_YAZIM_TALIMATI.md §3): kaynakta karşılık yoksa uydurma, açığı
-   bildir. Bu yüzden içindekiler dosyasında "Henüz eklenmedi" diye işaretli
-   derslerin (Vergi, Avukatlık, Hukuk Felsefesi, Hukuk Tarihi, Genel Kamu,
-   Anayasa Yargısı) hiçbir konusu için sayfa uydurulmadı — NO_BOOK_SUBJECTS'te
-   listeleniyor, arayüz bunlar için "kitap verisi henüz eklenmedi" gösterir.
+   book-map.js — Konu ve kaynak bölüm aralığı eşlemesi
    ========================================================================== */
 /* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-/** İçindekiler dökümü hiç gelmemiş dersler — sayfa göstermeye çalışma. */
 export const NO_BOOK_SUBJECTS = new Set([
   'anayasa_yargisi', 'vergi_hukuku', 'vergi_usul',
   'avukatlik', 'hukuk_felsefesi', 'hukuk_tarihi', 'genel_kamu'
 ]);
 
-/**
- * topicId → "kitapta nereye bak" metni.
- * CMK ayrı: fiziksel kitapta CMK s.64-380 arası ama iç başlık fotoğrafı hiç
- * gelmedi (bkz. içindekiler dosyası "Henüz eklenmedi" listesi) — o yüzden
- * CMK konuları için sadece geniş aralık var, alt başlık uydurulmadı.
- */
 export const TOPIC_LOCATION = {
   // --- Medeni Hukuk (~308 s.) ---
   tpc_medeni_001: 'Kişiler Hukuku – Gerçek Kişiler (s.47-98)',

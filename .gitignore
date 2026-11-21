@@ -1,8 +1,8 @@
 # ==============================================================================
-# HMGS GÜVENLİK VE GİT SÜZGEÇ DOSYASI (.gitignore)
+# HMGS (.gitignore)
 # ==============================================================================
 
-# --- 1. GİZLİ KİMLİK BİLGİLERİ (ASLA COMMIT EDİLMEMELİ) ---
+# --- 1. Kimlik ve Ortam Dosyaları ---
 HMGS_Takip_App/sync/client_secret.json
 HMGS_Takip_App/sync/.tokens.json
 HMGS_Takip_App/sync/sync.log
@@ -12,10 +12,8 @@ HMGS_Takip_App/sync/.pushed_studio_sessions.json
 *.pem
 *.key
 
-# --- 2. KİŞİSEL ÇALIŞMA VERİSİ (Google Drive ile cihazlar arası eşitlenir) ---
+# --- 2. Yerel Çalışma Verileri ---
 HMGS_Takip_App/uploads/
-HMGS_Takip_App/ocr_results.json
-HMGS_Takip_App/work/ocr_*.txt
 HMGS_Takip_App/claude_tasks.json
 HMGS_Takip_App/claude_report*.json
 HMGS_Takip_App/task_history.json
@@ -23,13 +21,11 @@ HMGS_Takip_App/refs/
 studio_sessions_export.json
 HMGS_Drive_Yedek/
 
-# --- 3. AĞIR TARAMA VE ARŞİV DOSYALARI ---
-scans/to_process/
-scans/archive/
+# --- 3. Geçici ve Yedek Dosyalar ---
 *.bak*
 *.tmp
 
-# --- 4. SİSTEM, PAKET VE ÖNBELLEK DOSYALARI ---
+# --- 4. Sistem, Paket ve Önbellek Dosyaları ---
 node_modules/
 __pycache__/
 *.pyc
@@ -39,7 +35,7 @@ log/
 .DS_Store
 Thumbs.db
 
-# --- 5. TELİFLİ SORU BANKALARI VE GİZLİ VERİ KASASI (Google Drive Vault ile eşitlenir) ---
+# --- 5. Yerel Veri Dosyaları ---
 questions.js
 topics.js
 kitap_envanteri.js
@@ -53,14 +49,8 @@ HMGS_Takip_App/sync/github_token.txt
 HMGS_Android/
 scratch/
 # ==============================================================================
-# --- 6. VARSAYILAN YASAK (DEFAULT-DENY): SIFIR-VERI KABUGU KORUMASI ---
+# --- 6. YAYIN BEYAZ LİSTESİ (DEFAULT-DENY) ---
 # ==============================================================================
-# NOT: Yukaridaki kara liste tek basina YETMEZ. Bir dosya bir kez "git add" ile
-# takibe alinmissa .gitignore onu artik korumaz (takip edilen dosya ignore edilmez).
-# Bu yuzden bu bolumde kok dizindeki HER SEY yasaklanir; yalnizca GitHub'a
-# yayinlanan arayuz kabugu acikca izinli birakilir. Boylece "git add ."
-# calistirilsa dahi soru bankasi, sinav taramasi, kisisel not veya takip verisi
-# pakete giremez.
 /*
 !/.gitignore
 !/.gitattributes
@@ -81,5 +71,4 @@ scratch/
 !/js/
 !/studio/
 !/.githooks/
-# Studyo test / fixture dosyalari yayinlanmaz
 /studio/test/

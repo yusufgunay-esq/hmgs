@@ -1,9 +1,7 @@
 #!/bin/sh
 # ==============================================================================
-# HMGS PUBLIC-REPO GUARD - pre-commit
-# Yalnizca yayinlanan arayuz kabugu commit edilebilir.
-# Soru bankasi / sinav taramasi / kisisel not / takip verisi ASLA.
-# Kaldirmak icin: git config --unset core.hooksPath
+# REPO GUARD - pre-commit
+# Yalnizca beyaz listedeki dosyalar commit edilebilir.
 # ==============================================================================
 
 allow=".githooks/allowlist.txt"
@@ -38,8 +36,6 @@ rm -f "$tmp"
 if [ "$bad" -ne 0 ]; then
     echo ""
     echo "  COMMIT ENGELLENDI."
-    echo "  Bu depo yalnizca arayuz kabugunu barindirir (public)."
-    echo "  Kisisel veri icin: HMGS_Yayinla.bat -> sadece kabuk, API ile yayinlar."
     echo "  Bilerek eklemek istediginiz dosya varsa: .githooks/allowlist.txt"
     exit 1
 fi

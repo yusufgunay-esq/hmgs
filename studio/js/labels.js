@@ -1,16 +1,10 @@
 /* ==========================================================================
-   labels.js — dinamik kaynak etiket motoru
-   Açık kaynak repoda YALNIZCA nötr kod adları barınır.
-   Gerçek sınav ve yayın etiketleri KESİNLİKLE açık kodda tutulmaz;
-   kullanıcı Google Drive kasasını bağladığında doğrudan şahsi Drive
-   kasasından (IndexedDB / vaultData) dinamik olarak yüklenir.
+   labels.js — Kaynak ve bölüm etiket yardımcıları
    ========================================================================== */
 
 /* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama,
    türetme veya yeniden yayınlama yasaktır. */
-
-// ---- KOD ADLARI (açık repo / misafir modu fallbacks) --------------------
 
 const DENEME_ALIAS = {
   deneme_1: 'Deneme Seti 1',
@@ -30,14 +24,8 @@ const ARSIV_ALIAS = {
   hmgs_2026_eylul: 'Arşiv Sınavı 5',
 };
 
-// ---- DİNAMİK KASA METADATASI (Google Drive kasasından gelir) ------------
-
 let vaultMeta = null;
 
-/**
- * Kasa yüklendiğinde data.js tarafından çağrılır.
- * Gerçek isimler ve başlıklar doğrudan kullanıcının şahsi kasasından beslenir.
- */
 export function setVaultLabels(meta) {
   vaultMeta = meta || null;
 }
