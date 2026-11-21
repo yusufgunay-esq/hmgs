@@ -1,0 +1,74 @@
+# ==============================================================================
+# HMGS (.gitignore)
+# ==============================================================================
+
+# --- 1. Kimlik ve Ortam Dosyaları ---
+HMGS_Takip_App/sync/client_secret.json
+HMGS_Takip_App/sync/.tokens.json
+HMGS_Takip_App/sync/sync.log
+HMGS_Takip_App/sync/.pushed_studio_sessions.json
+.env
+*.env
+*.pem
+*.key
+
+# --- 2. Yerel Çalışma Verileri ---
+HMGS_Takip_App/uploads/
+HMGS_Takip_App/claude_tasks.json
+HMGS_Takip_App/claude_report*.json
+HMGS_Takip_App/task_history.json
+HMGS_Takip_App/refs/
+studio_sessions_export.json
+HMGS_Drive_Yedek/
+
+# --- 3. Geçici ve Yedek Dosyalar ---
+*.bak*
+*.tmp
+
+# --- 4. Sistem, Paket ve Önbellek Dosyaları ---
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+log/
+*.log
+.DS_Store
+Thumbs.db
+
+# --- 5. Yerel Veri Dosyaları ---
+questions.js
+topics.js
+kitap_envanteri.js
+data/
+hmgs_vault.json
+hmgs_2026_data.json
+sync/github_token.txt
+HMGS_Takip_App/sync/github_token.txt
+
+
+HMGS_Android/
+scratch/
+# ==============================================================================
+# --- 6. YAYIN BEYAZ LİSTESİ (DEFAULT-DENY) ---
+# ==============================================================================
+/*
+!/.gitignore
+!/.gitattributes
+!/.nojekyll
+!/README.md
+!/LICENSE
+!/robots.txt
+!/index.html
+!/portal.html
+!/sw.js
+!/studio.html
+!/studio.webmanifest
+!/questions_ai.js
+!/apple-touch-icon.png
+!/favicon.ico
+!/favicon.png
+!/icons/
+!/js/
+!/studio/
+!/.githooks/
+/studio/test/
