@@ -78,9 +78,8 @@ export function render() {
   }
   const t = cur.topicId ? topicById.get(cur.topicId) : null;
 
-  // Sorusu olmayan konularda okundu anında işlenir; sorulu konularda blok içi
-  // mini kontrol sorusunu cevaplayınca (ya da alttan elle işaretleyince) okundu sayılır.
-  if (t && !ui.sinav && !questionsOfTopic(t.id).length) { markTopicRead(t.id); save(); }
+  // Konu okunmuş sayılır; blok içi mini kontrol sorusu ayrıca aktif pekiştirme sağlar.
+  if (t && !ui.sinav) { markTopicRead(t.id); save(); }
 
   host.innerHTML = `
     <div class="wrap">
