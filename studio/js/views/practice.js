@@ -390,7 +390,7 @@ export function render() {
             <button class="btn btn-2 btn-s" data-act="ask-gemini" title="Soruyu ve beş şıkkı ipucu istemi olarak kopyalar — doğru şık gönderilmez (G)">İpucu İste <span class="kbd">G</span></button>
             <button class="q-quit-link" data-act="quit">Seansı bitir</button>
             <span class="hint">
-              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> bahis · <span class="kbd">P</span> park · <span class="kbd">F</span> odak
+              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> bahis · <span class="kbd">P</span> park · <span class="kbd">F</span> odak · <span class="kbd">G</span> yapay zeka
             </span>
           </div>
           ${topic ? `<p class="hint q-topic-hint">Bağlı konu: ${esc(topic.title)}</p>` : ''}
