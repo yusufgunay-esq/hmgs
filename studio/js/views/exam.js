@@ -20,6 +20,7 @@ import { pushStudioQueueToDrive, getActiveToken, setActiveToken, requestSilentTo
 import { buildGeminiPrompt } from './practice.js';
 import { arsivLabel, denemeLabel, arsivStartLabel, denemeStartLabel, SECTION } from '../labels.js';
 import { kurtarmaRadariHTML } from '../tuyolar.js';
+import { adhdSettings, negativeBannerHTML, enhanceAskHTML, examQuarterMeta, noiseButtonHTML } from '../adhd.js';
 
 /** HMGS: 120 soru / 155 dakika (Adalet Bakanlığı PGM, 27 Eylül 2026 ilanı:
  *  "cevaplama süresi 155 dakika"). Eskiden 150 yazıyordu. */
@@ -112,7 +113,9 @@ function beginExam(questions, { shortfall, label, real, stats }) {
     times: new Array(questions.length).fill(0),
     qStart: performance.now(),
     startedAt: Date.now(),
+    durationMs,
     endsAt: Date.now() + durationMs,
+    crossedQuarters: new Set([1]),
     shortfall: shortfall || [],
     label,
     real,
@@ -312,28 +315,44 @@ export function render() {
   const struckPremises = E.elimPremises[E.i] || (E.elimPremises[E.i] = new Set());
   const struckOptions = E.elimOptions[E.i] || (E.elimOptions[E.i] = new Set());
   const allNumerals = extractNumerals(premise);
+  const qm = examQuarterMeta(E.i, E.questions.length, E.endsAt - Date.now(), E.durationMs || DURATION_MS);
+
+  const quarterMapHTML = qm.quarters.map(gr => {
+    const doneInQ = E.answers.slice(gr.start, gr.end + 1).filter(a => a !== null).length;
+    const isNow = gr.num === qm.quarter;
+    let btns = '';
+    for (let i = gr.start; i <= gr.end; i++) {
+      btns += `<button data-act="exam-goto" data-i="${i}"
+        class="${E.answers[i] !== null ? 'answered' : 'blank'} ${E.marked.has(i) ? 'marked' : ''} ${i === E.i ? 'now' : ''}"
+        title="Soru ${i + 1}">${i + 1}</button>`;
+    }
+    return `<div class="exam-q-group${isNow ? ' is-active' : ''}">
+      <div class="exam-q-head"><span>Ç${gr.num} · ${gr.start + 1}–${gr.end + 1}</span><span>${doneInQ}/${gr.count}</span></div>
+      <div class="exam-q-cells">${btns}</div>
+    </div>`;
+  }).join('');
 
   host.innerHTML = `
     <div class="wrap">
       <div class="exam-bar">
         <span class="exam-clock" id="exam-clock">${fmtClock(E.endsAt - Date.now())}</span>
+        <span class="chip exam-quarter-chip tone-${qm.paceTone}" id="exam-quarter" title="4 çeyrek tempo pusulası">${esc(qm.paceLabel)}</span>
         <span class="chip" id="exam-pace" title="Kalan süre ÷ işaretlenmemiş soru. Bütçe büyükse acele ediyorsun: kökü ikinci kez oku, şıkları tek tek ele.">${paceText()}</span>
         ${E.real ? `<span class="chip accent">${esc(E.label)}</span>` : ''}
         <span class="chip">${answeredCount} / ${E.questions.length} işaretli</span>
         ${answeredCount < E.questions.length ? `<button class="btn btn-2 btn-s exam-blank-jump" data-act="exam-next-blank" title="Sıradaki boş soruya git (Haritada boşlar düz, kuşkulu boşlar sarı; kuşkulu ama işaretli olanlar sarı çerçeveli mavi)">${E.questions.length - answeredCount} boş · sıradakine git</button>` : ''}
         <button class="btn btn-2 btn-s" data-act="exam-finish">Sınavı bitir</button>
-        <div class="exam-map" id="exam-map">
-          ${E.questions.map((_, i) => `<button data-act="exam-goto" data-i="${i}"
-            class="${E.answers[i] !== null ? 'answered' : 'blank'} ${E.marked.has(i) ? 'marked' : ''} ${i === E.i ? 'now' : ''}"
-            title="Soru ${i + 1}">${i + 1}</button>`).join('')}
-        </div>
+        <div class="exam-map exam-map-quarters" id="exam-map">${quarterMapHTML}</div>
       </div>
 
       <div class="wrap-read">
         <div class="q-head">
-          <span>Soru ${E.i + 1} / ${E.questions.length}</span>
+          <span>Soru ${E.i + 1} / ${E.questions.length} · Çeyrek ${qm.quarter}/4 (${qm.inQuarterPos}/${qm.quarterLen})</span>
           <span>${esc(subjectName(q.subjectId))}</span>
-          <button class="btn btn-2 btn-s exam-doubt${E.marked.has(E.i) ? ' on' : ''}" data-act="exam-mark" style="margin-left:auto"
+          <button class="btn btn-2 btn-s${adhdSettings().focusRail ? ' active' : ''}" data-act="adhd-toggle-rail" aria-pressed="${adhdSettings().focusRail}" style="margin-left:auto"
+            title="Odak satırı: uzun metinde cümle cümle oku (F)">Odak <span class="kbd">F</span></button>
+          ${noiseButtonHTML()}
+          <button class="btn btn-2 btn-s exam-doubt${E.marked.has(E.i) ? ' on' : ''}" data-act="exam-mark"
             title="Bu soruda kuşkun olduğunu işaretler. Soru haritasında işaretli kalır, sonuç ekranında da kuşkulu sayılır (K)">
             ${E.marked.has(E.i) ? 'Kuşkuyu kaldır' : 'Kuşkuluyum'} <span class="kbd">K</span>
           </button>
@@ -341,7 +360,8 @@ export function render() {
 
         <div class="card">
           ${premiseHTML(premise, struckPremises)}
-          <div class="q-ask">${rich(ask)}</div>
+          ${negativeBannerHTML(ask)}
+          <div class="q-ask">${enhanceAskHTML(ask, rich)}</div>
           <div class="opts" id="exam-opts">
             ${q.options.map(o => {
               const isStruckManual = struckOptions.has(o.key);
@@ -381,6 +401,12 @@ function startClock() {
     }
     const pe = $('#exam-pace');
     if (pe) pe.textContent = paceText();
+    const qe = $('#exam-quarter');
+    if (qe) {
+      const qm = examQuarterMeta(E.i, E.questions.length, left, E.durationMs || DURATION_MS);
+      qe.textContent = qm.paceLabel;
+      qe.className = `chip exam-quarter-chip tone-${qm.paceTone}`;
+    }
     if (left <= 0) { toast('Süre doldu.'); finish(true); }
   }, 500);
 }
@@ -407,12 +433,26 @@ function accrueTime() {
   E.qStart = performance.now();
 }
 
+function checkQuarterCross() {
+  if (!E || !E.crossedQuarters) return;
+  const qm = examQuarterMeta(E.i, E.questions.length, E.endsAt - Date.now(), E.durationMs || DURATION_MS);
+  if (qm.quarter > 1 && !E.crossedQuarters.has(qm.quarter)) {
+    E.crossedQuarters.add(qm.quarter);
+    toast(`${qm.quarter - 1}. çeyrek bitti · gözünü 5 sn uzağa odakla, ${qm.quarter}. çeyreğe geç.`);
+  }
+}
+
 export function pick(key) {
   if (!E || E.finished) return;
   accrueTime();
   E.answers[E.i] = key;
-  if (E.i < E.questions.length - 1) { E.i += 1; render(); }
-  else render();
+  if (E.i < E.questions.length - 1) {
+    E.i += 1;
+    checkQuarterCross();
+    render();
+  } else {
+    render();
+  }
 }
 
 export function clear() { if (E) { E.answers[E.i] = null; render(); } }
@@ -471,7 +511,13 @@ export function mark() {
   const pe = $('#exam-pace');
   if (pe) pe.textContent = paceText();
 }
-export function goto(i) { if (E) { accrueTime(); E.i = Math.max(0, Math.min(E.questions.length - 1, i)); render(); } }
+export function goto(i) {
+  if (!E) return;
+  accrueTime();
+  E.i = Math.max(0, Math.min(E.questions.length - 1, i));
+  checkQuarterCross();
+  render();
+}
 /** Kuşku işareti boşları gizliyordu: sıradaki boş soruya (döngüsel) atlar. */
 export function nextBlank() {
   if (!E) return;

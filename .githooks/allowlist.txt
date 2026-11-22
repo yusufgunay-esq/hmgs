@@ -22,6 +22,7 @@ studio.webmanifest
 questions_ai.js
 studio/css/studio-mobile.css
 studio/css/studio.css
+studio/js/adhd.js
 studio/js/book-map.js
 studio/js/data.js
 studio/js/labels.js

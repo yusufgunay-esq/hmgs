@@ -18,6 +18,10 @@ import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim
 import { kuralButtonHTML } from '../kural.js';
 import { pushStudioQueueToDrive, getActiveToken, setActiveToken, requestSilentToken } from '../vault-client.js';
 import { tuyoSec, kurtarmaRadariHTML } from '../tuyolar.js';
+import {
+  adhdSettings, negativeBannerHTML, enhanceAskHTML, impulseWarning,
+  progressiveExplanationHTML, buildSparkSet, parkInQueue, showReentry, noiseButtonHTML
+} from '../adhd.js';
 
 let S = null;   // aktif seans
 let tick = null;
@@ -199,9 +203,32 @@ export function startSession(opts = {}) {
   // Seans saati burada başlar. Soru sürelerinin toplamı seansın süresi
   // DEĞİLDİR; duvar saati, mola ve boşta geçen zaman ayrı tutulur (seans.js).
   seans.begin({ mode, label });
-  seans.onKacis(ms => toast(`${Math.round(ms / 1000)} sn dışarıdaydın.`));
+  seans.onKacis(ms => {
+    if (S && !S.answered) showReentry('#view-practice', ms, 'practice-park');
+    else toast(`${Math.round(ms / 1000)} sn ara verdin.`);
+  });
   render();
   return true;
+}
+
+/** 5 soruluk İlk Kıvılcım ısınma seti: göreve başlama felcini kırmak için. */
+export function startSpark(count = 5) {
+  const seenIds = new Set((state().answers || []).map(a => a.qId));
+  const raw = allQuestions();
+  const core = raw.filter(isCoreTarget);
+  const pool = sortByTierPriority(core.length ? core : raw);
+  const qs = buildSparkSet(pool, seenIds, count);
+  if (!qs.length) {
+    toast('Isınma seti için soru bulunamadı.');
+    return false;
+  }
+  return startSession({
+    mode: 'mixed',
+    questions: qs,
+    count: qs.length,
+    customLabel: `İlk Kıvılcım · ${qs.length} Soru`,
+    tag: 'spark'
+  });
 }
 
 function allQuestions() {
@@ -306,8 +333,17 @@ export function render() {
           </div>
         </div>
         <div class="q-strip-right">
+          <span id="pr-break-slot">${prBreakChipHTML()}</span>
           <span class="chip accent">${esc(S.label)}</span>
           <span class="q-timer" id="q-timer">0 sn</span>
+          <button class="icon-btn${adhdSettings().focusRail ? ' active' : ''}" data-act="adhd-toggle-rail" aria-pressed="${adhdSettings().focusRail}" title="Odak satırı: uzun metinde cümle cümle oku (F)" aria-label="Odak satırı">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <line x1="4" y1="6" x2="20" y2="6" opacity="0.35"></line>
+              <line x1="4" y1="12" x2="20" y2="12"></line>
+              <line x1="4" y1="18" x2="15" y2="18" opacity="0.35"></line>
+            </svg>
+          </button>
+          ${noiseButtonHTML()}
           <button class="icon-btn" data-act="toggle-font-size" title="Metin Boyutunu Değiştir" aria-label="Metin boyutu">
             <span style="font-family:var(--sans);font-size:0.72rem;font-weight:700">A±</span>
           </button>
@@ -323,7 +359,8 @@ export function render() {
         <div class="q-main">
           <div class="card q-card">
             ${premiseHTML(premise)}
-            <div class="q-ask">${rich(ask)}</div>
+            ${negativeBannerHTML(ask)}
+            <div class="q-ask">${enhanceAskHTML(ask, rich)}</div>
             <div class="opts" id="opts">
               ${q.options.map(o => optionRowHTML(o, { pickAct: 'practice-arm' })).join('')}
             </div>
@@ -348,11 +385,12 @@ export function render() {
           </div>
 
           <div class="q-main-foot" id="q-actions">
+            ${S.questions.length - S.i > 1 ? `<button class="btn btn-2 btn-s" data-act="practice-park" title="Bu soruyu boş bırakmadan setin arkasına bırak (P)">Sonraya bırak <span class="kbd">P</span></button>` : ''}
             <button class="btn btn-2 btn-s" data-act="dontknow">Bilmiyorum · çözümü göster</button>
             <button class="btn btn-2 btn-s" data-act="ask-gemini" title="Soruyu ve beş şıkkı ipucu istemi olarak kopyalar — doğru şık gönderilmez (G)">İpucu İste <span class="kbd">G</span></button>
             <button class="q-quit-link" data-act="quit">Seansı bitir</button>
             <span class="hint">
-              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> bahis · <span class="kbd">G</span> yapay zeka · <span class="kbd">Enter</span> devam
+              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> bahis · <span class="kbd">P</span> park · <span class="kbd">F</span> odak
             </span>
           </div>
           ${topic ? `<p class="hint q-topic-hint">Bağlı konu: ${esc(topic.title)}</p>` : ''}
@@ -417,10 +455,39 @@ export function arm(key) {
  * "kilitle" düğmesi gelir: açıklamayı okuduktan sonra verilen güven yargısı
  * ölçmek istediğimiz şeyin kendisini bozar (bkz. engine.js CONF.hint).
  */
+function prBreakChipHTML() {
+  if (!seans.softBreakDue()) return '';
+  return `<span class="adhd-soft-break">
+    <button class="akim-break-chip soft" data-act="practice-soft-break" title="15 dakika oldu. 3 dakikalık kısa nefes molası alabilirsin.">15 dk · Nefes?</button>
+    <button class="adhd-soft-x" data-act="adhd-dismiss-break" title="Akışta kal (+15 dk ertele)" aria-label="Ertele">✕</button>
+  </span>`;
+}
+
+export function takeSoftBreak() {
+  if (!S) return;
+  seans.startSoftBreak(() => {
+    const slot = $('#pr-break-slot');
+    if (slot) slot.innerHTML = prBreakChipHTML();
+  }, adhdSettings().softBreakMin);
+  const slot = $('#pr-break-slot');
+  if (slot) slot.innerHTML = '';
+}
+
+export function dismissSoftBreak() {
+  seans.dismissSoftBreak(adhdSettings().softCheckMin);
+  const slot = $('#pr-break-slot');
+  if (slot) slot.innerHTML = prBreakChipHTML();
+}
+
 function paintBet() {
   const helped = !!S && S.geminiAskedPreAnswer;
+  const q = S && S.questions[S.i];
+  const warn = !helped && q ? impulseWarning(seans.qElapsed(), splitStem(q.stem).ask) : '';
   const k = $('#pr-bet-k'), row = $('#pr-bet-row'), hint = $('#pr-bet-hint');
-  if (k) k.textContent = helped ? 'İpucunu okudun' : 'Ne kadar eminsin?';
+  if (k) {
+    k.textContent = helped ? 'İpucunu okudun' : (warn || 'Ne kadar eminsin?');
+    k.classList.toggle('is-warn', !!warn);
+  }
   if (row) row.hidden = helped;
   if (hint) hint.hidden = !helped;
 }
@@ -610,9 +677,13 @@ function paintResult(q, chosen, row, sched, ms) {
   // Sol kontrol alanını cevaplanmış duruma göre senkronize et
   const btnDontKnow = document.querySelector('#q-actions [data-act="dontknow"]');
   if (btnDontKnow) btnDontKnow.style.display = 'none';
+  const btnPark = document.querySelector('#q-actions [data-act="practice-park"]');
+  if (btnPark) btnPark.style.display = 'none';
+  const brk = $('#pr-break-slot');
+  if (brk) brk.innerHTML = prBreakChipHTML();
   const qHint = document.querySelector('#q-actions .hint');
   if (qHint) {
-    qHint.innerHTML = `<span class="kbd">Enter</span> sonraki soru${row.ok ? ' · <span class="kbd">M</span> mantıkla geç' : ''} · <span class="kbd">G</span> yapay zeka`;
+    qHint.innerHTML = `<span class="kbd">Enter</span> sonraki soru · <span class="kbd">D</span> detay${row.ok ? ' · <span class="kbd">M</span> mantıkla geç' : ''} · <span class="kbd">G</span> yapay zeka`;
   }
 
   // Gizlenen ders adı cevaptan sonra açılır
@@ -650,7 +721,26 @@ function formatExplanationText(text) {
 function explanationHTML(q, chosen) {
   const text = q.explanation || 'Bu soru için gerekçeli açıklama henüz yazılmamış.';
   const formatted = formatExplanationText(text);
-  return `<div class="fb-lead">${richBlock(formatted)}</div>`;
+  return progressiveExplanationHTML(formatted, richBlock);
+}
+
+/** Tıkayan soruyu boş bırakmadan setin arkasına (en çok 6 adım ileri) park eder. */
+export function park() {
+  if (!S || S.answered) return false;
+  const res = parkInQueue(S.questions, S.i, 6);
+  if (!res.moved) {
+    toast('Bu sette park edilecek başka soru kalmadı.');
+    return false;
+  }
+  seans.qDiscard();
+  stopTick();
+  S.armed = null;
+  S.elimUsed = false;
+  S.geminiAsked = false;
+  S.geminiAskedPreAnswer = false;
+  toast('Soru sonraya bırakıldı · taze soruyla devam.');
+  render();
+  return true;
 }
 
 function $$opts() { return [...document.querySelectorAll('#opts .opt')]; }

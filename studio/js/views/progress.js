@@ -11,6 +11,7 @@ import { esc, $, fmtClock, toast } from '../ui.js';
 import { SUBJECTS, subjectName, integrity, topicById } from '../data.js';
 import { state, exportJSON, hardReset, PASS_CORRECT, TARGET_SEC, save } from '../store.js';
 import { allSubjectMastery, MASTERY_LABEL, srsSummary, BOXES, examGap, worstExamSubjects, answerQualitySignals } from '../engine.js';
+import { adhdSettingsPanelHTML } from '../adhd.js';
 
 let cachedProfil = null;
 try {
@@ -218,6 +219,8 @@ export function render() {
           </tbody>
         </table>
       </div>
+
+      ${adhdSettingsPanelHTML()}
 
       <div class="section-label">Kütüphane</div>
       <div class="card">

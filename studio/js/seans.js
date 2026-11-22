@@ -63,6 +63,8 @@ const IDLE_MS = 150 * 1000;
     kendini ilk kez orada bulur. 50 dakika, sınav süresinin tam yarısıdır. */
 const DEFAULT_WORK_MIN = 50;
 const DEFAULT_BREAK_MIN = 10;
+const DEFAULT_SOFT_CHECK_MIN = 15;
+const DEFAULT_SOFT_BREAK_MIN = 3;
 
 /** Odak izi — G tuşuyla Gemini'ye gidip pencereden çıkmak "yapay zeka turu",
     başka bir sebeple çıkmak "kaçış" sayılır (bkz. PLAN_ODAK_IZI_VE_ISTEM.md).
@@ -141,6 +143,7 @@ export function begin(meta = {}) {
     pomoOn: a.on,
     workMs: a.workMin * 60000,
     breakMs: a.breakMin * 60000,
+    softNextMs: DEFAULT_SOFT_CHECK_MIN * 60000,
     blockT0: now(),    // içinde bulunulan bloğun başı
     blockMs: 0,        // bu blokta çalışılan (aktif + kısa boşluk) süre
     blocksDone: 0,
@@ -261,6 +264,16 @@ export function qBegin() {
 export function qElapsed() {
   if (!SS) return 0;
   return SS.qAccum + (SS.qRunSince != null ? now() - SS.qRunSince : 0);
+}
+
+/** Park edilen (sonraya atılan) sorunun yarım süresini telemetriye yazmadan temizler. */
+export function qDiscard() {
+  if (!SS) return;
+  SS.qAccum = 0;
+  SS.qRunSince = null;
+  SS.qT0 = null;
+  SS.qIdleMs = 0;
+  SS.qIdleSince = null;
 }
 
 /**
@@ -417,6 +430,36 @@ export function suggestBreak(sebep = 'akis') {
 export function breakDue() { return !!(SS && SS.breakDue && !SS.onBreak); }
 
 /**
+ * 15 dakikalık sessiz nefes kontrol noktası (ADHD elastik sprint):
+ * Ekranı asla kilitlemez; yalnız şeritte gönüllü küçük bir çip olarak görünür.
+ */
+export function softBreakDue() {
+  if (!SS || !SS.pomoOn || SS.onBreak || SS.breakDue) return false;
+  return SS.softNextMs > 0 && SS.blockMs >= SS.softNextMs;
+}
+
+/** Hiper-odakta mola istenmezse sonraki kontrol noktasını +15 dk ileri alır. */
+export function dismissSoftBreak(snoozeMin = DEFAULT_SOFT_CHECK_MIN) {
+  if (!SS) return;
+  const step = Math.max(5, Number(snoozeMin) || DEFAULT_SOFT_CHECK_MIN) * 60000;
+  SS.softNextMs = Math.max(SS.blockMs, SS.softNextMs) + step;
+}
+
+/** Gönüllü 3 dakikalık kısa nefes molası başlatır (ana 50/10 ayarını bozmaz). */
+export function startSoftBreak(resumeFn, mins = DEFAULT_SOFT_BREAK_MIN) {
+  if (!SS || SS.onBreak) return;
+  pauseQ();
+  SS.onBreak = true;
+  SS.breakDue = false;
+  SS.molaSebep = 'nefes';
+  SS.breakT0 = now();
+  const durMin = Math.max(1, Number(mins) || DEFAULT_SOFT_BREAK_MIN);
+  SS.breakEndsAt = Date.now() + durMin * 60000;
+  SS.afterBreak = typeof resumeFn === 'function' ? resumeFn : null;
+  renderOverlay();
+}
+
+/**
  * "Devam" düğmesinin kapısı. Mola varsa molayı başlatır, true döner ve
  * çağıran akışı durdurur; mola bitince `resumeFn` çağrılır.
  * Mola yoksa false döner, hiçbir şey olmaz.
@@ -445,6 +488,7 @@ export function endBreak(silent = false) {
   SS.onBreak = false;
   SS.blocksDone += 1;
   SS.blockMs = 0;
+  SS.softNextMs = DEFAULT_SOFT_CHECK_MIN * 60000;
   SS.blockT0 = now();
   removeOverlay();
   lastInput = now();
@@ -478,12 +522,11 @@ function renderOverlay() {
       </div>
       <div class="mola-ayar">
         <span class="mola-ayar-k">Blok</span>
-        ${[25, 50, 75].map(m => `<button class="mola-chip${SS.workMs === m * 60000 ? ' secili' : ''}" data-blok="${m}">${m} dk</button>`).join('')}
+        ${[15, 25, 50, 75].map(m => `<button class="mola-chip${SS.workMs === m * 60000 ? ' secili' : ''}" data-blok="${m}">${m} dk</button>`).join('')}
         <button class="mola-chip" data-act="mola-kapat">Molasız</button>
       </div>
       <p class="mola-not" style="margin:0.9rem 0 0">
-        Sınav 155 dakika kesintisizdir. 25 dakikalık bloklarla çalışan kafa,
-        o 155 dakikanın ikinci yarısını ilk kez sınavda görür.
+        Kısa nefes molaları odağı tazeler; hiper-odaktaysan çipi kapatıp kesintisiz devam edebilirsin.
       </p>
     </div>`;
   document.body.appendChild(el);
@@ -491,9 +534,11 @@ function renderOverlay() {
 
   const alt = el.querySelector('#mola-alt');
   if (alt) {
-    alt.textContent = SS.molaSebep === 'akis'
-      ? 'Son sorularda tempo ve isabet birlikte düştü. Zorlayarak devam etmek yanlışı öğretir.'
-      : `${Math.round(SS.workMs / 60000)} dakikalık blok doldu.`;
+    alt.textContent = SS.molaSebep === 'nefes'
+      ? 'Kısa nefes molası. 3 dakika gözünü dinlendirip taze dön.'
+      : SS.molaSebep === 'akis'
+        ? 'Son sorularda tempo ve isabet birlikte düştü. Zorlayarak devam etmek yanlışı öğretir.'
+        : `${Math.round(SS.workMs / 60000)} dakikalık blok doldu.`;
   }
 
   el.addEventListener('click', ev => {

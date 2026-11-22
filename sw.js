@@ -1,13 +1,13 @@
-/* HMGS 2026 — Service Worker
-   Amaç: uygulama telefonda internetsiz de açılsın; Drive trafiği ASLA önbelleğe girmesin. */
-/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
-   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
-   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
+﻿/* HMGS 2026 â€” Service Worker
+   AmaÃ§: uygulama telefonda internetsiz de aÃ§Ä±lsÄ±n; Drive trafiÄŸi ASLA Ã¶nbelleÄŸe girmesin. */
+/* Â© 2026 Yusuf GÃœNAY â€” TÃ¼m HaklarÄ± SaklÄ±dÄ±r / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. Ä°zinsiz kopyalama, tÃ¼retme
+   veya yeniden yayÄ±nlama yasaktÄ±r. Lisans: depo kÃ¶kÃ¼ndeki LICENSE dosyasÄ±. */
 
-const VERSION = 'hmgs-v87';
+const VERSION = 'hmgs-v81';
 const SHELL = VERSION + '-shell';
 
-// Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
+// UygulamanÄ±n kendi dosyalarÄ± + dÄ±ÅŸarÄ±dan gelen gÃ¶rÃ¼nÃ¼m dosyalarÄ± + StÃ¼dyo kabuÄŸu.
 const PRECACHE = [
   './',
   './index.html',
@@ -23,6 +23,7 @@ const PRECACHE = [
   './studio/css/studio.css',
   './studio/css/studio-mobile.css',
   './studio/js/main.js',
+  './studio/js/adhd.js',
   './studio/js/data.js',
   './studio/js/labels.js',
   './studio/js/engine.js',
@@ -60,7 +61,7 @@ const PRECACHE = [
 ];
 
 
-// Bunlar asla önbelleğe alınmaz: kimlik doğrulama ve Drive API canlı olmak zorunda.
+// Bunlar asla Ã¶nbelleÄŸe alÄ±nmaz: kimlik doÄŸrulama ve Drive API canlÄ± olmak zorunda.
 const NEVER_CACHE = [
   'accounts.google.com',
   'oauth2.googleapis.com',
@@ -72,10 +73,10 @@ const NEVER_CACHE = [
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL);
-    // Tek bir dosya patlarsa kurulumun tamamı düşmesin.
+    // Tek bir dosya patlarsa kurulumun tamamÄ± dÃ¼ÅŸmesin.
     await Promise.all(PRECACHE.map(async url => {
       try { await cache.add(new Request(url, { cache: 'reload' })); }
-      catch (e) { console.warn('[sw] önbelleğe alınamadı:', url); }
+      catch (e) { console.warn('[sw] Ã¶nbelleÄŸe alÄ±namadÄ±:', url); }
     }));
     self.skipWaiting();
   })());
@@ -100,11 +101,11 @@ self.addEventListener('fetch', event => {
   let url;
   try { url = new URL(req.url); } catch (_) { return; }
 
-  if (NEVER_CACHE.some(h => url.hostname.endsWith(h))) return;      // doğrudan ağa
-  if (url.pathname.startsWith('/api/')) return;                      // yerel sunucu uçları
+  if (NEVER_CACHE.some(h => url.hostname.endsWith(h))) return;      // doÄŸrudan aÄŸa
+  if (url.pathname.startsWith('/api/')) return;                      // yerel sunucu uÃ§larÄ±
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
-  // Sayfa açılışı ve modül dosyaları: Ağ öncelikli (network-first), bağlantı yoksa önbellek
+  // Sayfa aÃ§Ä±lÄ±ÅŸÄ± ve modÃ¼l dosyalarÄ±: AÄŸ Ã¶ncelikli (network-first), baÄŸlantÄ± yoksa Ã¶nbellek
   event.respondWith((async () => {
     try {
       const fresh = await fetch(req);
@@ -121,7 +122,7 @@ self.addEventListener('fetch', event => {
         if (fallback) return fallback;
       }
       return new Response(
-        '<meta charset="utf-8"><body style="background:#0b0f19;color:#94a3b8;font:16px system-ui;padding:2rem">Bağlantı yok ve önbellek henüz hazır değil. İnternete bağlandığınızda sayfa otomatik yüklenecektir.</body>',
+        '<meta charset="utf-8"><body style="background:#0b0f19;color:#94a3b8;font:16px system-ui;padding:2rem">BaÄŸlantÄ± yok ve Ã¶nbellek henÃ¼z hazÄ±r deÄŸil. Ä°nternete baÄŸlandÄ±ÄŸÄ±nÄ±zda sayfa otomatik yÃ¼klenecektir.</body>',
         { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
       );
     }
