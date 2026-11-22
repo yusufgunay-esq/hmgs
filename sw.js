@@ -4,7 +4,7 @@
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-const VERSION = 'hmgs-v81';
+const VERSION = 'hmgs-v82';
 const SHELL = VERSION + '-shell';
 
 // Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
@@ -40,6 +40,7 @@ const PRECACHE = [
   './studio/js/pregel.js',
   './studio/js/rota.js',
   './studio/js/koc.js',
+  './studio/js/ritim.js',
   './studio/js/kitap.js',
   './studio/js/kitaplar.js',
   './studio/js/tuyolar.js',

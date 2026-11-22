@@ -46,6 +46,7 @@ studio/js/legacy-adapt.js
 studio/js/main.js
 studio/js/pregel.js
 studio/js/rota.js
+studio/js/ritim.js
 studio/js/seans.js
 studio/js/store.js
 studio/js/tuyolar.js

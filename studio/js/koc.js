@@ -18,12 +18,26 @@
       bitirir (deneme ölçer, öğretmez). Uzakta haftada bir, yaklaştıkça sıklaşır.
 
    FORMÜLLER (computeKoc)
-     çalışma günü = max(1, round(D * 6/7))      haftada bir dinlenme payı
-     yeniGun      = ceil((görülmemiş gerçek + deneme) / çalışma günü)
+     işGünü(x)    = max(1, round(x * 6/7))      haftada bir dinlenme payı
+     yeni havuz   = faza göre (aşağıdaki tablo)
+     yeniGun      = ceil(yeni havuz / işGünü(D - bitiş payı))
      tekrarGun    = ceil(vadesi gelen / max(1, min(D, 14)))
      hedef        = 10'a yuvarla(max(20, yeniGun + tekrarGun))
      eksik        = tempo > 0 ? max(0, yeniGun + tekrarGun - ceil(tempo * 1.15)) : 0
-     kapsamaGun   = ceil((görülmemiş gerçek + deneme) / max(1, tempo * 0.7))
+     kapsamaGun   = ceil(yeni havuz / max(1, tempo * 0.7))
+
+   FAZA GÖRE YENİ HAVUZ (22 Kasım 2026, 5 aylık ufuk düzeltmesi)
+     faz         havuz                                   bitiş payı
+     inşa >90    çıkmış + deneme + HMGS benzeri + hâkimlik   21 gün
+     pekiştirme  çıkmış + deneme + HMGS benzeri               7 gün
+     final 8-21  çıkmış + deneme                              0 gün
+   ESKİ HATA: havuz her fazda yalnız çıkmış + deneme idi (~1.180 soru). 154
+   gün kala bu "günde 9 yeni" yapıyordu, hedef hep 20 tabanına yapışıyordu ve
+   2.400 soruluk HMGS benzeri + hâkimlik bankası hiç hesaba girmiyordu. Uzak
+   ufukta bütün çekirdek havuz bitirilir ve son 3 hafta deneme ile tekrara
+   kalır; yaklaştıkça havuz daralır (zaman kısalınca derin banka bırakılır).
+   Sıralamayı yine karma motoru yapar (önce çıkmış, sonra deneme...); koç
+   yalnız günlük miktarı söyler.
 
    SON HAFTA (1 <= D <= 7) — ham formül burada anlamsızlaşır: D=1'de 650
    görülmemiş soru "günde 770 soru" üretiyordu. Sınav ölçer, öğretmez; son
@@ -41,7 +55,7 @@
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-import { questionById, tierOf, TIER_REAL, TIER_DENEME, TIER_AI } from './data.js';
+import { questionById, tierOf, isCoreTarget, TIER_REAL, TIER_DENEME, TIER_AI, TIER_ADV } from './data.js';
 import { state, todayKey, daysLeft, lastExam } from './store.js';
 import { dueQuestions } from './engine.js';
 
@@ -120,30 +134,32 @@ export function computeKoc(input = {}) {
   const unseenReal = Math.floor(sayi0(input.unseenReal));
   const unseenDeneme = Math.floor(sayi0(input.unseenDeneme));
   const unseenAi = Math.floor(sayi0(input.unseenAi));
+  const unseenAdv = Math.floor(sayi0(input.unseenAdv));
   const dueCount = Math.floor(sayi0(input.dueCount));
   const tempo = Math.round(sayi0(input.measuredPace));
   const todayDone = Math.floor(sayi0(input.todayDone));
-  const unseen = unseenReal + unseenDeneme;
   const faz = fazOf(D);
   const aralik = denemeAraligi(D);
+  const { unseen, bitisPayi, havuzAdi } = yeniHavuz(faz, { unseenReal, unseenDeneme, unseenAi, unseenAdv });
 
   // Sınav günü hedef yok: rota o gün yalnız sınav kartını çizer.
   if (D === 0) {
     return {
       faz, hedef: 0, yeniGun: 0, tekrarGun: 0, tempo, eksik: 0, kapsamaGun: 0,
       mesaj: MESAJ[faz], denemeAraligi: aralik,
-      unseen, unseenReal, unseenDeneme, unseenAi, dueCount,
-      workDays: 0, todayDone, D, sonHafta: false
+      unseen, unseenReal, unseenDeneme, unseenAi, unseenAdv, dueCount, havuzAdi,
+      workDays: 0, yeniIsGunu: 0, bitisPayi, todayDone, D, sonHafta: false
     };
   }
 
-  const workDays = Math.max(1, Math.round(D * 6 / 7));
+  const workDays = isGunu(D);
+  const yeniIsGunu = isGunu(D - bitisPayi);
   const tekrarPencere = Math.max(1, Math.min(D, 14));
   const tekrarGun = Math.ceil(dueCount / tekrarPencere);
 
   // Son hafta: yeni soru kovalanmaz, hedef son tempoyu korumakla sınırlanır.
   const sonHafta = D <= 7;
-  const yeniGun = sonHafta ? 0 : Math.ceil(unseen / workDays);
+  const yeniGun = sonHafta ? 0 : Math.ceil(unseen / yeniIsGunu);
   const ham = yeniGun + tekrarGun;
   const hedef = sonHafta
     ? onla(Math.max(20, tempo > 0 ? Math.ceil(tempo * 1.15) : 40))
@@ -156,9 +172,28 @@ export function computeKoc(input = {}) {
   return {
     faz, hedef, yeniGun, tekrarGun, tempo, eksik, kapsamaGun,
     mesaj: MESAJ[faz], denemeAraligi: aralik,
-    unseen, unseenReal, unseenDeneme, unseenAi, dueCount,
-    workDays, todayDone, D, sonHafta
+    unseen, unseenReal, unseenDeneme, unseenAi, unseenAdv, dueCount, havuzAdi,
+    workDays, yeniIsGunu, bitisPayi, todayDone, D, sonHafta
   };
+}
+
+/** Haftada bir dinlenme payıyla iş günü. */
+function isGunu(x) { return Math.max(1, Math.round(Math.max(0, x) * 6 / 7)); }
+
+/**
+ * Faza göre yeni malzeme havuzu ve havuzun sınavdan kaç gün önce bitmesi
+ * gerektiği. Tablo dosya başındaki yorumda.
+ */
+export function yeniHavuz(faz, { unseenReal = 0, unseenDeneme = 0, unseenAi = 0, unseenAdv = 0 } = {}) {
+  if (faz === FAZ.insa) {
+    return { unseen: unseenReal + unseenDeneme + unseenAi + unseenAdv, bitisPayi: 21,
+      havuzAdi: 'çıkmış, deneme, HMGS benzeri ve hâkimlik' };
+  }
+  if (faz === FAZ.pekistirme) {
+    return { unseen: unseenReal + unseenDeneme + unseenAi, bitisPayi: 7,
+      havuzAdi: 'çıkmış, deneme ve HMGS benzeri' };
+  }
+  return { unseen: unseenReal + unseenDeneme, bitisPayi: 0, havuzAdi: 'çıkmış ve deneme' };
 }
 
 /* ---------- veri sarmalayıcısı ---------- */
@@ -191,18 +226,19 @@ export function tempoOlc(today = todayKey()) {
   return { n: Math.round(median(aktif)), gun: aktif.length };
 }
 
-/** Görülmemiş sorular, katman katman. */
+/** Görülmemiş sorular, katman katman. Hâkimlik bankasından yalnız HMGS çekirdeğine işaretli olanlar. */
 export function gorulmemis() {
   const seen = new Set((state().answers || []).map(a => a.qId));
-  let real = 0, deneme = 0, ai = 0;
+  let real = 0, deneme = 0, ai = 0, adv = 0;
   for (const q of questionById.values()) {
     if (seen.has(q.id)) continue;
     const t = tierOf(q);
     if (t === TIER_REAL) real++;
     else if (t === TIER_DENEME) deneme++;
     else if (t === TIER_AI) ai++;
+    else if (t === TIER_ADV && isCoreTarget(q)) adv++;
   }
-  return { real, deneme, ai };
+  return { real, deneme, ai, adv };
 }
 
 /**
@@ -223,6 +259,7 @@ export function koc() {
     unseenReal: g.real,
     unseenDeneme: g.deneme,
     unseenAi: g.ai,
+    unseenAdv: g.adv,
     dueCount: dueQuestions().length,
     measuredPace: tempo.n,
     todayDone: bugunCozulen,

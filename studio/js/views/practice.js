@@ -236,6 +236,11 @@ function allQuestions() {
 }
 
 export function hasSession() { return !!S && S.i < S.questions.length; }
+/** Bugün ekranındaki "yarım kalan set" şeridi için kısa özet. */
+export function sessionBrief() {
+  if (!hasSession()) return null;
+  return { label: S.label || 'Soru seti', i: S.i, n: S.questions.length };
+}
 export function currentQuestion() { return S && S.questions ? S.questions[S.i] : null; }
 
 /**
