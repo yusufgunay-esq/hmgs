@@ -442,7 +442,7 @@ function caseHTML(c) {
         ${c.question ? `<p><strong>${rich(maddesiz(c.question))}</strong></p>` : ''}
         <div class="reveal-box" style="margin:0.5rem 0 0">
           <button data-act="reveal">
-            <span>${esc(c.solutionTitle || 'Çözüm')}</span>
+            <span>${esc(maddesiz(c.solutionTitle) || 'Çözüm')}</span>
             <span class="hint">göster</span>
           </button>
           <div style="display:none">${rich(maddesiz(c.solutionText || ''))}</div>

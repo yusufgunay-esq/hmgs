@@ -594,14 +594,6 @@ document.addEventListener('click', async e => {
   }
 });
 
-/* ---------- form değişiklikleri (açılır listeler) ---------- */
-
-document.addEventListener('change', e => {
-  const el = e.target.closest('[data-act]');
-  if (!el) return;
-  if (el.dataset.act === 'flow-subject-select') flow.setSubject(el.value);
-});
-
 /* ---------- klavye ---------- */
 
 document.addEventListener('keydown', e => {
