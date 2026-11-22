@@ -11,7 +11,7 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich, richBlock, stripEmoji, splitStem, fmtClock, emptyState, $, toast } from '../ui.js';
-import { buildAlgorithmicExamSet, getAlgorithmicExamPreview, subjectName, SUBJECTS, topicById, questionById, questionsBySubject, pastExamList, pastExamQuestions, denemeSetList, denemeSetQuestions } from '../data.js';
+import { buildAlgorithmicExamSet, buildAiExamSet, getAlgorithmicExamPreview, subjectName, SUBJECTS, topicById, questionById, questionsBySubject, pastExamList, pastExamQuestions, denemeSetList, denemeSetQuestions } from '../data.js';
 import { recordAnswer, markExamAnswerAttention, save, saveExam, state, lastExam, EXAM_TOTAL, PASS_CORRECT } from '../store.js';
 import { scheduleAfterAnswer, scoreOf } from '../engine.js';
 import { premiseHTML, optionRowHTML, toggleOption, togglePremise, extractNumerals, isAutoStruck } from '../elim.js';
@@ -97,6 +97,18 @@ export function startDenemeSet(sourceId) {
 }
 
 export const startYekti = startDenemeSet;
+
+/**
+ * Yapay zekâ (HMGS benzeri) denemesi: resmî ders dağılımıyla 120 soru,
+ * görülmemiş HMGS benzeri önce (data.js buildAiExamSet). Rota bu kâğıdı
+ * "en az görülmüş kâğıt" olarak seçebilir; 22 Kasım 2026'ya kadar bu
+ * fonksiyon silinmiş, rota düğmesi TypeError verip hiçbir şey açmıyordu.
+ */
+export function startAi() {
+  const seen = new Map((state().answers || []).map(a => [a.qId, new Date(a.at || 0).getTime()]));
+  const { questions, shortfall } = buildAiExamSet(seen);
+  return beginExam(questions, { shortfall, label: 'Yapay Zeka Denemesi', real: 'ai_hmgs' });
+}
 
 function beginExam(questions, { shortfall, label, real, stats }) {
   /* أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ · بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ · رَبِّ يَسِّرْ وَلَا تُعَسِّرْ رَبِّ تَمِّمْ بِالْخَيْرِ */
@@ -300,6 +312,30 @@ export function render() {
           }).join('')}
         </div>
       </div>` : ''}
+
+      <!-- 4. BÖLÜM: HMGS BENZERİ DENEME (rota da bu kâğıdı seçebilir: denemeSecimi kind 'ai') -->
+      ${(() => {
+        const past = (s.exams || []).filter(e => e.real === 'ai_hmgs');
+        const lastPast = past.length ? past[past.length - 1] : null;
+        return `
+      <div style="margin-top:2rem">
+        <h3 style="font-size:1.05rem;font-weight:700;margin:0 0 0.75rem 0;color:var(--ink)">HMGS benzeri</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:0.85rem">
+          <div class="card" style="display:flex;flex-direction:column;justify-content:space-between;padding:1rem;gap:0.75rem">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <h4 style="font-size:0.95rem;font-weight:600;margin:0;color:var(--ink)">HMGS benzeri deneme</h4>
+                ${lastPast ? `<span class="chip ${lastPast.pass ? 'accent' : ''}" style="font-size:0.72rem">${lastPast.net} net</span>` : ''}
+              </div>
+              <span style="font-size:0.82rem;color:var(--ink-2)">120 soru · 155 dakika · sınav biçiminde yazılmış sorular</span>
+            </div>
+            <button class="btn btn-2 btn-s" data-act="exam-start-ai" style="align-self:flex-start">
+              ${lastPast ? 'Tekrar Çöz' : 'Denemeyi Başlat'}
+            </button>
+          </div>
+        </div>
+      </div>`;
+      })()}
 
     </div>`;
     return;
