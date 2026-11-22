@@ -15,7 +15,9 @@ import { nextAction, srsSummary, allSubjectMastery,
   examGap, worstExamSubjects, answerQualitySignals } from '../engine.js';
 import { rota } from '../rota.js';
 import { koc } from '../koc.js';
+import { ritim } from '../ritim.js';
 import { active as examActive } from './exam.js';
+import { sessionBrief } from './practice.js';
 import { adhdSettings } from '../adhd.js';
 
 export function render() {
@@ -24,6 +26,7 @@ export function render() {
 
   const r = rota({ examActive: examActive() });
   const k = koc();
+  const rt = ritim(k.hedef, adhdSettings().dailyMin, 14);
   const srs = srsSummary();
   const d = daysLeft();
   const st = streak();
@@ -53,12 +56,13 @@ export function render() {
   if (r.D >= 0 && r.D <= 4) {
     host.innerHTML = `
     <div class="wrap">
-      ${rotaHTML(r, k)}
+      ${yarimSetHTML()}
+      ${rotaHTML(r, k, rt)}
       <div class="grid grid-3" style="margin-top:1.25rem">
         <div class="metric">
           <div class="metric-k">Sınava kalan</div>
           <div class="metric-v">${d}<span style="font-size:0.85rem;font-weight:600"> gün</span></div>
-          <div class="metric-n">27 Eylül Pazar · 10.15 · binaya 10.00'a kadar</div>
+          <div class="metric-n">${examDateLabel()} · 10.15 · giriş belgesindeki saatte binada ol</div>
         </div>
         <div class="metric">
           <div class="metric-k">Bugün çözülen</div>
@@ -153,10 +157,10 @@ export function render() {
       <div class="section-label">Dersler · otomatikleşme durumu</div>
       ${renderSubjects(mastery)}`;
 
-  host.innerHTML = `
-    <div class="wrap">
-      ${rotaHTML(r, k)}
-
+  // Sade modda (varsayılan) kahramanın altında yalnız tek kapalı çekmece kalır:
+  // üç sayı kartı da çekmeceye iner. "Son 7 gün" zaten ritim şeridinde,
+  // "sınava kalan" üst çubukta; açık ekranda tekrar etmeleri gürültüydü.
+  const metricsHTML = `
       <div class="grid grid-3" style="margin-top:1.25rem">
         <div class="metric">
           <div class="metric-k">Sınava kalan</div>
@@ -164,10 +168,10 @@ export function render() {
           <div class="metric-n">HMGS · ${examDateLabel()}</div>
         </div>
         <div class="metric">
-          <div class="metric-k">Bugün çözülen</div>
-          <div class="metric-v">${r.bugun.toplam}<span style="font-size:0.85rem;font-weight:600;color:var(--ink-3)"> soru</span></div>
-          <div class="metric-n">${r.bugun.toplam ? `${r.bugun.dogru} doğru · ${pct((r.bugun.dogru / r.bugun.toplam) * 100)}` : '5 soruyla başla, gerisi gelir'}</div>
-          <div class="metric-n">deneme cevapları hariç</div>
+          <div class="metric-k">Son 7 gün</div>
+          <div class="metric-v">${rt.haftaToplam}<span style="font-size:0.85rem;font-weight:600;color:var(--ink-3)"> soru</span></div>
+          <div class="metric-n">${rt.haftaTamGun} / 7 gün minimum doldu${r.bugun.toplam ? ` · bugün isabet ${pct((r.bugun.dogru / r.bugun.toplam) * 100)}` : ''}</div>
+          <div class="metric-n">${rt.enIyi > rt.seri ? `en uzun zincir ${rt.enIyi} gün` : 'deneme cevapları dahil'}</div>
         </div>
         <div class="metric">
           <div class="metric-k">Son deneme neti</div>
@@ -175,17 +179,20 @@ export function render() {
           <div class="track ${ex && ex.pass ? 'ok' : 'no'}"><i style="width:${ex ? Math.min(100, (ex.correct / PASS_CORRECT) * 100) : 0}%"></i></div>
           <div class="metric-n">${ex ? `baraj ${PASS_CORRECT} net · ${new Date(ex.at).toLocaleDateString('tr-TR')}` : 'henüz deneme çözülmedi'}</div>
         </div>
-      </div>
+      </div>`;
 
+  host.innerHTML = `
+    <div class="wrap">
+      ${yarimSetHTML()}
+      ${rotaHTML(r, k, rt)}
       ${cleanMode
         ? `<details class="today-details" style="margin-top:1.25rem">
             <summary class="today-details-sum">
-              <span>Ayrıntılı analiz, serbest çalışma ve tüm dersler</span>
-              <span class="hint">${srs.due ? `${srs.due} tekrar · ` : ''}${mastery.length} ders</span>
+              <span>Ayrıntılar</span>
             </summary>
-            <div class="today-details-body">${detailsBody}</div>
+            <div class="today-details-body">${metricsHTML}${detailsBody}</div>
           </details>`
-        : detailsBody}
+        : metricsHTML + detailsBody}
     </div>`;
 }
 
@@ -202,7 +209,7 @@ export function render() {
  */
 const GUN_ADI = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 
-function rotaHTML(r, k) {
+function rotaHTML(r, k, rt) {
   if (r.kart && (r.kart.tur === 'sinav' || r.kart.tur === 'bitti')) return sinavKarti(r);
 
   const s = r.simdi;
@@ -210,50 +217,47 @@ function rotaHTML(r, k) {
   const isabet = r.bugun.toplam ? Math.round((r.bugun.dogru / r.bugun.toplam) * 100) : 0;
 
   const sparkCta = r.bugun.toplam === 0
-    ? `<button class="btn adhd-spark-btn" data-act="start-spark" title="Göreve başlama eşiğini düşüren 5 soruluk kısa ısınma seti (~4 dk)">5 soruyla başla · 4 dk</button>`
+    ? `<button class="btn adhd-spark-btn" data-act="start-spark" title="5 soruluk kısa ısınma, ~4 dk">5 soruyla başla</button>`
     : (s && s.tur === 'deneme'
-        ? `<button class="btn btn-2" data-act="start-spark" title="Denemeden önce 5 soruluk kısa ısınma">Önce 5 soruyla ısın</button>`
+        ? `<button class="btn btn-2" data-act="start-spark" title="Denemeden önce 5 soruluk kısa ısınma">5 soruyla ısın</button>`
         : '');
 
   let kicker, title, why, cta;
   if (!s) {
     // Sınırlı adımların hepsi bitti: kahraman akış. Tavan yok, gün bir sayıyla bitmez.
     const ak = r.adimlar.find(a => a.tur === 'akis');
-    kicker = 'Liste bitti · akış açık';
+    kicker = 'Akış açık';
     title = r.bugun.toplam ? `Bugün ${r.bugun.toplam} soru · isabet %${isabet}` : 'Akışa gir';
     why = ak ? ak.neden : 'Karışık, sınav biçiminde ve sonu yok.';
     cta = sparkCta + '<button class="btn" data-act="rota-go" data-step="akis">Akışa devam et</button>';
   } else {
     const no = sirali.indexOf(s) + 1;
     const kalan = s.plan - s.yapilan;
-    kicker = s.sinirsiz ? 'Sırada' : `Sırada · ${no > 0 ? no : 1} / ${Math.max(1, sirali.length)}${s.tur === 'konu' ? ' · konu onarımı' : ''}`;
+    kicker = sirali.length > 1 && !s.sinirsiz ? `Sırada · ${no > 0 ? no : 1} / ${sirali.length}` : 'Sırada';
     title = s.tur === 'deneme' || s.sinirsiz ? s.baslik : `${s.baslik} · ${kalan} ${s.birim || 'soru'}`;
     why = s.neden;
     cta = sparkCta
       + (s.topicId ? `<button class="btn btn-2" data-act="go-flow-topic" data-topic="${esc(s.topicId)}">Önce konuyu oku</button>` : '')
-      + `<button class="btn${r.bugun.toplam === 0 ? ' btn-2' : ''}" data-act="rota-go" data-step="${esc(s.id)}">${esc(s.cta)}</button>`
-      + (s.saat ? `<span class="hint" style="margin:0">önerilen başlangıç ${esc(s.saat)}</span>` : '');
+      + `<button class="btn${r.bugun.toplam === 0 ? ' btn-2' : ''}" data-act="rota-go" data-step="${esc(s.id)}">${esc(s.tur === 'deneme' ? 'Denemeyi başlat' : s.cta)}</button>`;
   }
 
   const satirlar = r.adimlar.map(a => {
     const st = a.bilgi ? 'info' : a.bitti ? 'done' : a === s ? 'now' : 'todo';
     const sayi = a.bilgi ? ''
       : a.tur === 'deneme' ? (a.bitti ? 'bitti' : '120 soru')
-        : a.sinirsiz ? `bugün ${a.yapilan} · sınırsız`
+        : a.sinirsiz ? `${a.yapilan}`
           : `${a.yapilan} / ${a.plan}`;
     const btn = a.bilgi || a.bitti || a === s ? ''
       : `<button class="btn btn-2 btn-s" data-act="rota-go" data-step="${esc(a.id)}">${a.sinirsiz ? 'Aç' : 'Başla'}</button>`;
-    const alt = a.bilgi ? `<div class="rota-meta">${esc(a.neden)}</div>`
-      : a.alt ? `<div class="rota-meta">${esc(a.alt)}</div>` : '';
-    return `<div class="rota-row ${st}">
+    const ipucu = a.bilgi ? a.neden : (a.alt || '');
+    return `<div class="rota-row ${st}"${ipucu ? ` title="${esc(ipucu)}"` : ''}>
         <span class="rota-dot" aria-hidden="true"></span>
-        <div class="rota-main"><div class="rota-name">${esc(a.baslik)}</div>${alt}</div>
+        <div class="rota-main"><div class="rota-name">${esc(a.baslik)}</div></div>
         <div class="rota-count">${esc(sayi)}</div>
         <div class="rota-act">${btn}</div>
       </div>`;
   }).join('');
 
-  const gunAdi = GUN_ADI[new Date(r.today + 'T12:00:00Z').getUTCDay()];
   const yuzde = r.toplamPlan ? Math.min(100, Math.round((r.toplamYapilan / r.toplamPlan) * 100)) : 0;
   // Bugün bitmemiş tam deneme varsa koç "hedef 20" derken kahraman 120 soruluk
   // deneme öneriyor olabilir; çelişkiyi saklamak yerine tek satırla açıklıyoruz.
@@ -261,23 +265,115 @@ function rotaHTML(r, k) {
 
   return `
     <div class="hero rota-hero">
-      <div class="hero-kicker">${esc(kicker)}</div>
-      <div class="hero-title">${esc(title)}</div>
-      <p class="hero-why">${esc(why)}</p>
-      <div class="hero-main-cta">${cta}</div>
-
-      ${kocHTML(k, denemeVar)}
+      <div class="rh-grid">
+        <div class="rh-main">
+          <div class="hero-kicker">${esc(kicker)}</div>
+          <div class="hero-title" title="${esc(why)}">${esc(title)}</div>
+          <div class="hero-main-cta">${cta}</div>
+        </div>
+        ${rt ? ritimHTML(rt, k) : kocHTML(k, denemeVar)}
+      </div>
 
       <div class="rota">
         <div class="rota-head">
-          <span>Günün rotası · ${gunAdi} · sınava ${r.D} gün</span>
-          <span>liste ${r.toplamYapilan} / ${r.toplamPlan}</span>
+          <span>Bugün</span>
+          ${r.toplamPlan ? `<span>liste ${r.toplamYapilan} / ${r.toplamPlan}</span>` : ''}
         </div>
-        <div class="track" style="margin:0.2rem 0 0.6rem"><i style="width:${yuzde}%"></i></div>
+        ${r.toplamPlan ? `<div class="track" style="margin:0.2rem 0 0.6rem"><i style="width:${yuzde}%"></i></div>` : '<div style="height:0.4rem"></div>'}
         ${satirlar}
-        <div class="rota-foot">Liste bittiğinde akış açık kalır, sonu yok. Kâğıtta çözdüklerin bu sayılara girmez.</div>
       </div>
     </div>`;
+}
+
+/**
+ * Yarım kalan soru seti. "Soru" sekmesi yalnız açık set varken görünür; set
+ * açıkken başka sekmeye geçen kullanıcı geri dönüş yolunu Bugün'ün en üstünde
+ * bulur.
+ */
+function yarimSetHTML() {
+  const b = sessionBrief();
+  if (!b) return '';
+  return `
+    <div class="yarim-set">
+      <div class="yarim-set-txt" title="${esc(b.label)}"><b>Yarım set</b> · ${b.i} / ${b.n}</div>
+      <button class="btn btn-s" data-view="practice">Devam et</button>
+    </div>`;
+}
+
+/**
+ * RİTİM KARTI — günlük minimum halkası + 14 günlük zincir (ritim.js).
+ * Kahramanın sağ sütunu (telefonda en üstte). Tek bakışta üç şey:
+ * bugün minimum doldu mu, zincir kaç gün, son iki hafta nasıl geçti.
+ */
+const GUN_HARF = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
+const AY_KISA = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+
+function ritimHTML(rt, k) {
+  const min = rt.minimum;
+  const oran = Math.min(1, rt.bugun / Math.max(1, min));
+  const R = 27, C = 2 * Math.PI * R;
+  const dolu = (C * oran).toFixed(1);
+  const tamam = rt.bugunTamam;
+  const hedef = k.hedef || 0;
+
+  const hucre = h => {
+    const dt = new Date(h.key + 'T12:00:00Z');
+    const etiket = `${dt.getUTCDate()} ${AY_KISA[dt.getUTCMonth()]} ${GUN_HARF[dt.getUTCDay()]} · ${h.n} soru${h.serbest ? ' · serbest gün' : ''}${h.kopus ? ' · zincir koptu' : ''}`;
+    return `<i class="rc ${h.durum}${h.bugun ? ' bugun' : ''}${h.serbest ? ' serbest' : ''}" title="${esc(etiket)}"></i>`;
+  };
+
+  // Tek kısa satır. Uzun açıklama (ritim.js cumle + hesap) yalnız ipucunda.
+  const satir = !tamam
+    ? `${rt.kalan} soru daha · ~${Math.max(1, Math.round(rt.kalan * rt.dkSoru))} dk`
+    : (hedef > rt.bugun ? `Gün tamam · hedefe ${hedef - rt.bugun}` : 'Gün tamam');
+  const ipucu = [rt.cumle, ...ritimMathLines(rt, k)].join('\n');
+
+  return `
+    <aside class="ritim${tamam ? ' tamam' : ''}" aria-label="Günlük minimum ve çalışma zinciri" title="${esc(ipucu)}">
+      <div class="ritim-mid">
+        <div class="ritim-ring" role="img" aria-label="Günlük minimum: ${rt.bugun} / ${min} soru">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <circle class="rr-bg" cx="32" cy="32" r="${R}"></circle>
+            <circle class="rr-fg" cx="32" cy="32" r="${R}" stroke-dasharray="${dolu} ${C.toFixed(1)}"></circle>
+          </svg>
+          <div class="ritim-ring-n">${tamam
+            ? `<svg class="rr-tik" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"></path></svg><span>${rt.bugun}</span>`
+            : `<b>${rt.bugun}</b><span>/ ${min}</span>`}</div>
+        </div>
+        <div class="ritim-txt">
+          <div class="ritim-seri"><b>${rt.seri}</b> gün zincir</div>
+          <div class="ritim-satir">${esc(satir)}</div>
+        </div>
+      </div>
+      <div class="ritim-strip" role="img" aria-label="Son 14 gün: ${rt.hucreler.filter(h => h.durum === 'tam').length} gün minimum doldu">${rt.hucreler.map(hucre).join('')}</div>
+    </aside>`;
+}
+
+function ritimMathLines(rt, k) {
+  return [
+    `Minimum: ${rt.otomatik ? `koçun hedefinin yarısı, 15-30 aralığında → ${rt.minimum}. İlerleme sekmesinden sabitleyebilirsin.` : `senin seçimin (${rt.minimum}). İlerleme sekmesinden otomatiğe alabilirsin.`}`,
+    `Zincir: minimumu dolduran gün bir halka ekler. 7 günde bir boş gün serbest; iki gün üst üste boş geçerse zincir sıfırlanır. Gün 03.00'te döner.`,
+    ...kocMathLines(k)
+  ];
+}
+
+function kocMathLines(k) {
+  const unseen = k.unseen || 0;
+  const pencere = Math.max(1, Math.min(k.D, 14));
+  const ham = (k.yeniGun || 0) + (k.tekrarGun || 0);
+  const hedef = k.hedef || 0;
+  if (k.sonHafta) {
+    return [
+      `Hedef: son hafta yeni soru 0; hedef = tempo × 1,15 → 10'a yuvarlanınca ${hedef}.${k.tempo > 0 ? '' : ' Tempo henüz ölçülmedi, taban 40.'}`,
+      `Vadesi gelen ${k.dueCount} tekrar bilgi olarak duruyor; hedefe eklenmiyor.`,
+      `Son 7 günün temposu günde ~${k.tempo} soru${k.tempoGun ? ` (${k.tempoGun} aktif gün)` : ' (henüz ölçüm yok)'} · tam deneme ${k.denemeAraligi} günde bir.`
+    ];
+  }
+  return [
+    `Hedef: görülmemiş ${unseen} soru (${k.havuzAdi || 'çekirdek havuz'}) sınavdan ${k.bitisPayi || 0} gün önce bitsin → ${k.yeniIsGunu || k.workDays} çalışma günü → günde ~${k.yeniGun} yeni.`,
+    `Vadesi gelen ${k.dueCount} tekrar, ${pencere} güne yayılırsa günde ~${k.tekrarGun}. ${k.yeniGun} + ${k.tekrarGun} = ${ham}; 10'a yuvarlanınca hedef ${hedef}.`,
+    `Son 7 günün temposu günde ~${k.tempo} soru${k.tempoGun ? ` (${k.tempoGun} aktif gün)` : ' (henüz ölçüm yok)'} · tam deneme ${k.denemeAraligi} günde bir. Hedef öneridir; akışı kilitlemez.`
+  ];
 }
 
 /**
@@ -375,7 +471,7 @@ function sinavKarti(r) {
       <div class="hero-title">Sınav günü</div>
       <p class="hero-why">Bugün soru çözme; bildiğin yeterli. Aşağıdakiler dışında yapılacak iş yok.</p>
       <div class="rota">
-        <div class="rota-row todo"><span class="rota-dot"></span><div class="rota-main"><div class="rota-name">Saat 10.00'dan önce binada ol</div><div class="rota-meta">10.00'dan sonra binaya alınmıyor (PGM ilanı). Sınav 10.15'te başlıyor.</div></div><div class="rota-count"></div><div class="rota-act"></div></div>
+        <div class="rota-row todo"><span class="rota-dot"></span><div class="rota-main"><div class="rota-name">Giriş belgesindeki saatten önce binada ol</div><div class="rota-meta">Geç kalan binaya alınmıyor; saati sınava giriş belgesinden kontrol et. Sınav 10.15'te başlıyor.</div></div><div class="rota-count"></div><div class="rota-act"></div></div>
         <div class="rota-row todo"><span class="rota-dot"></span><div class="rota-main"><div class="rota-name">Sabah son bakış: sayılar</div><div class="rota-meta">Notlar içinde Sayılar sekmesi, "Kendini sına". En fazla 20 dakika; yeni konu açma.</div></div><div class="rota-count"></div><div class="rota-act"><button class="btn btn-2 btn-s" data-view="notlar">Aç</button></div></div>
         <div class="rota-row todo"><span class="rota-dot"></span><div class="rota-main"><div class="rota-name">Kimlik ve sınava giriş belgesi</div><div class="rota-meta">Çıkmadan önce bir kez daha kontrol et.</div></div><div class="rota-count"></div><div class="rota-act"></div></div>
         <div class="rota-row todo"><span class="rota-dot"></span><div class="rota-main"><div class="rota-name">120 soru · 155 dakika</div><div class="rota-meta">Soru başına ~75 saniye. Takıldığını işaretle geç, ikinci turda dön; boş bırakma.</div></div><div class="rota-count"></div><div class="rota-act"></div></div>
