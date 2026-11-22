@@ -3781,3 +3781,111 @@ button.akim-round:hover {
   color: #FAF9F6;
 }
 [data-theme="dark"] .adhd-set-chip.on { color: #121316; }
+
+
+/* ---------- RİTİM · GÜNLÜK MİNİMUM VE ZİNCİR (ritim.js, 22 Kasım 2026) ----------
+   Kahramanın sağ sütunu. Tek bakışta üç şey: bugün minimum doldu mu (halka),
+   zincir kaç gün (üst satır), son iki hafta nasıl geçti (şerit). Renk dili
+   rotayla aynı: tek aksan, "tamam" yalnız yeşil. Hareket yalnız halkanın
+   dolması; konfeti, titreşim, sayaç animasyonu yok (ADHD: dikkat çalan
+   hiçbir şey kahramanın yanına konmaz). */
+.rh-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18.5rem;
+  gap: 1.75rem;
+  align-items: start;
+}
+.rh-main { min-width: 0; }
+.rh-main .hero-title { margin-bottom: 1.15rem; }
+
+.ritim {
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  padding: 0.95rem 1.05rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.ritim-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; }
+.ritim-k { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.ritim-seri { font-size: 0.8rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ritim-seri b { font-weight: 700; color: var(--ink); }
+.ritim.tamam .ritim-seri b { color: var(--ok); }
+
+.ritim-mid { display: flex; align-items: center; gap: 0.9rem; }
+.ritim-ring { position: relative; width: 4rem; height: 4rem; flex: none; }
+.ritim-ring > svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+.ritim-ring circle { fill: none; stroke-width: 6; }
+.rr-bg { stroke: var(--line-strong); }
+.rr-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray 0.5s ease; }
+.ritim.tamam .rr-fg { stroke: var(--ok); }
+.ritim-ring-n {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  line-height: 1; font-variant-numeric: tabular-nums;
+}
+.ritim-ring-n b { font-family: var(--serif); font-size: 1.25rem; font-weight: 600; color: var(--ink); }
+.ritim-ring-n span { font-size: 0.66rem; color: var(--ink-3); margin-top: 0.12rem; }
+.rr-tik { width: 1.15rem; height: 1.15rem; fill: none; stroke: var(--ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.ritim.tamam .ritim-ring-n span { color: var(--ok); font-weight: 600; font-size: 0.72rem; }
+
+.ritim-txt { min-width: 0; flex: 1; }
+.ritim-line { font-size: 0.8rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ritim-line b { color: var(--ink-2); font-weight: 700; }
+.ritim-ok { color: var(--ok); font-weight: 700; }
+.ritim-txt .ritim-seri { font-size: 0.95rem; color: var(--ink-2); }
+.ritim-satir { font-size: 0.82rem; color: var(--ink-3); margin-top: 0.2rem; font-variant-numeric: tabular-nums; }
+.ritim.tamam .ritim-satir { color: var(--ok); font-weight: 600; }
+.ritim-cumle { font-size: 0.86rem; color: var(--ink); line-height: 1.45; margin-top: 0.22rem; }
+
+.ritim-strip { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px; }
+.rc {
+  display: block; height: 0.72rem; border-radius: 3px;
+  background: var(--line-strong);
+}
+.rc.tam { background: var(--ok); }
+.rc.yarim { background: var(--ok); opacity: 0.38; }
+.rc.once { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.rc.serbest { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ok); }
+.rc.bugun { outline: 1.5px solid var(--accent); outline-offset: 1.5px; }
+.ritim-strip-cap {
+  display: flex; justify-content: space-between; gap: 0.5rem;
+  margin-top: 0.35rem; font-size: 0.66rem; color: var(--ink-3);
+}
+.ritim-strip-cap span:nth-child(2) { text-align: center; }
+.ritim-not { font-size: 0.76rem; color: var(--ink-3); line-height: 1.45; }
+.ritim-det summary { font-size: 0.72rem; color: var(--ink-3); cursor: pointer; }
+.ritim-det[open] summary { margin-bottom: 0.1rem; }
+
+/* Yarım kalan set: Bugün'ün en üstünde tek satır geri dönüş yolu. */
+.yarim-set {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.9rem;
+  margin-bottom: 1rem; padding: 0.7rem 0.9rem 0.7rem 1.05rem;
+  background: var(--accent-soft); border: 1px solid var(--line);
+  border-radius: var(--r-m);
+}
+.yarim-set-txt { font-size: 0.86rem; color: var(--ink-2); min-width: 0; }
+.yarim-set-txt b { color: var(--ink); font-weight: 700; }
+
+/* Koyu temada aksan (#7697C2) üstünde beyaz yazı 3:1'de kalıyordu; Bugün'ün
+   ana düğmelerinde koyu yazı (6:1). Kapsam bilerek dar: uygulamanın geri
+   kalanındaki .btn varyantlarına dokunmaz. */
+[data-theme="dark"] .rota-hero .btn:not(.btn-2):not(.btn-link),
+[data-theme="dark"] .yarim-set .btn:not(.btn-2) { color: #121316; }
+
+/* "Soru" sekmesi yalnız açık set varken görünür (main.js show()). */
+.nav button[hidden] { display: none; }
+
+@media (max-width: 900px) {
+  .rh-grid { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+  .ritim { max-width: 30rem; }
+}
+@media (max-width: 767px) {
+  .ritim { padding: 0.85rem 0.9rem 0.75rem; max-width: none; }
+  .ritim-ring { width: 3.6rem; height: 3.6rem; }
+  .yarim-set { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rr-fg { transition: none; }
+}
