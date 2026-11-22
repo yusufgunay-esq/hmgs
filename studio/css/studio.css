@@ -3397,3 +3397,350 @@ button.rv-stat.clickable:hover {
   .koc-num { font-size: 1.7rem; }
   .koc-head { flex-direction: column; gap: 0.2rem; }
 }
+
+
+/* ---------- ADHD BİLİŞSEL ODAK VE AKIŞ KATMANI (adhd.js) ----------
+   Sakin, gürültüsüz, yüksek kontrastlı ama gözü yormayan vurgu dili.
+   Hem aydınlık fildişi hem karanlık kadife grafit temayla tam uyumludur. */
+
+/* 1. Bugün ekranı: İlk Kıvılcım düğmesi & kapalı ayrıntı çekmecesi */
+.adhd-spark-btn {
+  background: var(--accent);
+  color: #FAF9F6;
+  box-shadow: 0 2px 10px rgba(32, 54, 86, 0.16);
+}
+[data-theme="dark"] .adhd-spark-btn {
+  color: #121316;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+.today-details {
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--bg-raise);
+  padding: 0.75rem 1.05rem;
+}
+.today-details-sum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.today-details-sum::-webkit-details-marker { display: none; }
+.today-details-sum::after {
+  content: '▾';
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  transition: transform 0.18s ease;
+}
+.today-details[open] .today-details-sum::after { transform: rotate(180deg); }
+.today-details-body { margin-top: 0.85rem; }
+
+/* 2. Ters kök kalkanı */
+.adhd-neg-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  background: var(--warn-soft);
+  border: 1px solid rgba(163, 82, 0, 0.24);
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--warn);
+  letter-spacing: 0.01em;
+}
+[data-theme="dark"] .adhd-neg-banner {
+  border-color: rgba(229, 161, 56, 0.3);
+}
+.adhd-neg-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+  flex: none;
+}
+.adhd-neg-match {
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(163, 82, 0, 0.12);
+  font-weight: 700;
+}
+
+/* 3. Dürtü fısıltısı (bahis başlığı) */
+.akim-bet-k.is-warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+/* 4. Hukuk / süre çapaları (göz taramasını kolaylaştıran hafif tipografik ağırlık) */
+.adhd-anchor {
+  background: var(--accent-soft);
+  color: inherit;
+  font-weight: 600;
+  padding: 0.03em 0.22em;
+  border-radius: 4px;
+}
+
+/* 5. Odak satırı (Focus Rail — F tuşu) */
+.icon-btn.active,
+.btn-2.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.adhd-rail-on .adhd-sent {
+  opacity: 0.34;
+  transition: opacity 0.16s ease, background-color 0.16s ease;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0.04em 0.14em;
+}
+.adhd-rail-on .adhd-sent:hover {
+  opacity: 0.72;
+}
+.adhd-rail-on .adhd-sent.is-focus {
+  opacity: 1;
+  background: var(--accent-soft);
+}
+
+/* 6. Kademeli açıklama (Progressive Disclosure — D tuşu) */
+.adhd-exp-core .adhd-exp-k {
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.25rem;
+}
+.adhd-exp-rest {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--line-strong);
+}
+.adhd-exp-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+  padding: 0.32rem 0.65rem;
+  border-radius: var(--r-s);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.adhd-exp-toggle:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* 7. Akış tur düğmesi & 15 dk gönüllü nefes çipi */
+button.akim-round {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+button.akim-round:hover {
+  border-color: var(--line-strong);
+  background: var(--bg-hover);
+}
+.adhd-soft-break {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.akim-break-chip.soft {
+  background: var(--ok-soft);
+  color: var(--ok);
+  border-color: rgba(29, 115, 78, 0.25);
+}
+.adhd-soft-x {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.adhd-soft-x:hover { color: var(--ink); background: var(--bg-hover); }
+
+/* 8. Kaçış sonrası sakin geri giriş şeridi */
+.adhd-reentry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--r-m);
+  background: var(--bg-raise);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  font-size: 0.84rem;
+  color: var(--ink-2);
+}
+.adhd-reentry-acts {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.adhd-reentry-close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+}
+.adhd-reentry-close:hover { color: var(--ink); background: var(--bg-hover); }
+@keyframes adhdFocusPulse {
+  0% { box-shadow: 0 0 0 0 rgba(32, 54, 86, 0.28); }
+  100% { box-shadow: 0 0 0 12px rgba(32, 54, 86, 0); }
+}
+.q-card.adhd-pulse { animation: adhdFocusPulse 0.75s ease-out; }
+
+/* 9. Deneme 4 çeyrek haritası & pusula çipi */
+.exam-quarter-chip.tone-ahead { background: var(--ok-soft); color: var(--ok); }
+.exam-quarter-chip.tone-behind { background: var(--warn-soft); color: var(--warn); }
+.exam-map-quarters {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  width: 100%;
+}
+.exam-q-group {
+  padding: 0.5rem 0.55rem;
+  border-radius: var(--r-s);
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  transition: border-color 0.15s ease;
+}
+.exam-q-group.is-active {
+  border-color: var(--accent);
+  background: var(--bg-raise);
+}
+.exam-q-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--ink-3);
+  margin-bottom: 0.4rem;
+}
+.exam-q-group.is-active .exam-q-head { color: var(--accent); }
+.exam-q-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* 10. Konular: blok içi sandviç kontrol kartı */
+.fl-micro {
+  margin: 1.45rem 0;
+  padding: 1.05rem 1.2rem;
+  border-radius: var(--r-m);
+  background: var(--bg-raise);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+}
+.fl-micro-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+.fl-micro-k {
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.fl-micro-stem {
+  font-family: var(--serif);
+  font-size: 1rem;
+  line-height: 1.58;
+  color: var(--ink);
+  margin-bottom: 0.75rem;
+}
+.fl-micro-opts {
+  display: grid;
+  gap: 0.4rem;
+}
+.fl-micro-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--r-s);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background-color 0.14s ease;
+}
+.fl-micro-opt:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.fl-micro-opt.is-ok {
+  border-color: var(--ok);
+  background: var(--ok-soft);
+}
+.fl-micro-opt.is-no {
+  border-color: var(--no);
+  background: var(--no-soft);
+}
+.fl-micro-opt.is-dim { opacity: 0.45; }
+.fl-micro-key {
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 1.15rem;
+  flex: none;
+}
+.fl-micro-fb {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+@media (max-width: 960px) {
+  .exam-map-quarters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .exam-map-quarters { grid-template-columns: 1fr; }
+  .adhd-reentry { flex-direction: column; align-items: flex-start; }
+}

@@ -40,6 +40,10 @@ import { premiseHTML, optionRowHTML, toggleOption, togglePremise } from '../elim
 import { kuralButtonHTML } from '../kural.js';
 import { kurtarmaRadariHTML } from '../tuyolar.js';
 import { buildGeminiPrompt, queueSessionForTakip, pushSessionToDriveDirectly, pushToLocalServer } from './practice.js';
+import {
+  adhdSettings, updateAdhdSettings, negativeBannerHTML, enhanceAskHTML,
+  impulseWarning, progressiveExplanationHTML, parkInQueue, showReentry, applyFocusRail
+} from '../adhd.js';
 
 let A = null;       // aktif akış seansı
 let tick = null;    // süre sayacı
@@ -106,7 +110,10 @@ export function start(opts = {}) {
   };
 
   seans.begin({ mode: 'flow', label: A.label });
-  seans.onKacis(ms => toast(`${Math.round(ms / 1000)} sn dışarıdaydın.`));
+  seans.onKacis(ms => {
+    if (A && !A.answered) showReentry('#view-akim', ms, 'akim-park');
+    else toast(`${Math.round(ms / 1000)} sn ara verdin.`);
+  });
 
   for (const q of f.questions) {
     if (!A.usedIds.has(q.id)) { A.queue.push(q); A.usedIds.add(q.id); }
@@ -166,6 +173,13 @@ export function render() {
         <div class="q-strip-right">
           <span id="akim-break-slot">${breakChipHTML()}</span>
           <span class="akim-map-chip" id="akim-map-chip" title="HMGS haritası: yanan kare / toplam (arşiv + HMGS benzeri)">${mapChipText()}</span>
+          <button class="icon-btn${adhdSettings().focusRail ? ' active' : ''}" data-act="adhd-toggle-rail" aria-pressed="${adhdSettings().focusRail}" title="Odak satırı: uzun metinde cümle cümle oku (F)" aria-label="Odak satırı">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <line x1="4" y1="6" x2="20" y2="6" opacity="0.35"></line>
+              <line x1="4" y1="12" x2="20" y2="12"></line>
+              <line x1="4" y1="18" x2="15" y2="18" opacity="0.35"></line>
+            </svg>
+          </button>
           <button class="icon-btn" data-act="toggle-font-size" title="Metin Boyutunu Değiştir" aria-label="Metin boyutu">
             <span style="font-family:var(--sans);font-size:0.72rem;font-weight:700">A±</span>
           </button>
@@ -182,7 +196,8 @@ export function render() {
         <div class="q-main">
           <div class="card q-card akim-card">
             ${premiseHTML(premise)}
-            <div class="q-ask">${rich(ask)}</div>
+            ${negativeBannerHTML(ask)}
+            <div class="q-ask">${enhanceAskHTML(ask, rich)}</div>
             <div class="opts" id="opts">
               ${q.options.map(o => optionRowHTML(o, { pickAct: 'akim-pick' })).join('')}
             </div>
@@ -200,10 +215,11 @@ export function render() {
           </div>
 
           <div class="q-main-foot" id="q-actions">
+            <button class="btn btn-2 btn-s" data-act="akim-park" title="Bu soruyu boş bırakmadan kuyruğun 6 adım arkasına bırak (P)">Sonraya bırak <span class="kbd">P</span></button>
             <button class="btn btn-2 btn-s" data-act="akim-dontknow">Bilmiyorum · çözümü göster</button>
             <button class="btn btn-2 btn-s" data-act="akim-ask-gemini" title="Soruyu ve beş şıkkı ipucu istemi olarak kopyalar — doğru şık gönderilmez (G)">İpucu İste <span class="kbd">G</span></button>
             <span class="hint">
-              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> bahis · <span class="kbd">Enter</span> devam
+              <span class="kbd">A</span>–<span class="kbd">E</span> seç · <span class="kbd">1</span><span class="kbd">2</span><span class="kbd">3</span> bahis · <span class="kbd">P</span> park · <span class="kbd">F</span> odak
             </span>
           </div>
           ${topic ? `<p class="hint q-topic-hint">Bağlı konu: ${esc(topic.title)}</p>` : ''}
@@ -230,27 +246,37 @@ export function render() {
 
 /* ---------- tur, harita, mola: şeritteki üç sakin gösterge ---------- */
 
-/** Tur: 10 soruluk yakın hedef. Noktalar yalnız dolar, renkleri doğruluğu
-    yargılamaz (yanlış da tur doldurur: işin kendisi sayılır, isabet değil). */
-export const ROUND = 10;
+/** Tur: ADHD dostu 5 soruluk yakın hedef (tıklayınca 5 / 10 arası değişir).
+    Noktalar yalnız dolar, renkleri doğruluğu yargılamaz. */
+export const ROUND = 5;
+function roundSize() { return adhdSettings().roundSize; }
 
 function roundState() {
+  const r = roundSize();
   const n = A ? A.log.length : 0;
-  if (A && A.answered && n > 0) return { idx: Math.ceil(n / ROUND), filled: ((n - 1) % ROUND) + 1 };
-  return { idx: Math.floor(n / ROUND) + 1, filled: n % ROUND };
+  if (A && A.answered && n > 0) return { idx: Math.ceil(n / r), filled: ((n - 1) % r) + 1, size: r };
+  return { idx: Math.floor(n / r) + 1, filled: n % r, size: r };
 }
 
 function roundHTML() {
-  const { idx, filled } = roundState();
+  const { idx, filled, size } = roundState();
   let dots = '';
-  for (let i = 0; i < ROUND; i++) {
+  for (let i = 0; i < size; i++) {
     const on = i < filled;
     const fresh = A && A.answered && i === filled - 1;
     dots += `<span class="akim-dot${on ? ' on' : ''}${fresh ? ' fresh' : ''}"></span>`;
   }
-  return `<div class="akim-round" id="akim-round" title="Tur: ${ROUND} soruluk kısa hedef. Yarıda bırakırsan hiçbir şey kaybolmaz.">
+  return `<button type="button" class="akim-round" id="akim-round" data-act="adhd-toggle-round" title="Tur: ${size} soruluk kısa hedef (5 veya 10 olarak değiştirmek için tıkla)">
     <span class="akim-round-k">Tur ${idx}</span><span class="akim-dots">${dots}</span>
-  </div>`;
+  </button>`;
+}
+
+export function toggleRoundSize() {
+  const next = adhdSettings().roundSize === 5 ? 10 : 5;
+  updateAdhdSettings({ roundSize: next });
+  const rnd = $('#akim-round');
+  if (rnd) rnd.outerHTML = roundHTML();
+  toast(`Tur uzunluğu ${next} soru olarak ayarlandı.`);
 }
 
 function mapChipText() {
@@ -258,10 +284,18 @@ function mapChipText() {
   return `<b>${m.lit}</b><span class="akim-map-of">/${m.total}</span>`;
 }
 
-/** Blok süresi dolduysa şeritte sessiz bir teklif; ekranı kapatmaz. */
+/** Blok veya 15 dk nefes kontrol noktası dolduysa şeritte sessiz teklif; ekranı kapatmaz. */
 function breakChipHTML() {
-  if (!seans.breakDue()) return '';
-  return `<button class="akim-break-chip" data-act="akim-break" title="Blok süresi doldu. İstersen mola; istemezsen akış sürer.">Mola?</button>`;
+  if (seans.breakDue()) {
+    return `<button class="akim-break-chip" data-act="akim-break" title="Blok süresi doldu. İstersen mola; istemezsen akış sürer.">Mola?</button>`;
+  }
+  if (seans.softBreakDue()) {
+    return `<span class="adhd-soft-break">
+      <button class="akim-break-chip soft" data-act="akim-soft-break" title="15 dakika oldu. 3 dakikalık kısa nefes molası alabilirsin.">15 dk · Nefes?</button>
+      <button class="adhd-soft-x" data-act="adhd-dismiss-break" title="Akışta kal (+15 dk ertele)" aria-label="Ertele">✕</button>
+    </span>`;
+  }
+  return '';
 }
 
 export function takeBreak() {
@@ -272,6 +306,22 @@ export function takeBreak() {
   });
   const slot = $('#akim-break-slot');
   if (slot) slot.innerHTML = '';
+}
+
+export function takeSoftBreak() {
+  if (!A) return;
+  seans.startSoftBreak(() => {
+    const slot = $('#akim-break-slot');
+    if (slot) slot.innerHTML = breakChipHTML();
+  }, adhdSettings().softBreakMin);
+  const slot = $('#akim-break-slot');
+  if (slot) slot.innerHTML = '';
+}
+
+export function dismissSoftBreak() {
+  seans.dismissSoftBreak(adhdSettings().softCheckMin);
+  const slot = $('#akim-break-slot');
+  if (slot) slot.innerHTML = breakChipHTML();
 }
 
 function mapRowHTML(subjectId, nowId, justSealed) {
@@ -506,8 +556,13 @@ export function arm(key) {
  */
 function paintBet() {
   const helped = !!A && A.geminiAskedPreAnswer;
+  const q = A && A.queue[0];
+  const warn = !helped && q ? impulseWarning(seans.qElapsed(), splitStem(q.stem).ask) : '';
   const k = $('#akim-bet-k'), row = $('#akim-bet-row'), hint = $('#akim-bet-hint');
-  if (k) k.textContent = helped ? 'İpucunu okudun' : 'Ne kadar eminsin?';
+  if (k) {
+    k.textContent = helped ? 'İpucunu okudun' : (warn || 'Ne kadar eminsin?');
+    k.classList.toggle('is-warn', !!warn);
+  }
   if (row) row.hidden = helped;
   if (hint) hint.hidden = !helped;
 }
@@ -616,16 +671,17 @@ export function verdictOf(row, sched, entry) {
 
 /** Tur bittiyse tek satırlık özet (ekranı kapatmaz). */
 function roundSummaryHTML() {
+  const r = roundSize();
   const n = A.log.length;
-  if (!n || n % ROUND !== 0) return '';
-  const last = A.log.slice(-ROUND);
-  const ok = last.filter(r => r.ok).length;
-  const lit = last.filter(r => r.lit).length;
-  const mez = last.filter(r => r.sched && r.sched.kind === 'mezun').length;
-  const parts = [`${ok}/${ROUND} doğru`];
+  if (!n || n % r !== 0) return '';
+  const last = A.log.slice(-r);
+  const ok = last.filter(x => x.ok).length;
+  const lit = last.filter(x => x.lit).length;
+  const mez = last.filter(x => x.sched && x.sched.kind === 'mezun').length;
+  const parts = [`${ok}/${r} doğru`];
   if (lit) parts.push(`${lit} kare yandı`);
   if (mez) parts.push(`${mez} kural oturdu`);
-  return `<div class="akim-round-done"><b>Tur ${n / ROUND} tamam</b> · ${parts.join(' · ')}</div>`;
+  return `<div class="akim-round-done"><b>Tur ${n / r} tamam</b> · ${parts.join(' · ')}</div>`;
 }
 
 function paintResult(q, chosen, row, sched, ms) {
@@ -689,7 +745,7 @@ function paintResult(q, chosen, row, sched, ms) {
         ${roundSummaryHTML()}
         ${mapBlock}
         <div class="fb-body">
-          <div class="fb-lead">${richBlock(q.explanation || 'Bu soru için gerekçeli açıklama henüz yazılmamış.')}</div>
+          ${progressiveExplanationHTML(q.explanation || 'Bu soru için gerekçeli açıklama henüz yazılmamış.', richBlock)}
           ${radarHTML}
           <div class="fb-meta-strip">
             <div class="fb-meta-item"><span class="fb-meta-label">Kaynak</span><span class="fb-meta-val">${esc(sourceText(q))}</span></div>
@@ -705,7 +761,7 @@ function paintResult(q, chosen, row, sched, ms) {
             ${kuralButtonHTML(q)}
           </div>
           <div class="fb-actions-meta">
-            <span class="hint"><span class="kbd">Enter</span> devam${kuralButtonHTML(q) ? ' · <span class="kbd">K</span> kural' : ''} · <span class="kbd">G</span> yapay zeka</span>
+            <span class="hint"><span class="kbd">Enter</span> devam · <span class="kbd">D</span> detay${kuralButtonHTML(q) ? ' · <span class="kbd">K</span> kural' : ''} · <span class="kbd">G</span> yapay zeka</span>
           </div>
         </div>
       </div>`;
@@ -723,6 +779,8 @@ function paintResult(q, chosen, row, sched, ms) {
 
   const btnDontKnow = document.querySelector('#q-actions [data-act="akim-dontknow"]');
   if (btnDontKnow) btnDontKnow.style.display = 'none';
+  const btnPark = document.querySelector('#q-actions [data-act="akim-park"]');
+  if (btnPark) btnPark.style.display = 'none';
   const qHint = document.querySelector('#q-actions .hint');
   if (qHint) {
     qHint.innerHTML = `<span class="kbd">Enter</span> sonraki soru · <span class="kbd">G</span> yapay zeka`;
@@ -787,6 +845,30 @@ export function coverageHTML() {
 function $$opts() { return [...document.querySelectorAll('#opts .opt')]; }
 
 /* ---------- ilerleme ---------- */
+
+/**
+ * Tıkayan soruyu boş bırakmadan kuyruğun 6 adım arkasına park eder.
+ * Tek bir ağır soru yüzünden sekmeden kaçma döngüsünü kırar.
+ */
+export function park() {
+  if (!A || A.answered) return false;
+  refill();
+  const res = parkInQueue(A.queue, 0, 6);
+  if (!res.moved) {
+    toast('Kuyrukta park edilecek başka soru yok.');
+    return false;
+  }
+  seans.qDiscard();
+  stopTick();
+  A.armed = null;
+  A.elimUsed = false;
+  A.elimNudged = false;
+  A.geminiAsked = false;
+  A.geminiAskedPreAnswer = false;
+  toast('Soru sonraya bırakıldı · taze soruyla devam.');
+  render();
+  return true;
+}
 
 export function next() {
   if (!A || !A.answered) return;

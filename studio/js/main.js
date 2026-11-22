@@ -16,6 +16,10 @@ import { load, save, daysLeft, state, getSettings, updateSettings, importTakipEx
 import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress, requestSilentToken, fetchVaultFromDrive } from './vault-client.js';
 import { applySrsPolicy } from './engine.js';
 import { kuralToggle } from './kural.js';
+import {
+  adhdSettings, applyFocusRail, toggleFocusRail,
+  selectFocusSentence, stepFocusSentence, toggleExplanationDOM
+} from './adhd.js';
 
 
 import * as today from './views/today.js';
@@ -331,6 +335,9 @@ document.addEventListener('click', async e => {
     // karşılığı yoktu; dokunmatik ekranda şıklara basmak hiçbir şey yapmıyordu.
     case 'practice-arm':  practice.arm(el.dataset.key); break;
     case 'practice-conf': practice.commit(el.dataset.conf); break;
+    case 'practice-park': practice.park(); break;
+    case 'practice-soft-break': practice.takeSoftBreak(); break;
+    case 'start-spark':   if (practice.startSpark(5)) show('practice'); break;
     case 'pick':         practice.pick(el.dataset.key); break;
     case 'dontknow':     practice.dontKnow(); break;
     case 'ask-gemini':   practice.askGemini(); break;
@@ -356,10 +363,42 @@ document.addEventListener('click', async e => {
     case 'akim-pick':          akim.arm(el.dataset.key); break;
     case 'akim-conf':          akim.commit(el.dataset.conf); break;
     case 'akim-break':         akim.takeBreak(); break;
+    case 'akim-soft-break':    akim.takeSoftBreak(); break;
+    case 'akim-park':          akim.park(); break;
     case 'akim-dontknow':      akim.dontKnow(); break;
     case 'akim-next':          akim.next(); break;
     case 'akim-toggle-attention': akim.toggleAttention(); break;
     case 'akim-ask-gemini':    akim.askGemini(); break;
+
+    /* --- ADHD bilişsel destek eylemleri --- */
+    case 'adhd-toggle-rail': {
+      const on = toggleFocusRail();
+      toast(on ? 'Odak satırı açık · cümleye tıkla veya ↓↑ ile ilerle' : 'Odak satırı kapatıldı');
+      break;
+    }
+    case 'adhd-sent':
+      if (adhdSettings().focusRail) selectFocusSentence(el);
+      break;
+    case 'adhd-toggle-exp':
+      toggleExplanationDOM(`#view-${currentView}`);
+      break;
+    case 'adhd-toggle-round':
+      akim.toggleRoundSize();
+      break;
+    case 'adhd-dismiss-break':
+      if (currentView === 'akim') akim.dismissSoftBreak();
+      else practice.dismissSoftBreak();
+      toast('Akış devam ediyor · sonraki nefes hatırlatması 15 dk sonra.');
+      break;
+    case 'adhd-dismiss-reentry':
+      el.closest('#adhd-reentry')?.remove();
+      break;
+    case 'flow-inline-pick':
+      flow.answerInline(el.dataset.topic, el.dataset.qid, el.dataset.key);
+      break;
+    case 'flow-mark-read':
+      flow.markCurrentRead(el.dataset.topic);
+      break;
 
     /* --- şık / öncül eleme (pratik + sınav ortak) --- */
     case 'eliminate': {
@@ -513,6 +552,12 @@ document.addEventListener('keydown', e => {
 
   if (currentView === 'practice') {
     if (k === 'G') { practice.askGemini(); e.preventDefault(); return; }
+    if (k === 'F') {
+      const on = toggleFocusRail();
+      toast(on ? 'Odak satırı açık (↓↑)' : 'Odak satırı kapalı');
+      e.preventDefault();
+      return;
+    }
     if (k === 'K' && practice.isAnswered()) {
       const btn = document.querySelector('#view-practice [data-act="kural"]');
       if (btn) { kuralToggle(btn.dataset.topic, btn.dataset.qid); e.preventDefault(); }
@@ -521,7 +566,12 @@ document.addEventListener('keydown', e => {
     if (practice.isAnswered()) {
       if (e.key === 'Enter' || e.key === ' ') { practice.next(); e.preventDefault(); }
       else if (k === 'M') { practice.nextLogic(); e.preventDefault(); }
+      else if (k === 'D') { toggleExplanationDOM('#view-practice'); e.preventDefault(); }
     } else {
+      if (k === 'P') { practice.park(); e.preventDefault(); return; }
+      if (adhdSettings().focusRail && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        if (stepFocusSentence(e.key === 'ArrowDown' ? 1 : -1, '#view-practice')) { e.preventDefault(); return; }
+      }
       // Akış ile aynı: şık seçiliyse 1-2-3 bahis (Enter = Sanırım), değilse 1-5 şık.
       const conf = practice.isArmed() ? ({ '1': 'sure', '2': 'think', '3': 'guess' })[e.key] : null;
       if (conf) { practice.commit(conf); e.preventDefault(); }
@@ -531,6 +581,12 @@ document.addEventListener('keydown', e => {
   } else if (currentView === 'akim' && akim.hasSession()) {
     if (e.key === 'Escape') { akim.quit(); e.preventDefault(); return; }
     if (k === 'G') { akim.askGemini(); e.preventDefault(); return; }
+    if (k === 'F') {
+      const on = toggleFocusRail();
+      toast(on ? 'Odak satırı açık (↓↑)' : 'Odak satırı kapalı');
+      e.preventDefault();
+      return;
+    }
     if (k === 'K' && akim.isAnswered()) {
       const btn = document.querySelector('#view-akim [data-act="kural"]');
       if (btn) { kuralToggle(btn.dataset.topic, btn.dataset.qid); e.preventDefault(); }
@@ -540,7 +596,12 @@ document.addEventListener('keydown', e => {
       // M (mantık) kısayolu 20 Eylül 2026'da kaldırıldı: karar artık cevaptan
       // ÖNCE, bahis şeridinde veriliyor (3 = Mantıkla).
       if (e.key === 'Enter' || e.key === ' ') { akim.next(); e.preventDefault(); }
+      else if (k === 'D') { toggleExplanationDOM('#view-akim'); e.preventDefault(); }
     } else {
+      if (k === 'P') { akim.park(); e.preventDefault(); return; }
+      if (adhdSettings().focusRail && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        if (stepFocusSentence(e.key === 'ArrowDown' ? 1 : -1, '#view-akim')) { e.preventDefault(); return; }
+      }
       // Şık seçildiyse 1-2-3 bahistir (Enter = Sanırım); seçilmediyse 1-5 şıktır.
       const conf = akim.isArmed() ? ({ '1': 'sure', '2': 'think', '3': 'guess' })[e.key] : null;
       if (conf) { akim.commit(conf); e.preventDefault(); }
@@ -551,6 +612,15 @@ document.addEventListener('keydown', e => {
     // K: bu soruda kuşkum var. Hem soru haritasında işaretli kalır hem de
     // sonuç ekranında cevabı "kuşkulu" kovasına yazar.
     if (k === 'K') { exam.mark(); e.preventDefault(); return; }
+    if (k === 'F') {
+      const on = toggleFocusRail();
+      toast(on ? 'Odak satırı açık (↓↑)' : 'Odak satırı kapalı');
+      e.preventDefault();
+      return;
+    }
+    if (adhdSettings().focusRail && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      if (stepFocusSentence(e.key === 'ArrowDown' ? 1 : -1, '#view-exam')) { e.preventDefault(); return; }
+    }
     if (letter) { exam.pick(letter); e.preventDefault(); }
     else if (e.key === 'ArrowRight') { exam.next(); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { exam.prev(); e.preventDefault(); }
@@ -740,6 +810,7 @@ async function boot() {
     try { if (applySrsPolicy() > 0) save(); } catch (e) { console.warn('[srs politika]', e); }
 
     const initial = (location.hash || '#today').slice(1);
+    applyFocusRail(adhdSettings().focusRail);
     show(VIEWS.includes(initial) ? initial : 'today', false);
     try { history.replaceState({ view: currentView }, '', '#' + currentView); } catch (e) {}
 

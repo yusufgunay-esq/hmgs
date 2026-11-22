@@ -16,6 +16,7 @@ import { nextAction, srsSummary, allSubjectMastery,
 import { rota } from '../rota.js';
 import { koc } from '../koc.js';
 import { active as examActive } from './exam.js';
+import { adhdSettings } from '../adhd.js';
 
 export function render() {
   const host = $('#view-today');
@@ -84,6 +85,74 @@ export function render() {
     return;
   }
 
+  const cleanMode = adhdSettings().cleanToday;
+  const detailsBody = `
+      <div class="grid grid-3" style="margin-top:1rem">
+        <div class="metric">
+          <div class="metric-k">Tekrar sırası</div>
+          <div class="metric-v" style="${srs.due ? 'color:var(--warn)' : ''}">${srs.due}</div>
+          <div class="metric-n">${srs.tracked} soru takipte · ${srs.graduated} oturdu${srs.struggling ? ` · ${srs.struggling} inatçı` : ''}</div>
+          ${srs.due
+            ? `<button class="btn btn-s" style="margin-top:0.5rem;width:100%"
+                 data-act="review-due" data-count="${Math.min(srs.due, 20)}">Tekrarları çöz (${Math.min(srs.due, 20)})</button>`
+            : (srs.tracked
+                ? `<div class="metric-n" style="margin-top:0.4rem">${nextDue ? `sıradaki tekrar ${nextDue}` : 'bekleyen tekrar yok'}</div>`
+                : `<div class="metric-n" style="margin-top:0.4rem">henüz tekrar kaydı yok</div>`)}
+        </div>
+        <div class="metric">
+          <div class="metric-k">Otomatikleşen ders</div>
+          <div class="metric-v" style="color:var(--ok)">${auto}<span style="font-size:0.85rem;font-weight:600;color:var(--ink-3)"> / ${mastery.length}</span></div>
+          <div class="metric-n">${effort} gelişiyor · ${untouched} yeni</div>
+        </div>
+        <div class="metric">
+          <div class="metric-k">Çalışma ritmi</div>
+          <div class="metric-v">${st}<span style="font-size:0.85rem;font-weight:600"> gün</span></div>
+          <div class="metric-n">${st >= 3 ? 'ritim oturuyor' : '5 soruyla ritmi başlat'}</div>
+        </div>
+      </div>
+
+      ${diagnosisHTML(gap, worst, sig)}
+
+      ${bleeding.length ? `
+        <div class="section-label">En yüksek getirili konular · hızlı net kazancı</div>
+        ${bleeding.map(b => `
+          <div class="subj">
+            <div>
+              <div class="subj-name">${esc(b.topic.title.replace(/^\s*\d+\.\s*/, ''))}</div>
+              <div class="subj-meta">${esc(subjectName(b.topic.subjectId))} · ${b.wrong}/${b.n} tekrar bekliyor</div>
+            </div>
+            <div class="subj-right">
+              <span class="chip amber">${b.wrong} açık</span>
+              <button class="btn btn-2 btn-s" data-act="go-flow-topic" data-topic="${esc(b.topicId)}">Konuyu oku</button>
+            </div>
+          </div>`).join('')}` : ''}
+
+      ${bleedingT.length ? `
+        <div class="section-label">Öncelikli etiketler · senin verinden</div>
+        ${bleedingT.map(b => `
+          <div class="subj">
+            <div>
+              <div class="subj-name">${esc(b.tag)}</div>
+              <div class="subj-meta">${b.wrong}/${b.n} tekrar bekliyor</div>
+            </div>
+            <div class="subj-right">
+              <span class="chip amber">${b.wrong} açık</span>
+            </div>
+          </div>`).join('')}` : ''}
+
+      <div class="section-label">Serbest çalışma</div>
+      <div class="btn-row">
+        <button class="btn btn-2 btn-s" data-act="start-spark">5 soruluk ısınma</button>
+        <button class="btn btn-2 btn-s" data-act="practice-pastexam">Arşiv soruları · ${realCount}</button>
+        <button class="btn btn-2 btn-s" data-act="start-hmgs-benzeri">HMGS benzeri · 20</button>
+        <button class="btn btn-2 btn-s" data-act="start-deadlines">Süreler ve sayılar · 20</button>
+        <button class="btn btn-2 btn-s" data-act="practice-core-karma">Karma akış</button>
+        <button class="btn btn-2 btn-s" data-act="go-exam">Deneme sayfası</button>
+      </div>
+
+      <div class="section-label">Dersler · otomatikleşme durumu</div>
+      ${renderSubjects(mastery)}`;
+
   host.innerHTML = `
     <div class="wrap">
       ${rotaHTML(r, k)}
@@ -97,7 +166,7 @@ export function render() {
         <div class="metric">
           <div class="metric-k">Bugün çözülen</div>
           <div class="metric-v">${r.bugun.toplam}<span style="font-size:0.85rem;font-weight:600;color:var(--ink-3)"> soru</span></div>
-          <div class="metric-n">${r.bugun.toplam ? `${r.bugun.dogru} doğru · ${pct((r.bugun.dogru / r.bugun.toplam) * 100)}` : 'henüz başlamadın'}</div>
+          <div class="metric-n">${r.bugun.toplam ? `${r.bugun.dogru} doğru · ${pct((r.bugun.dogru / r.bugun.toplam) * 100)}` : '5 soruyla başla, gerisi gelir'}</div>
           <div class="metric-n">deneme cevapları hariç</div>
         </div>
         <div class="metric">
@@ -108,70 +177,15 @@ export function render() {
         </div>
       </div>
 
-      <div class="grid grid-3" style="margin-top:1rem">
-        <div class="metric">
-          <div class="metric-k">Yanlışlarım · tekrar sırası</div>
-          <div class="metric-v" style="${srs.due ? 'color:var(--warn)' : ''}">${srs.due}</div>
-          <div class="metric-n">${srs.tracked} soru takipte · ${srs.graduated} mezun${srs.struggling ? ` · ${srs.struggling} inatçı` : ''}</div>
-          ${srs.due
-            ? `<button class="btn btn-s" style="margin-top:0.5rem;width:100%"
-                 data-act="review-due" data-count="${Math.min(srs.due, 20)}">Yanlışlarımı çöz (${Math.min(srs.due, 20)})</button>`
-            : (srs.tracked
-                ? `<div class="metric-n" style="margin-top:0.4rem">${nextDue ? `sıradaki tekrar ${nextDue}` : 'bekleyen tekrar yok'}</div>`
-                : `<div class="metric-n" style="margin-top:0.4rem">henüz yanlış kaydı yok</div>`)}
-        </div>
-        <div class="metric">
-          <div class="metric-k">Otomatikleşen ders</div>
-          <div class="metric-v" style="color:var(--ok)">${auto}<span style="font-size:0.85rem;font-weight:600;color:var(--ink-3)"> / ${mastery.length}</span></div>
-          <div class="metric-n">${effort} eforlu · ${untouched} hiç çözülmedi</div>
-        </div>
-        <div class="metric">
-          <div class="metric-k">Çalışma serisi</div>
-          <div class="metric-v">${st}<span style="font-size:0.85rem;font-weight:600"> gün</span></div>
-          <div class="metric-n">${st >= 3 ? 'seriyi bozma' : 'seri kurmaya başla'}</div>
-        </div>
-      </div>
-
-      ${diagnosisHTML(gap, worst, sig)}
-
-      ${bleeding.length ? `
-        <div class="section-label">Kanayan konular · en çok hata yaptıkların</div>
-        ${bleeding.map(b => `
-          <div class="subj">
-            <div>
-              <div class="subj-name">${esc(b.topic.title.replace(/^\s*\d+\.\s*/, ''))}</div>
-              <div class="subj-meta">${esc(subjectName(b.topic.subjectId))} · ${b.wrong}/${b.n} yanlış</div>
-            </div>
-            <div class="subj-right">
-              <span class="chip red">%${Math.round(b.rate * 100)} hata</span>
-              <button class="btn btn-2 btn-s" data-act="go-flow-topic" data-topic="${esc(b.topicId)}">Konuyu oku</button>
-            </div>
-          </div>`).join('')}` : ''}
-
-      ${bleedingT.length ? `
-        <div class="section-label">Zorlandığın etiketler · statik zorluk değil, senin verinden</div>
-        ${bleedingT.map(b => `
-          <div class="subj">
-            <div>
-              <div class="subj-name">${esc(b.tag)}</div>
-              <div class="subj-meta">${b.wrong}/${b.n} yanlış</div>
-            </div>
-            <div class="subj-right">
-              <span class="chip amber">%${Math.round(b.rate * 100)} hata</span>
-            </div>
-          </div>`).join('')}` : ''}
-
-      <div class="section-label">Serbest çalışma</div>
-      <div class="btn-row">
-        <button class="btn btn-2 btn-s" data-act="practice-pastexam">Arşiv soruları · ${realCount}</button>
-        <button class="btn btn-2 btn-s" data-act="start-hmgs-benzeri">HMGS benzeri · 20</button>
-        <button class="btn btn-2 btn-s" data-act="start-deadlines">Süreler ve sayılar · 20</button>
-        <button class="btn btn-2 btn-s" data-act="practice-core-karma">Karma akış</button>
-        <button class="btn btn-2 btn-s" data-act="go-exam">Deneme sayfası</button>
-      </div>
-
-      <div class="section-label">Dersler · otomatikleşme durumu</div>
-      ${renderSubjects(mastery)}
+      ${cleanMode
+        ? `<details class="today-details" style="margin-top:1.25rem">
+            <summary class="today-details-sum">
+              <span>Ayrıntılı analiz, serbest çalışma ve tüm dersler</span>
+              <span class="hint">${srs.due ? `${srs.due} tekrar · ` : ''}${mastery.length} ders</span>
+            </summary>
+            <div class="today-details-body">${detailsBody}</div>
+          </details>`
+        : detailsBody}
     </div>`;
 }
 
@@ -195,6 +209,12 @@ function rotaHTML(r, k) {
   const sirali = r.adimlar.filter(a => !a.bilgi && !a.istege && !a.sinirsiz);
   const isabet = r.bugun.toplam ? Math.round((r.bugun.dogru / r.bugun.toplam) * 100) : 0;
 
+  const sparkCta = r.bugun.toplam === 0
+    ? `<button class="btn adhd-spark-btn" data-act="start-spark" title="Göreve başlama eşiğini düşüren 5 soruluk kısa ısınma seti (~4 dk)">5 soruyla başla · 4 dk</button>`
+    : (s && s.tur === 'deneme'
+        ? `<button class="btn btn-2" data-act="start-spark" title="Denemeden önce 5 soruluk kısa ısınma">Önce 5 soruyla ısın</button>`
+        : '');
+
   let kicker, title, why, cta;
   if (!s) {
     // Sınırlı adımların hepsi bitti: kahraman akış. Tavan yok, gün bir sayıyla bitmez.
@@ -202,15 +222,16 @@ function rotaHTML(r, k) {
     kicker = 'Liste bitti · akış açık';
     title = r.bugun.toplam ? `Bugün ${r.bugun.toplam} soru · isabet %${isabet}` : 'Akışa gir';
     why = ak ? ak.neden : 'Karışık, sınav biçiminde ve sonu yok.';
-    cta = '<button class="btn" data-act="rota-go" data-step="akis">Akışa devam et</button>';
+    cta = sparkCta + '<button class="btn" data-act="rota-go" data-step="akis">Akışa devam et</button>';
   } else {
     const no = sirali.indexOf(s) + 1;
     const kalan = s.plan - s.yapilan;
     kicker = s.sinirsiz ? 'Sırada' : `Sırada · ${no > 0 ? no : 1} / ${Math.max(1, sirali.length)}${s.tur === 'konu' ? ' · konu onarımı' : ''}`;
     title = s.tur === 'deneme' || s.sinirsiz ? s.baslik : `${s.baslik} · ${kalan} ${s.birim || 'soru'}`;
     why = s.neden;
-    cta = (s.topicId ? `<button class="btn btn-2" data-act="go-flow-topic" data-topic="${esc(s.topicId)}">Önce konuyu oku</button>` : '')
-      + `<button class="btn" data-act="rota-go" data-step="${esc(s.id)}">${esc(s.cta)}</button>`
+    cta = sparkCta
+      + (s.topicId ? `<button class="btn btn-2" data-act="go-flow-topic" data-topic="${esc(s.topicId)}">Önce konuyu oku</button>` : '')
+      + `<button class="btn${r.bugun.toplam === 0 ? ' btn-2' : ''}" data-act="rota-go" data-step="${esc(s.id)}">${esc(s.cta)}</button>`
       + (s.saat ? `<span class="hint" style="margin:0">önerilen başlangıç ${esc(s.saat)}</span>` : '');
   }
 
@@ -278,7 +299,7 @@ function kocHTML(k, denemeVar) {
   const yeniN = k.yeniGun || 0;
   const tekrarN = k.tekrarGun || 0;
   const uyari = !tamam && k.eksik > 0
-    ? `<div class="koc-not">Bugünkü tempoyla günde ~${k.eksik} soru eksik kalıyor; akşam bir blok daha.</div>`
+    ? `<div class="koc-not">Kısa 5 soruluk turlarla ritim hızla toparlanır; büyük sayılara takılma.</div>`
     : '';
   // Sıfır gürültüsü: "+ ~0 tekrar" yazmak satırı bilgisiz şişiriyor.
   const malzeme = `kalan ${unseen} çekirdek soru · sınava ${k.D} gün.`;

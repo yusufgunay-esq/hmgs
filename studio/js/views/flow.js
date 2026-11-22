@@ -25,9 +25,11 @@ import { topicMastery, MASTERY_LABEL } from '../engine.js';
 import { kitapPaneliHTML, ozetEtiketiHTML, kitapVar } from '../kitap.js';
 import { DERSLER } from '../notlar-data.js';
 import { openDers as notlarAc } from './notlar.js';
+import { splitExplanation, negativeBannerHTML, highlightAnchorsHTML } from '../adhd.js';
 
 let cur = { subjectId: 'medeni_hukuk', topicId: null };
 const ui = { menu: false, toc: false, q: '', sinav: false, sinavTum: true };
+const inlineAns = new Map(); // topicId -> { qId, chosen }
 let bagli = false;
 
 /* Stüdyo ders kimliği → Notlar ders kimliği */
@@ -76,8 +78,9 @@ export function render() {
   }
   const t = cur.topicId ? topicById.get(cur.topicId) : null;
 
-  // Konu okunmuş sayılır; kenar listesindeki işaret ve sayaç bunu anında göstersin.
-  if (t && !ui.sinav) { markTopicRead(t.id); save(); }
+  // Sorusu olmayan konularda okundu anında işlenir; sorulu konularda blok içi
+  // mini kontrol sorusunu cevaplayınca (ya da alttan elle işaretleyince) okundu sayılır.
+  if (t && !ui.sinav && !questionsOfTopic(t.id).length) { markTopicRead(t.id); save(); }
 
   host.innerHTML = `
     <div class="wrap">
@@ -254,22 +257,97 @@ function refBaslik(ref) {
 }
 const temizBaslik = title => maddesiz(topicHeading(title)).replace(/\s*[-–—:]\s*$/, '');
 
+/* ---------- sandviç okuma: blok içi mini kontrol sorusu ---------- */
+
+function pickInlineQuestion(topicId, qs) {
+  if (!qs || !qs.length) return null;
+  const saved = inlineAns.get(topicId);
+  if (saved) {
+    const found = qs.find(q => q.id === saved.qId);
+    if (found) return found;
+  }
+  const seen = new Set((state().answers || []).map(a => a.qId));
+  const unseen = qs.filter(q => !seen.has(q.id));
+  const pool = unseen.length ? unseen : qs;
+  return pool.slice().sort((a, b) => String(a.stem || '').length - String(b.stem || '').length)[0] || null;
+}
+
+function inlineCheckHTML(t, qs) {
+  const q = pickInlineQuestion(t.id, qs);
+  if (!q || !Array.isArray(q.options) || !q.options.length) return '';
+  const ans = inlineAns.get(t.id);
+  const answered = ans && ans.qId === q.id;
+  const ok = answered && ans.chosen === q.correct;
+  const sp = splitExplanation(q.explanation || '');
+
+  return `<div class="fl-micro" data-topic="${esc(t.id)}" data-qid="${esc(q.id)}">
+    <div class="fl-micro-head">
+      <span class="fl-micro-k">Aktif kontrol · okuduğunu 20 saniyede mühürle</span>
+      ${answered ? `<span class="chip ${ok ? 'accent' : 'amber'}">${ok ? 'Doğru · okundu işaretlendi' : `Doğru şık ${esc(q.correct)}`}</span>` : ''}
+    </div>
+    ${negativeBannerHTML(q.stem)}
+    <div class="fl-micro-stem">${highlightAnchorsHTML(rich(q.stem))}</div>
+    <div class="fl-micro-opts">
+      ${q.options.map(o => {
+        let cls = 'fl-micro-opt';
+        if (answered) {
+          if (o.key === q.correct) cls += ' is-ok';
+          else if (o.key === ans.chosen) cls += ' is-no';
+          else cls += ' is-dim';
+        }
+        return `<button type="button" class="${cls}" data-act="flow-inline-pick" data-topic="${esc(t.id)}" data-qid="${esc(q.id)}" data-key="${esc(o.key)}" ${answered ? 'disabled' : ''}>
+          <span class="fl-micro-key">${esc(o.key)}</span>
+          <span class="fl-micro-txt">${rich(o.text)}</span>
+        </button>`;
+      }).join('')}
+    </div>
+    ${answered && sp.lead ? `<div class="fl-micro-fb">${richBlock(sp.lead)}</div>` : ''}
+  </div>`;
+}
+
+export function answerInline(topicId, qId, key) {
+  if (!topicId || !qId || !key) return;
+  inlineAns.set(topicId, { qId, chosen: key });
+  markTopicRead(topicId);
+  save();
+  // Sayfayı başa sıçratmadan yalnız mini kontrol kartını ve kenar okundu işaretini güncelle
+  const t = topicById.get(topicId);
+  const qs = t ? questionsOfTopic(topicId) : [];
+  const box = document.querySelector(`#view-flow .fl-micro[data-topic="${topicId}"]`);
+  if (box && t) box.outerHTML = inlineCheckHTML(t, qs);
+  const tocLink = document.querySelector(`#view-flow .flow-toc a[data-topic="${topicId}"]`);
+  if (tocLink) tocLink.classList.add('is-read');
+}
+
+export function markCurrentRead(topicId) {
+  const id = topicId || cur.topicId;
+  if (!id) return;
+  markTopicRead(id);
+  save();
+  render();
+}
+
 /* ---------- sade okuma (topics.js → t.sade) ----------
    sade = { giris, bloklar:[{ b, m, o }], tuzak:[...], akil }
    b başlık · m anlatım (richBlock) · o örnek olay */
 function sadeHTML(t, list, i, qs) {
   const S = t.sade;
+  const bloklar = S.bloklar || [];
+  const checkAt = bloklar.length >= 2 ? 1 : bloklar.length - 1;
+  const microCard = inlineCheckHTML(t, qs);
   return `
     <p class="fl-eyebrow">${esc(subjectName(t.subjectId))} · Konu ${i + 1} / ${list.length}</p>
     <h2>${esc(S.baslik || temizBaslik(t.title))}</h2>
     ${S.giris ? `<p class="sd-giris">${rich(S.giris)}</p>` : ''}
     ${seritHTML(t.subjectId)}
-    ${(S.bloklar || []).map((k, n) => `
+    ${bloklar.map((k, n) => `
       <section class="sd-blok">
         <h3><span class="sd-no">${n + 1}</span>${esc(k.b)}</h3>
-        ${richBlock(k.m || '')}
-        ${k.o ? `<div class="sd-olay"><span class="lbl">Örnek olay</span><p>${rich(k.o)}</p></div>` : ''}
-      </section>`).join('')}
+        ${highlightAnchorsHTML(richBlock(k.m || ''))}
+        ${k.o ? `<div class="sd-olay"><span class="lbl">Örnek olay</span><p>${highlightAnchorsHTML(rich(k.o))}</p></div>` : ''}
+      </section>
+      ${n === checkAt ? microCard : ''}`).join('')}
+    ${bloklar.length === 0 ? microCard : ''}
     <div class="visual-slot" id="visual-slot" data-v3="true"></div>
     ${(S.tuzak || []).length ? `<div class="trap sd-tuzak">
       <div class="lbl">Sınavda dikkat</div>
@@ -281,6 +359,7 @@ function sadeHTML(t, list, i, qs) {
         ? `<button class="btn" data-act="flow-practice" data-topic="${esc(t.id)}">Bu konunun ${qs.length} sorusunu çöz</button>`
         : `<button class="btn btn-2" data-act="flow-practice-subject" data-subject="${esc(t.subjectId)}">${esc(subjectName(t.subjectId))} sorularını çöz</button>`}
       <button class="btn btn-2" data-act="akim-ders-start" data-subject="${esc(t.subjectId)}">${esc(subjectName(t.subjectId))} akışı</button>
+      ${!okundu(t.id) ? `<button class="btn btn-2 btn-s" data-act="flow-mark-read" data-topic="${esc(t.id)}">Okundu işaretle</button>` : ''}
     </div>
     ${pagerHTML(list, i)}`;
 }
@@ -309,12 +388,18 @@ function topicHTML(t, list) {
     ${kitapPaneliHTML(t.subjectId)}
 
     ${kitapVar(t.subjectId) ? ozetEtiketiHTML(t.subjectId) : ''}
-    ${(t.chunks || []).map(c => `
-      <section>
-        ${refBaslik(c.legalRef) ? `<h3 class="sd-h">${esc(refBaslik(c.legalRef))}</h3>` : ''}
-        ${richBlock(maddesiz(c.text || ''))}
-        ${c.detail ? detailHTML(maddesiz(c.detail)) : ''}
-      </section>`).join('')}
+    ${(() => {
+      const chunks = t.chunks || [];
+      const checkAt = chunks.length >= 2 ? 1 : chunks.length - 1;
+      const microCard = inlineCheckHTML(t, qs);
+      return chunks.map((c, n) => `
+        <section>
+          ${refBaslik(c.legalRef) ? `<h3 class="sd-h">${esc(refBaslik(c.legalRef))}</h3>` : ''}
+          ${highlightAnchorsHTML(richBlock(maddesiz(c.text || '')))}
+          ${c.detail ? detailHTML(maddesiz(c.detail)) : ''}
+        </section>
+        ${n === checkAt ? microCard : ''}`).join('') + (chunks.length === 0 ? microCard : '');
+    })()}
 
     <div class="visual-slot" id="visual-slot" data-v3="${isV3}"></div>
     ${t.visualExtra ? '<div class="visual-slot" id="visual-slot-extra" data-v3="true"></div>' : ''}

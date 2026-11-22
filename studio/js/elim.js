@@ -17,6 +17,7 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich } from './ui.js';
+import { enhanceReadingHTML, highlightAnchorsHTML } from './adhd.js';
 
 const ROMAN_LINE = /^(I{1,3}|IV|V|VI{0,3}|VII|VIII|IX|X)\.\s*(.*)$/;
 /* Çıplak rakam satırı ("I." tek başına) ve gerçek madde satırı ("I. metin"). */
@@ -53,10 +54,10 @@ export function premiseHTML(premise, struckNumerals) {
       const isStruck = struckSet.has(m[1]);
       return `<div class="premise-item${isStruck ? ' struck' : ''}" data-act="eliminate-premise" data-numeral="${esc(m[1])}"
         title="Bu öncülü yanlış say (onu içeren şıklar otomatik elenir)">
-        <span class="premise-num">${esc(m[1])}.</span><span class="premise-txt">${rich(m[2])}</span>
+        <span class="premise-num">${esc(m[1])}.</span><span class="premise-txt">${highlightAnchorsHTML(rich(m[2]))}</span>
       </div>`;
     }
-    return `<div class="premise-lead">${rich(line)}</div>`;
+    return `<div class="premise-lead">${enhanceReadingHTML(line, rich)}</div>`;
   });
   return `<div class="q-premise">${items.join('')}</div>`;
 }
