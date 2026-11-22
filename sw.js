@@ -1,13 +1,13 @@
-﻿/* HMGS 2026 â€” Service Worker
-   AmaÃ§: uygulama telefonda internetsiz de aÃ§Ä±lsÄ±n; Drive trafiÄŸi ASLA Ã¶nbelleÄŸe girmesin. */
-/* Â© 2026 Yusuf GÃœNAY â€” TÃ¼m HaklarÄ± SaklÄ±dÄ±r / All Rights Reserved.
-   Bu dosya HMGS projesinin tescilli kaynak kodudur. Ä°zinsiz kopyalama, tÃ¼retme
-   veya yeniden yayÄ±nlama yasaktÄ±r. Lisans: depo kÃ¶kÃ¼ndeki LICENSE dosyasÄ±. */
+/* HMGS 2026 — Service Worker
+   Amaç: uygulama telefonda internetsiz de açılsın; Drive trafiği ASLA önbelleğe girmesin. */
+/* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
+   Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
+   veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
-const VERSION = 'hmgs-v81';
+const VERSION = 'hmgs-v88';
 const SHELL = VERSION + '-shell';
 
-// UygulamanÄ±n kendi dosyalarÄ± + dÄ±ÅŸarÄ±dan gelen gÃ¶rÃ¼nÃ¼m dosyalarÄ± + StÃ¼dyo kabuÄŸu.
+// Uygulamanın kendi dosyaları + dışarıdan gelen görünüm dosyaları + Stüdyo kabuğu.
 const PRECACHE = [
   './',
   './index.html',
@@ -22,8 +22,10 @@ const PRECACHE = [
   './js/visual-engines-v3.js',
   './studio/css/studio.css',
   './studio/css/studio-mobile.css',
+  './studio/css/notlar.css',
   './studio/js/main.js',
   './studio/js/adhd.js',
+  './studio/js/ritim.js',
   './studio/js/data.js',
   './studio/js/labels.js',
   './studio/js/engine.js',
@@ -42,6 +44,10 @@ const PRECACHE = [
   './studio/js/kitaplar.js',
   './studio/js/tuyolar.js',
   './studio/js/sinav-konulari.js',
+  './studio/js/notlar-data.js',
+  './studio/js/hap-data.js',
+  './studio/js/not-eslesme.js',
+  './studio/js/views/notlar.js',
   './studio/js/views/today.js',
   './studio/js/views/odevler.js',
   './studio/js/views/flow.js',
@@ -51,6 +57,10 @@ const PRECACHE = [
   './studio/js/views/exam.js',
   './studio/js/views/progress.js',
   './studio/js/gen/alacak_devri.js',
+  './studio/js/gen/bosanma.js',
+  './studio/js/gen/ceza_suc.js',
+  './studio/js/gen/hmk_sure.js',
+  './studio/js/gen/kira.js',
   './studio/js/gen/ciro.js',
   './studio/js/gen/ehliyet.js',
   './studio/js/gen/gaiplik.js',
@@ -61,7 +71,7 @@ const PRECACHE = [
 ];
 
 
-// Bunlar asla Ã¶nbelleÄŸe alÄ±nmaz: kimlik doÄŸrulama ve Drive API canlÄ± olmak zorunda.
+// Bunlar asla önbelleğe alınmaz: kimlik doğrulama ve Drive API canlı olmak zorunda.
 const NEVER_CACHE = [
   'accounts.google.com',
   'oauth2.googleapis.com',
@@ -73,10 +83,10 @@ const NEVER_CACHE = [
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL);
-    // Tek bir dosya patlarsa kurulumun tamamÄ± dÃ¼ÅŸmesin.
+    // Tek bir dosya patlarsa kurulumun tamamı düşmesin.
     await Promise.all(PRECACHE.map(async url => {
       try { await cache.add(new Request(url, { cache: 'reload' })); }
-      catch (e) { console.warn('[sw] Ã¶nbelleÄŸe alÄ±namadÄ±:', url); }
+      catch (e) { console.warn('[sw] önbelleğe alınamadı:', url); }
     }));
     self.skipWaiting();
   })());
@@ -101,11 +111,11 @@ self.addEventListener('fetch', event => {
   let url;
   try { url = new URL(req.url); } catch (_) { return; }
 
-  if (NEVER_CACHE.some(h => url.hostname.endsWith(h))) return;      // doÄŸrudan aÄŸa
-  if (url.pathname.startsWith('/api/')) return;                      // yerel sunucu uÃ§larÄ±
+  if (NEVER_CACHE.some(h => url.hostname.endsWith(h))) return;      // doğrudan ağa
+  if (url.pathname.startsWith('/api/')) return;                      // yerel sunucu uçları
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
-  // Sayfa aÃ§Ä±lÄ±ÅŸÄ± ve modÃ¼l dosyalarÄ±: AÄŸ Ã¶ncelikli (network-first), baÄŸlantÄ± yoksa Ã¶nbellek
+  // Sayfa açılışı ve modül dosyaları: Ağ öncelikli (network-first), bağlantı yoksa önbellek
   event.respondWith((async () => {
     try {
       const fresh = await fetch(req);
@@ -122,7 +132,7 @@ self.addEventListener('fetch', event => {
         if (fallback) return fallback;
       }
       return new Response(
-        '<meta charset="utf-8"><body style="background:#0b0f19;color:#94a3b8;font:16px system-ui;padding:2rem">BaÄŸlantÄ± yok ve Ã¶nbellek henÃ¼z hazÄ±r deÄŸil. Ä°nternete baÄŸlandÄ±ÄŸÄ±nÄ±zda sayfa otomatik yÃ¼klenecektir.</body>',
+        '<meta charset="utf-8"><body style="background:#0b0f19;color:#94a3b8;font:16px system-ui;padding:2rem">Bağlantı yok ve önbellek henüz hazır değil. İnternete bağlandığınızda sayfa otomatik yüklenecektir.</body>',
         { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
       );
     }
