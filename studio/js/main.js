@@ -12,7 +12,9 @@
 
 import { $, $$, toast } from './ui.js';
 import { initData, initDataAsync, populateData, topicById, questionById } from './data.js';
-import { load, save, daysLeft, state, getSettings, updateSettings, importTakipExams, reconcilePastData } from './store.js';
+import { load, save, daysLeft, state, getSettings, updateSettings, importTakipExams, reconcilePastData, onAnswer, todayKey } from './store.js';
+import { koc } from './koc.js';
+import { ritim } from './ritim.js';
 import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress, requestSilentToken, fetchVaultFromDrive } from './vault-client.js';
 import { applySrsPolicy } from './engine.js';
 import { kuralToggle } from './kural.js';
@@ -37,6 +39,36 @@ import { rota, adimSorulari, kagitSorulari, konuSetSorulari } from './rota.js';
 const VIEWS = ['today', 'odevler', 'flow', 'notlar', 'akim', 'practice', 'pratik', 'exam', 'progress'];
 let currentView = 'today';
 let lastAction = null;
+
+/* ---------- günlük minimum: dolduğu an tek satır ----------
+   Kullanıcı (22 Kasım 2026): "boğmasın, ben zaten flow'a girerim." Bu yüzden
+   günde EN FAZLA BİR bildirim: minimum dolduğu cevapta kendiliğinden kaybolan
+   tek toast. Hedef için ayrı bildirim, modal, ses, konfeti yok; denemede hiç
+   yok. Eşik gün başına bir kez hesaplanır (koc() havuzu tarar, cevap başına
+   koşmasın). */
+let esik = { gun: null, min: 0, hedef: 0, bildirildi: false };
+function esikBilgisi() {
+  const g = todayKey();
+  if (esik.gun !== g) {
+    const k = koc();
+    const rt = ritim(k.hedef, adhdSettings().dailyMin, 1);
+    esik = { gun: g, min: rt.minimum, hedef: k.hedef, bildirildi: rt.bugunTamam };
+  }
+  return esik;
+}
+function esikSifirla() { esik.gun = null; }
+onAnswer(row => {
+  if (!row || row.mode === 'exam') return;
+  const e = esikBilgisi();
+  if (e.bildirildi) return;
+  const k = todayKey();
+  let n = 0;
+  for (const a of state().answers) if (a.at && a.at.slice(0, 10) === k) n++;
+  if (n < e.min) return;
+  e.bildirildi = true;
+  const rt = ritim(e.hedef, adhdSettings().dailyMin, 1);
+  toast(`Günlük minimum tamam · zincir ${rt.seri} gün`);
+});
 
 /* ---------- tema ve yazı boyutu yönetimi ---------- */
 
@@ -96,6 +128,10 @@ function show(view, push = true) {
   }
   VIEWS.forEach(v => $('#view-' + v)?.classList.toggle('on', v === view));
   $$('.nav button').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === view)));
+  // "Soru" sekmesi yalnız açık set varken (ya da o ekrandayken) görünür. Boşken
+  // gösterdiği ekran "Açık bir seans yok" idi; 8 sekmelik çubuğu 7'ye indirir.
+  const soruBtn = $('.nav button[data-view="practice"]');
+  if (soruBtn) soruBtn.hidden = !(view === 'practice' || practice.hasSession());
 
   try {
     if (view === 'today') today.render();
@@ -143,7 +179,7 @@ function runAction(a) {
     else show('today');
   } else if (a.view === 'exam') {
     show('exam');
-    if (a.mode === 'start') exam.start();
+    if (a.mode === 'start') exam.startSmart();
   } else {
     show(a.view || 'today');
   }
@@ -388,6 +424,10 @@ document.addEventListener('click', async e => {
       if (k === 'roundSize') updateAdhdSettings({ roundSize: Number(v) === 10 ? 10 : 5 });
       else if (k === 'cleanToday') updateAdhdSettings({ cleanToday: v === 'true' });
       else if (k === 'compactFeedback') updateAdhdSettings({ compactFeedback: v === 'true' });
+      else if (k === 'dailyMin') {
+        updateAdhdSettings({ dailyMin: Math.max(0, Math.round(Number(v) || 0)) });
+        esikSifirla();
+      }
       else if (k === 'focusRail') {
         const on = v === 'true';
         updateAdhdSettings({ focusRail: on });
@@ -438,6 +478,7 @@ document.addEventListener('click', async e => {
 
     /* --- sınav --- */
     case 'exam-start-smart': exam.startSmart(); break;
+    case 'exam-start-ai': exam.startAi(); break;
     case 'exam-start-real': exam.startReal(el.dataset.source); break;
     case 'exam-start-deneme':
     case 'exam-start-yekti': if (exam.startDenemeSet(el.dataset.source)) show('exam'); break;
@@ -763,7 +804,9 @@ function rotaBaslat(adim) {
       ok = sec.kind === 'real' ? exam.startReal(sec.source)
         : sec.kind === 'set' ? exam.startQuestions(kagitSorulari(sec.source), sec.label, sec.source)
           : sec.kind === 'ai' ? exam.startAi()
-            : exam.start();
+            // 'karma' ve bilinmeyen tür: algoritmik deneme. Eskiden var olmayan
+            // exam.start() çağrılıyordu ve düğme sessizce hiçbir şey yapmıyordu.
+            : exam.startSmart();
       if (ok !== false) show('exam');
       return;
     }
