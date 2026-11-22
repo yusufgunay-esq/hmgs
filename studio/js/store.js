@@ -104,6 +104,14 @@ export function onStateChange(cb) {
   if (typeof cb === 'function') stateChangeCallbacks.push(cb);
 }
 
+/* Cevap anında (debounce'suz) çalışan dinleyiciler. Günlük minimumun dolduğu
+   anı yakalamak için (main.js → ritim.js). onStateChange 4 sn geciktirir ve
+   yalnız eşitleme içindir; anlık geri bildirim buradan gider. */
+const answerCallbacks = [];
+export function onAnswer(cb) {
+  if (typeof cb === 'function') answerCallbacks.push(cb);
+}
+
 export function replaceState(newState) {
   S = migrate(newState);
   try {
@@ -192,6 +200,9 @@ export function recordAnswer(q, chosen, ms, mode, flags = {}) {
   if (row.dilemma5050 === false) delete row.dilemma5050;
   if (row.eliminatedOptions === undefined) delete row.eliminatedOptions;
   S.answers.push(row);
+  for (const cb of answerCallbacks) {
+    try { cb(row); } catch (err) { console.warn('[store] onAnswer hatası:', err); }
+  }
   return row;
 }
 
