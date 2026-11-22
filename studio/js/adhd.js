@@ -36,13 +36,17 @@ export function adhdSettings() {
   const roundSize = Number(raw.roundSize) === 10 ? 10 : 5;
   const softCheckMin = Number(raw.softCheckMin) > 0 ? Number(raw.softCheckMin) : ADHD_DEFAULTS.softCheckMin;
   const softBreakMin = Number(raw.softBreakMin) > 0 ? Number(raw.softBreakMin) : ADHD_DEFAULTS.softBreakMin;
+  // Günlük minimum (ritim.js): 0 = otomatik (koç hedefinin yarısı, 15-30).
+  const dm = Math.round(Number(raw.dailyMin));
+  const dailyMin = Number.isFinite(dm) && dm > 0 && dm <= 200 ? dm : 0;
   return {
     roundSize,
     softCheckMin,
     softBreakMin,
     compactFeedback: raw.compactFeedback !== false,
     focusRail: !!raw.focusRail,
-    cleanToday: raw.cleanToday !== false
+    cleanToday: raw.cleanToday !== false,
+    dailyMin
   };
 }
 
@@ -574,6 +578,15 @@ export function adhdSettingsPanelHTML() {
     <div class="section-label">Odak ve çalışma tercihleri</div>
     <div class="card adhd-settings-card">
       <div class="adhd-set-grid">
+        <div class="adhd-set-row">
+          <div>
+            <div class="adhd-set-name">Günlük minimum</div>
+            <div class="adhd-set-sub">Kötü günde bile yapılacak taban. Dolunca gün tamam sayılır, zincir uzar.</div>
+          </div>
+          <div class="adhd-set-opts">
+            ${[0, 10, 20, 30, 40].map(n => chip('dailyMin', n, s.dailyMin === n, n ? String(n) : 'Otomatik')).join('')}
+          </div>
+        </div>
         <div class="adhd-set-row">
           <div>
             <div class="adhd-set-name">Bugün ekranı</div>
