@@ -17,8 +17,8 @@ import { requestDriveLoginAndDownload, clearVaultIndexedDB, syncStudioProgress, 
 import { applySrsPolicy } from './engine.js';
 import { kuralToggle } from './kural.js';
 import {
-  adhdSettings, applyFocusRail, toggleFocusRail,
-  selectFocusSentence, stepFocusSentence, toggleExplanationDOM
+  adhdSettings, updateAdhdSettings, applyFocusRail, toggleFocusRail,
+  selectFocusSentence, stepFocusSentence, toggleExplanationDOM, toggleBrownNoise
 } from './adhd.js';
 
 
@@ -376,6 +376,28 @@ document.addEventListener('click', async e => {
       toast(on ? 'Odak satırı açık · cümleye tıkla veya ↓↑ ile ilerle' : 'Odak satırı kapatıldı');
       break;
     }
+    case 'adhd-toggle-noise': {
+      const on = toggleBrownNoise();
+      toast(on ? 'Odak sesi açık (yumuşak kahverengi gürültü)' : 'Odak sesi kapatıldı');
+      if (currentView === 'progress') progress.render();
+      break;
+    }
+    case 'adhd-set': {
+      const k = el.dataset.key;
+      const v = el.dataset.val;
+      if (k === 'roundSize') updateAdhdSettings({ roundSize: Number(v) === 10 ? 10 : 5 });
+      else if (k === 'cleanToday') updateAdhdSettings({ cleanToday: v === 'true' });
+      else if (k === 'compactFeedback') updateAdhdSettings({ compactFeedback: v === 'true' });
+      else if (k === 'focusRail') {
+        const on = v === 'true';
+        updateAdhdSettings({ focusRail: on });
+        applyFocusRail(on);
+      }
+      if (currentView === 'progress') progress.render();
+      else if (currentView === 'today') today.render();
+      toast('Odak tercihi güncellendi.');
+      break;
+    }
     case 'adhd-sent':
       if (adhdSettings().focusRail) selectFocusSentence(el);
       break;
@@ -547,6 +569,12 @@ document.addEventListener('keydown', e => {
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
   const k = e.key.toUpperCase();
+  if (k === 'N' && (currentView === 'practice' || (currentView === 'akim' && akim.hasSession()) || (currentView === 'exam' && exam.active()))) {
+    const on = toggleBrownNoise();
+    toast(on ? 'Odak sesi açık' : 'Odak sesi kapatıldı');
+    e.preventDefault();
+    return;
+  }
   const letter = ['A', 'B', 'C', 'D', 'E'].includes(k) ? k
     : ({ '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E' })[k];
 

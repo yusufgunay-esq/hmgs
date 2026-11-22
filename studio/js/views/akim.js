@@ -42,7 +42,7 @@ import { kurtarmaRadariHTML } from '../tuyolar.js';
 import { buildGeminiPrompt, queueSessionForTakip, pushSessionToDriveDirectly, pushToLocalServer } from './practice.js';
 import {
   adhdSettings, updateAdhdSettings, negativeBannerHTML, enhanceAskHTML,
-  impulseWarning, progressiveExplanationHTML, parkInQueue, showReentry, applyFocusRail
+  impulseWarning, progressiveExplanationHTML, parkInQueue, showReentry, applyFocusRail, noiseButtonHTML
 } from '../adhd.js';
 
 let A = null;       // aktif akış seansı
@@ -180,6 +180,7 @@ export function render() {
               <line x1="4" y1="18" x2="15" y2="18" opacity="0.35"></line>
             </svg>
           </button>
+          ${noiseButtonHTML()}
           <button class="icon-btn" data-act="toggle-font-size" title="Metin Boyutunu Değiştir" aria-label="Metin boyutu">
             <span style="font-family:var(--sans);font-size:0.72rem;font-weight:700">A±</span>
           </button>

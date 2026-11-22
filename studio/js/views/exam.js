@@ -20,7 +20,7 @@ import { pushStudioQueueToDrive, getActiveToken, setActiveToken, requestSilentTo
 import { buildGeminiPrompt } from './practice.js';
 import { arsivLabel, denemeLabel, arsivStartLabel, denemeStartLabel, SECTION } from '../labels.js';
 import { kurtarmaRadariHTML } from '../tuyolar.js';
-import { adhdSettings, negativeBannerHTML, enhanceAskHTML, examQuarterMeta } from '../adhd.js';
+import { adhdSettings, negativeBannerHTML, enhanceAskHTML, examQuarterMeta, noiseButtonHTML } from '../adhd.js';
 
 /** HMGS: 120 soru / 155 dakika (Adalet Bakanlığı PGM, 27 Eylül 2026 ilanı:
  *  "cevaplama süresi 155 dakika"). Eskiden 150 yazıyordu. */
@@ -351,6 +351,7 @@ export function render() {
           <span>${esc(subjectName(q.subjectId))}</span>
           <button class="btn btn-2 btn-s${adhdSettings().focusRail ? ' active' : ''}" data-act="adhd-toggle-rail" aria-pressed="${adhdSettings().focusRail}" style="margin-left:auto"
             title="Odak satırı: uzun metinde cümle cümle oku (F)">Odak <span class="kbd">F</span></button>
+          ${noiseButtonHTML()}
           <button class="btn btn-2 btn-s exam-doubt${E.marked.has(E.i) ? ' on' : ''}" data-act="exam-mark"
             title="Bu soruda kuşkun olduğunu işaretler. Soru haritasında işaretli kalır, sonuç ekranında da kuşkulu sayılır (K)">
             ${E.marked.has(E.i) ? 'Kuşkuyu kaldır' : 'Kuşkuluyum'} <span class="kbd">K</span>

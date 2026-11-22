@@ -3744,3 +3744,40 @@ button.akim-round:hover {
   .exam-map-quarters { grid-template-columns: 1fr; }
   .adhd-reentry { flex-direction: column; align-items: flex-start; }
 }
+
+/* 11. Odak ayarları kartı (İlerleme sekmesi) */
+.adhd-settings-card { padding: 1.05rem 1.2rem; }
+.adhd-set-grid { display: flex; flex-direction: column; gap: 0.85rem; }
+.adhd-set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+.adhd-set-row:last-child { padding-bottom: 0; border-bottom: 0; }
+.adhd-set-name { font-size: 0.9rem; font-weight: 600; color: var(--ink); }
+.adhd-set-sub { font-size: 0.78rem; color: var(--ink-3); margin-top: 0.12rem; }
+.adhd-set-opts { display: inline-flex; gap: 0.35rem; flex-wrap: wrap; }
+.adhd-set-chip {
+  appearance: none;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+.adhd-set-chip:hover { border-color: var(--accent); color: var(--accent); }
+.adhd-set-chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FAF9F6;
+}
+[data-theme="dark"] .adhd-set-chip.on { color: #121316; }

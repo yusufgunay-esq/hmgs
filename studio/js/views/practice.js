@@ -20,7 +20,7 @@ import { pushStudioQueueToDrive, getActiveToken, setActiveToken, requestSilentTo
 import { tuyoSec, kurtarmaRadariHTML } from '../tuyolar.js';
 import {
   adhdSettings, negativeBannerHTML, enhanceAskHTML, impulseWarning,
-  progressiveExplanationHTML, buildSparkSet, parkInQueue, showReentry
+  progressiveExplanationHTML, buildSparkSet, parkInQueue, showReentry, noiseButtonHTML
 } from '../adhd.js';
 
 let S = null;   // aktif seans
@@ -343,6 +343,7 @@ export function render() {
               <line x1="4" y1="18" x2="15" y2="18" opacity="0.35"></line>
             </svg>
           </button>
+          ${noiseButtonHTML()}
           <button class="icon-btn" data-act="toggle-font-size" title="Metin Boyutunu Değiştir" aria-label="Metin boyutu">
             <span style="font-family:var(--sans);font-size:0.72rem;font-weight:700">A±</span>
           </button>

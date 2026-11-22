@@ -445,3 +445,184 @@ export function stepFocusSentence(dir, viewSel) {
   sents[nextIdx]?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
   return true;
 }
+
+
+/* ---------- 10. ÇEVRİMDIŞI ODAK SESİ (SICAK KAHVERENGİ GÜRÜLTÜ) ----------
+   Sıfır indirme, sıfır harici ses dosyası: Web Audio API ile 400 Hz altı
+   yumuşak kahverengi gürültü sentezler. Çalışma belleğini dış seslerden
+   yalıtır; açılış/kapanış 0.35 sn yumuşak geçişle çıtsız çalışır. */
+
+let _audioCtx = null;
+let _noiseNode = null;
+let _gainNode = null;
+let _noiseOn = false;
+
+export function isBrownNoiseOn() { return _noiseOn; }
+
+function syncNoiseButtons() {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('[data-act="adhd-toggle-noise"]').forEach(btn => {
+    btn.classList.toggle('active', _noiseOn);
+    btn.setAttribute('aria-pressed', String(_noiseOn));
+  });
+}
+
+export function startBrownNoise() {
+  if (_noiseOn || typeof window === 'undefined') return _noiseOn;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return false;
+  try {
+    if (!_audioCtx) _audioCtx = new AC();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+
+    // 4 saniyelik dikişsiz sıcak kahverengi gürültü tamponu (saf matematik)
+    const sampleRate = _audioCtx.sampleRate;
+    const len = sampleRate * 4;
+    const buf = _audioCtx.createBuffer(1, len, sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) {
+      const white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02;
+      data[i] = last * 3.2;
+    }
+    // Döngü ucunda sıfır tıkırtı için çapraz yumuşatma (son 0.15 sn → başa)
+    const fade = Math.min(Math.floor(sampleRate * 0.15), Math.floor(len / 8));
+    for (let i = 0; i < fade; i++) {
+      const t = i / fade;
+      data[len - fade + i] = data[len - fade + i] * (1 - t) + data[i] * t;
+    }
+
+    const src = _audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+
+    const filter = _audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 380;
+
+    const gain = _audioCtx.createGain();
+    const now = _audioCtx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.055, now + 0.35);
+
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(_audioCtx.destination);
+    src.start();
+
+    _noiseNode = src;
+    _gainNode = gain;
+    _noiseOn = true;
+    syncNoiseButtons();
+    return true;
+  } catch (_) {
+    _noiseOn = false;
+    syncNoiseButtons();
+    return false;
+  }
+}
+
+export function stopBrownNoise() {
+  if (!_noiseOn) return false;
+  _noiseOn = false;
+  try {
+    const src = _noiseNode;
+    const gain = _gainNode;
+    _noiseNode = null;
+    _gainNode = null;
+    if (_audioCtx && gain) {
+      const now = _audioCtx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+      setTimeout(() => { try { src?.stop(); src?.disconnect(); } catch (_) {} }, 280);
+    } else {
+      src?.stop();
+    }
+  } catch (_) {}
+  syncNoiseButtons();
+  return true;
+}
+
+export function toggleBrownNoise() {
+  if (_noiseOn) { stopBrownNoise(); return false; }
+  return startBrownNoise();
+}
+
+export function noiseButtonHTML() {
+  const on = isBrownNoiseOn();
+  return `<button class="icon-btn${on ? ' active' : ''}" data-act="adhd-toggle-noise" aria-pressed="${on}" title="Odak sesi: yumuşak kahverengi gürültü (N)" aria-label="Odak sesi">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+      <path d="M3 12h2"></path>
+      <path d="M8 8v8"></path>
+      <path d="M12 5v14"></path>
+      <path d="M16 9v6"></path>
+      <path d="M19 12h2"></path>
+    </svg>
+  </button>`;
+}
+
+/* ---------- 11. ODAK AYARLARI KARTI (İLERLEME SEKMESİ) ---------- */
+
+export function adhdSettingsPanelHTML() {
+  const s = adhdSettings();
+  const noise = isBrownNoiseOn();
+  const chip = (key, val, active, label) =>
+    `<button type="button" class="adhd-set-chip${active ? ' on' : ''}" data-act="adhd-set" data-key="${esc(key)}" data-val="${esc(String(val))}">${esc(label)}</button>`;
+  return `
+    <div class="section-label">Odak ve çalışma tercihleri</div>
+    <div class="card adhd-settings-card">
+      <div class="adhd-set-grid">
+        <div class="adhd-set-row">
+          <div>
+            <div class="adhd-set-name">Bugün ekranı</div>
+            <div class="adhd-set-sub">Sade görünüm karar yorgunluğunu keser; ayrıntılar tek tıkla açılır.</div>
+          </div>
+          <div class="adhd-set-opts">
+            ${chip('cleanToday', 'true', s.cleanToday, 'Sade')}
+            ${chip('cleanToday', 'false', !s.cleanToday, 'Tümü açık')}
+          </div>
+        </div>
+        <div class="adhd-set-row">
+          <div>
+            <div class="adhd-set-name">Akış tur uzunluğu</div>
+            <div class="adhd-set-sub">Her tur sonunda küçük dolum hissi verir, akışı kesmez.</div>
+          </div>
+          <div class="adhd-set-opts">
+            ${chip('roundSize', '5', s.roundSize === 5, '5 soru')}
+            ${chip('roundSize', '10', s.roundSize === 10, '10 soru')}
+          </div>
+        </div>
+        <div class="adhd-set-row">
+          <div>
+            <div class="adhd-set-name">Açıklama görünümü</div>
+            <div class="adhd-set-sub">Önce 2 satırlık öz görünür; D tuşuyla tüm detay açılır.</div>
+          </div>
+          <div class="adhd-set-opts">
+            ${chip('compactFeedback', 'true', s.compactFeedback, 'Öz önce')}
+            ${chip('compactFeedback', 'false', !s.compactFeedback, 'Hep tam')}
+          </div>
+        </div>
+        <div class="adhd-set-row">
+          <div>
+            <div class="adhd-set-name">Odak satırı (F)</div>
+            <div class="adhd-set-sub">Uzun metinlerde aktif cümleyi net tutar, diğerlerini hafifçe kısar.</div>
+          </div>
+          <div class="adhd-set-opts">
+            ${chip('focusRail', 'true', s.focusRail, 'Açık')}
+            ${chip('focusRail', 'false', !s.focusRail, 'Kapalı')}
+          </div>
+        </div>
+        <div class="adhd-set-row">
+          <div>
+            <div class="adhd-set-name">Odak sesi (N)</div>
+            <div class="adhd-set-sub">Çevrimdışı sentezlenen yumuşak kahverengi gürültü.</div>
+          </div>
+          <div class="adhd-set-opts">
+            <button type="button" class="adhd-set-chip${noise ? ' on' : ''}" data-act="adhd-toggle-noise" aria-pressed="${noise}">${noise ? 'Açık · kapat' : 'Aç'}</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
