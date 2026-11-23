@@ -95,7 +95,7 @@ export function render() {
         <div class="metric">
           <div class="metric-k">Tekrar sırası</div>
           <div class="metric-v" style="${srs.due ? 'color:var(--warn)' : ''}">${srs.due}</div>
-          <div class="metric-n">${srs.tracked} soru takipte · ${srs.graduated} oturdu${srs.struggling ? ` · ${srs.struggling} inatçı` : ''}</div>
+          <div class="metric-n">${srs.tracked} soru takipte · ${srs.reviewing} yoklamada · ${srs.ready} sınava hazır${srs.struggling ? ` · ${srs.struggling} inatçı` : ''}</div>
           ${srs.due
             ? `<button class="btn btn-s" style="margin-top:0.5rem;width:100%"
                  data-act="review-due" data-count="${Math.min(srs.due, 20)}">Tekrarları çöz (${Math.min(srs.due, 20)})</button>`
@@ -519,13 +519,18 @@ function diagnosisHTML(gap, worst, sig) {
     </div>`;
 }
 
-/** Vadesi gelen yoksa: sıradaki tekrar kaç soru sonra (v3: vade soru sayacıdır, gün değil). */
+/** Vadesi gelen yoksa: sıradaki tekrar ne zaman (öğrenme adımı soru sayısıyla, yoklama günle). */
 function nextDueDate() {
   const n = state().answers.length;
-  const rows = Object.values(state().srs || {})
-    .map(r => r && r.dueN).filter(x => x != null && x > n).sort((a, b) => a - b);
-  if (!rows.length) return null;
-  return `${rows[0] - n} soru sonra`;
+  const rows = Object.values(state().srs || {}).filter(Boolean);
+  const adim = rows.map(r => r.dueN).filter(x => x != null && x > n).sort((a, b) => a - b);
+  if (adim.length) return `${adim[0] - n} soru sonra`;
+  const now = Date.now();
+  const gun = rows.filter(r => r.dueD && r.dueN == null && !r.hazir)
+    .map(r => new Date(r.dueD).getTime()).filter(t => t > now).sort((a, b) => a - b);
+  if (!gun.length) return null;
+  const d = Math.max(1, Math.ceil((gun[0] - now) / 86400000));
+  return d === 1 ? 'yarın' : `${d} gün sonra`;
 }
 
 function renderSubjects(rows) {
