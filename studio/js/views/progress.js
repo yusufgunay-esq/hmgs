@@ -168,7 +168,7 @@ export function render() {
         <div class="metric">
           <div class="metric-k">Tekrar havuzu</div>
           <div class="metric-v">${srs.tracked}</div>
-          <div class="metric-n">${srs.due} vadesinde · ${srs.graduated} mezun · ${srs.struggling} inatçı</div>
+          <div class="metric-n">${srs.due} vadesinde · ${srs.reviewing} yoklamada · ${srs.ready} sınava hazır${srs.struggling ? ` · ${srs.struggling} inatçı` : ''}</div>
         </div>
       </div>
 
@@ -200,8 +200,9 @@ export function render() {
 
       <div class="section-label">Tekrar durumu</div>
       <div class="card">
-        <p class="hint" style="margin-bottom:0.9rem">İlk seferde doğru çözdüğün soru bir daha gelmez. Yanlış yaptığın HMGS sorusu araya birkaç soru girdikten sonra akışta yeniden gelir; orada doğru yaparsan biter, yine yanlışsa yine gelir. Bir soruda 2+ kez takılıp sonra toparlarsan, çok ileride ve düşük öncelikli TEK bir nokta kontrolü daha gelir. İleri havuz sorusu yanlışta yalnız bir kez döner.</p>
+        <p class="hint" style="margin-bottom:0.9rem">Yanlış soru birkaç soru sonra yeniden gelir. Doğru bildiğin soru günler sonra bir kez yoklanır; her hatırlayışta ara uzar. Ara sınav gününü geçince soru sınava hazırdır.</p>
         ${boxBars(S.srs)}
+        ${kalibrasyonHTML(srs.kalibrasyon)}
       </div>
 
       <div class="section-label">Veri bütünlüğü</div>
@@ -334,24 +335,22 @@ function examHistory(exams) {
   </div>`;
 }
 
-/* Tekrar politikası v3.2 (20 Eylül 2026): Leitner kutuları 2-4 artık
-   kullanılmıyor. "Nokta kontrolü" yeni: 2+ kez takılıp toparlanan sorunun
-   TEK, uzak, düşük öncelikli son turu (bkz. engine.js SRS_SPOTCHECK_GAP). */
+/* Tekrar politikası v4 (23 Kasım 2026, engine.js SRS v4). */
 function boxBars(srs) {
   const rows = [
-    { label: 'Tekrar bekliyor', n: 0, ok: false },
-    { label: 'Nokta kontrolü', n: 0, ok: false },
-    { label: 'Eski kayıt', n: 0, ok: false },
+    { label: 'Yanlıştan sonra', n: 0, ok: false },
+    { label: 'Yoklama bekliyor', n: 0, ok: false },
+    { label: 'Sınava hazır', n: 0, ok: true },
     { label: 'Tamam', n: 0, ok: true },
     { label: 'Bırakıldı', n: 0, ok: true }
   ];
   Object.values(srs).forEach(r => {
     if (!r) return;
     if (r.dropped) rows[4].n++;
-    else if ((!r.dueAt && r.dueN == null) || r.box >= BOXES.length) rows[3].n++;
-    else if (r.spot) rows[1].n++;
-    else if (r.box >= 1) rows[2].n++;
-    else rows[0].n++;
+    else if (r.hazir) rows[2].n++;
+    else if ((r.box || 0) >= BOXES.length || (r.dueN == null && !r.dueD && !r.dueAt)) rows[3].n++;
+    else if (r.dueN != null) rows[0].n++;
+    else rows[1].n++;
   });
   const max = Math.max(1, ...rows.map(r => r.n));
   return rows.map(r => `
@@ -360,6 +359,14 @@ function boxBars(srs) {
       <div class="track" style="margin:0"><i style="width:${(r.n / max) * 100}%;background:${r.ok ? 'var(--ok)' : 'var(--accent)'}"></i></div>
       <span class="hint" style="text-align:right">${r.n}</span>
     </div>`).join('');
+}
+
+/** Aralıkların kendini ayarlaması: modelin tahmini ile gerçek hatırlama. */
+function kalibrasyonHTML(k) {
+  if (!k || !k.n) return '';
+  const pct = x => `%${Math.round(x * 100)}`;
+  const yon = k.carpan > 1.02 ? 'aralıklar uzuyor' : k.carpan < 0.98 ? 'aralıklar kısalıyor' : 'aralıklar yerinde';
+  return `<p class="hint" style="margin-top:0.6rem" title="Her yoklamada modelin tahmin ettiği hatırlama ile gerçek sonuç karşılaştırılır; aralıklar buna göre ×${k.carpan} ölçeklenir.">${k.n} yoklama · tahmin ${pct(k.tahmin)} · gerçek ${pct(k.gercek)} · ${yon}</p>`;
 }
 
 export function doExport() {

@@ -276,7 +276,9 @@ function kardesHavuzu(k, haric) {
  * Bugün başlanmış grup, yanlışları bitse de bitene kadar listede kalır.
  */
 export function konuOnarimi(today = todayKey()) {
-  const due = dueQuestions().filter(d => onarimYanlisi(d.q));
+  // v4: yalnız öğrenme adımındaki YANLIŞLAR. Vadesi gelen aralıklı yoklama
+  // (doğru bilinen soru) onarım değil, akışın tekrar payında döner.
+  const due = dueQuestions().filter(d => d.kind === 'relearn' && onarimYanlisi(d.q));
   const gruplar = new Map();
   const grup = k => {
     if (!gruplar.has(k)) gruplar.set(k, { key: k, yanlislar: [], n: 0, hata: 0 });
@@ -322,7 +324,7 @@ export function konuOnarimi(today = todayKey()) {
 
 /** main.js için: grubun seansı. Önce kardeşler (kuralı kur), en sonda yanlışlar (sına). */
 export function konuSetSorulari(key) {
-  const due = dueQuestions().filter(d => onarimYanlisi(d.q) && grupAnahtari(d.q) === key).map(d => d.q)
+  const due = dueQuestions().filter(d => d.kind === 'relearn' && onarimYanlisi(d.q) && grupAnahtari(d.q) === key).map(d => d.q)
     .slice(0, ONARIM.YANLIS_MAX);
   const c = bugunSayac(todayKey());
   const kardesKalan = Math.max(0, ONARIM.KARDES - (c.konuYeni[key] || 0));

@@ -21,7 +21,8 @@
      işGünü(x)    = max(1, round(x * 6/7))      haftada bir dinlenme payı
      yeni havuz   = faza göre (aşağıdaki tablo)
      yeniGun      = ceil(yeni havuz / işGünü(D - bitiş payı))
-     tekrarGun    = ceil(vadesi gelen / max(1, min(D, 14)))
+     tekrarGun    = ceil(vadesi gelen / yayma) + ceil(14 günde gelecek yoklama / 14)
+     yayma        = min(D, clamp(round(D/5), 14, 30))   (v4, 23 Kasım 2026)
      hedef        = 10'a yuvarla(max(20, yeniGun + tekrarGun))
      eksik        = tempo > 0 ? max(0, yeniGun + tekrarGun - ceil(tempo * 1.15)) : 0
      kapsamaGun   = ceil(yeni havuz / max(1, tempo * 0.7))
@@ -50,6 +51,13 @@
    NEDEN 1,15 ve 0,7: tempo hedefin %15'in altında kalıyorsa sakin bir uyarı
    eşiği (gürültü değil); kapsama günü temponun %70'iyle hesaplanır çünkü
    günün bir kısmı tekrar ve onarıma gider, yalnız yeni malzemeye gitmez.
+
+   TEKRAR YÜKÜ (v4, 23 Kasım 2026): tekrar artık gün aralıklı bir akış
+   (engine.js SRS v4). İki parçası var: bugün vadesi gelmiş yığın ve önümüzdeki
+   14 günün planlı yoklamaları (srsForecast). Yığın uzak ufukta 30 güne yayılır:
+   v3'ten devralınan eski doğrular ilk açılışta bir defada vadeye düşer ve
+   14 güne sıkıştırılırsa hedefi bir anda iki katına çıkarırdı. Yakın ufukta
+   (D <= 70) eskisi gibi 14 gün.
    ========================================================================== */
 /* © 2026 Yusuf GÜNAY — Tüm Hakları Saklıdır / All Rights Reserved.
    Bu dosya HMGS projesinin tescilli kaynak kodudur. İzinsiz kopyalama, türetme
@@ -57,7 +65,7 @@
 
 import { questionById, tierOf, isCoreTarget, TIER_REAL, TIER_DENEME, TIER_AI, TIER_ADV } from './data.js';
 import { state, todayKey, daysLeft, lastExam } from './store.js';
-import { dueQuestions } from './engine.js';
+import { dueQuestions, srsForecast } from './engine.js';
 
 const sayi0 = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : 0; };
 const onla = n => Math.round(n / 10) * 10;
@@ -136,6 +144,7 @@ export function computeKoc(input = {}) {
   const unseenAi = Math.floor(sayi0(input.unseenAi));
   const unseenAdv = Math.floor(sayi0(input.unseenAdv));
   const dueCount = Math.floor(sayi0(input.dueCount));
+  const upcoming = Math.floor(sayi0(input.upcoming));
   const tempo = Math.round(sayi0(input.measuredPace));
   const todayDone = Math.floor(sayi0(input.todayDone));
   const faz = fazOf(D);
@@ -147,15 +156,15 @@ export function computeKoc(input = {}) {
     return {
       faz, hedef: 0, yeniGun: 0, tekrarGun: 0, tempo, eksik: 0, kapsamaGun: 0,
       mesaj: MESAJ[faz], denemeAraligi: aralik,
-      unseen, unseenReal, unseenDeneme, unseenAi, unseenAdv, dueCount, havuzAdi,
+      unseen, unseenReal, unseenDeneme, unseenAi, unseenAdv, dueCount, upcoming, havuzAdi,
       workDays: 0, yeniIsGunu: 0, bitisPayi, todayDone, D, sonHafta: false
     };
   }
 
   const workDays = isGunu(D);
   const yeniIsGunu = isGunu(D - bitisPayi);
-  const tekrarPencere = Math.max(1, Math.min(D, 14));
-  const tekrarGun = Math.ceil(dueCount / tekrarPencere);
+  const tekrarPencere = tekrarYayma(D);
+  const tekrarGun = Math.ceil(dueCount / tekrarPencere) + Math.ceil(upcoming / 14);
 
   // Son hafta: yeni soru kovalanmaz, hedef son tempoyu korumakla sınırlanır.
   const sonHafta = D <= 7;
@@ -172,9 +181,15 @@ export function computeKoc(input = {}) {
   return {
     faz, hedef, yeniGun, tekrarGun, tempo, eksik, kapsamaGun,
     mesaj: MESAJ[faz], denemeAraligi: aralik,
-    unseen, unseenReal, unseenDeneme, unseenAi, unseenAdv, dueCount, havuzAdi,
+    unseen, unseenReal, unseenDeneme, unseenAi, unseenAdv, dueCount, upcoming, havuzAdi,
     workDays, yeniIsGunu, bitisPayi, todayDone, D, sonHafta
   };
+}
+
+/** Vadesi geçmiş tekrar yığını kaç güne yayılır. */
+export function tekrarYayma(D) {
+  const d = Math.max(1, Math.round(Number(D) || 0));
+  return Math.max(1, Math.min(d, Math.min(30, Math.max(14, Math.round(d / 5)))));
 }
 
 /** Haftada bir dinlenme payıyla iş günü. */
@@ -261,6 +276,7 @@ export function koc() {
     unseenAi: g.ai,
     unseenAdv: g.adv,
     dueCount: dueQuestions().length,
+    upcoming: srsForecast(14).n,
     measuredPace: tempo.n,
     todayDone: bugunCozulen,
     lastExamDaysAgo

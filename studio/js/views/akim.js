@@ -28,7 +28,7 @@
    veya yeniden yayınlama yasaktır. Lisans: depo kökündeki LICENSE dosyası. */
 
 import { esc, rich, richBlock, splitStem, fmtSec, stripEmoji, $, toast } from '../ui.js';
-import { subjectName, topicById, tierOf } from '../data.js';
+import { subjectName, topicById, tierOf, TIER_ADV } from '../data.js';
 import { recordAnswer, markLastAnswerAttention, save, saveSession, state, TARGET_SEC } from '../store.js';
 import * as seans from '../seans.js';
 import {
@@ -586,7 +586,7 @@ export function pick(key, conf = 'think') {
   // Cevaptan önce ipucu istendiyse bahis sorulmaz; sorulmuş olsa bile (eski
   // çağrı, klavye alışkanlığı) 'hint' olarak kaydedilir. Bkz. engine.js CONF.
   const c = A.geminiAskedPreAnswer ? 'hint' : (CONF[conf] ? conf : 'think');
-  const before = tierOf(q) !== 3 ? tileState(q.id) : null;
+  const before = tierOf(q) !== TIER_ADV ? tileState(q.id) : null;
   const t = seans.qEnd();
   const ms = t.ms;
   A.answered = true;
@@ -606,7 +606,7 @@ export function pick(key, conf = 'think') {
 export function dontKnow() {
   if (!A || A.answered) return;
   const q = A.queue[0];
-  const before = tierOf(q) !== 3 ? tileState(q.id) : null;
+  const before = tierOf(q) !== TIER_ADV ? tileState(q.id) : null;
   const t = seans.qEnd();
   const ms = t.ms;
   A.answered = true;
@@ -647,7 +647,13 @@ export function verdictOf(row, sched, entry) {
   if (row.chosen === null) return { head: 'Boş bıraktın', sub: 'Birkaç soru sonra yeniden gelecek. Sınavda boş bırakma: yanlış doğruyu götürmüyor.', tone: 'no' };
   if (sched && sched.kind === 'mezun') {
     const g = entry && entry.gap != null ? `${entry.gap} soru önce yanlış yapmıştın. ` : '';
-    return { head: 'Oturdu', sub: `${g}Bu sefer doğru: kare yandı, tekrar sırasından çıktı.`, tone: 'win' };
+    const sonra = sched.hazir ? 'Sınava kadar kalıcı.' : `${sched.gun} gün sonra bir kez daha yoklanacak.`;
+    return { head: 'Oturdu', sub: `${g}Bu sefer doğru: kare yandı. ${sonra}`, tone: 'win' };
+  }
+  // v4: aralıklı yoklamada doğru. Günler sonra hatırlamak asıl öğrenme kanıtı.
+  if (sched && sched.kind === 'hatirladi' && row.ok) {
+    const sonra = sched.hazir ? 'Sınava kadar kalıcı.' : `Sıradaki yoklama ${sched.gun} gün sonra.`;
+    return { head: 'Hatırladın', sub: `${sched.gecen} gün önce çözmüştün. ${sonra}`, tone: 'win' };
   }
   if (row.elimTrap) {
     return row.ok
@@ -678,7 +684,7 @@ function roundSummaryHTML() {
   const last = A.log.slice(-r);
   const ok = last.filter(x => x.ok).length;
   const lit = last.filter(x => x.lit).length;
-  const mez = last.filter(x => x.sched && x.sched.kind === 'mezun').length;
+  const mez = last.filter(x => x.sched && (x.sched.kind === 'mezun' || x.sched.kind === 'hatirladi')).length;
   const parts = [`${ok}/${r} doğru`];
   if (lit) parts.push(`${lit} kare yandı`);
   if (mez) parts.push(`${mez} kural oturdu`);
@@ -724,7 +730,7 @@ function paintResult(q, chosen, row, sched, ms) {
       ? `<button class="btn btn-2 btn-s" data-act="akim-ask-gemini" title="Doğru şıkkı, diğer şıkların tuzağını ve uygulama açıklamasını sağlama istemi olarak kopyalar (G)">Sağlamasını Yap <span class="kbd">G</span></button>`
       : `<button class="btn btn-2 btn-s" data-act="akim-ask-gemini" title="Seçtiğin şık, doğru şık ve uygulama açıklaması analiz istemi olarak kopyalanır (G)">Yanlışı Analiz Et <span class="kbd">G</span></button>`;
 
-  const mapBlock = tierOf(q) !== 3
+  const mapBlock = tierOf(q) !== TIER_ADV
     ? mapRowHTML(q.subjectId, q.id, entry && entry.sealed)
     : `<div class="akim-maprow off"><span class="hint">İleri havuz sorusu · haritanın dışında</span></div>`;
 
