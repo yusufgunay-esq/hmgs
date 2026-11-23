@@ -51,7 +51,7 @@ function esikBilgisi() {
   const g = todayKey();
   if (esik.gun !== g) {
     const k = koc();
-    const rt = ritim(k.hedef, adhdSettings().dailyMin, 1);
+    const rt = ritim(k.hedef, adhdSettings().dailyMin);
     esik = { gun: g, min: rt.minimum, hedef: k.hedef, bildirildi: rt.bugunTamam };
   }
   return esik;
@@ -66,8 +66,7 @@ onAnswer(row => {
   for (const a of state().answers) if (a.at && a.at.slice(0, 10) === k) n++;
   if (n < e.min) return;
   e.bildirildi = true;
-  const rt = ritim(e.hedef, adhdSettings().dailyMin, 1);
-  toast(`Günlük minimum tamam · zincir ${rt.seri} gün`);
+  toast('Asgari tamam. Bundan sonrası yeşil.');
 });
 
 /* ---------- tema ve yazı boyutu yönetimi ---------- */

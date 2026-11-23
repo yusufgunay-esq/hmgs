@@ -9,7 +9,7 @@
 
 import { esc, $, pct } from '../ui.js';
 import { subjectName, topicById, aiQuestions, pastExamQuestions } from '../data.js';
-import { daysLeft, streak, lastExam, PASS_CORRECT, state, examDateLabel } from '../store.js';
+import { daysLeft, lastExam, PASS_CORRECT, state, examDateLabel } from '../store.js';
 import { nextAction, srsSummary, allSubjectMastery,
   MASTERY_LABEL, bleedingTopics, bleedingTags, dueQuestions,
   examGap, worstExamSubjects, answerQualitySignals } from '../engine.js';
@@ -26,10 +26,10 @@ export function render() {
 
   const r = rota({ examActive: examActive() });
   const k = koc();
-  const rt = ritim(k.hedef, adhdSettings().dailyMin, 14);
+  const rt = ritim(k.hedef, adhdSettings().dailyMin);
   const srs = srsSummary();
   const d = daysLeft();
-  const st = streak();
+
   const ex = lastExam();
   const nextDue = nextDueDate();
   const bleeding = bleedingTopics(5);
@@ -91,7 +91,7 @@ export function render() {
 
   const cleanMode = adhdSettings().cleanToday;
   const detailsBody = `
-      <div class="grid grid-3" style="margin-top:1rem">
+      <div class="grid grid-2" style="margin-top:1rem">
         <div class="metric">
           <div class="metric-k">Tekrar sırası</div>
           <div class="metric-v" style="${srs.due ? 'color:var(--warn)' : ''}">${srs.due}</div>
@@ -107,11 +107,6 @@ export function render() {
           <div class="metric-k">Otomatikleşen ders</div>
           <div class="metric-v" style="color:var(--ok)">${auto}<span style="font-size:0.85rem;font-weight:600;color:var(--ink-3)"> / ${mastery.length}</span></div>
           <div class="metric-n">${effort} gelişiyor · ${untouched} yeni</div>
-        </div>
-        <div class="metric">
-          <div class="metric-k">Çalışma ritmi</div>
-          <div class="metric-v">${st}<span style="font-size:0.85rem;font-weight:600"> gün</span></div>
-          <div class="metric-n">${st >= 3 ? 'ritim oturuyor' : '5 soruyla ritmi başlat'}</div>
         </div>
       </div>
 
@@ -158,20 +153,14 @@ export function render() {
       ${renderSubjects(mastery)}`;
 
   // Sade modda (varsayılan) kahramanın altında yalnız tek kapalı çekmece kalır:
-  // üç sayı kartı da çekmeceye iner. "Son 7 gün" zaten ritim şeridinde,
-  // "sınava kalan" üst çubukta; açık ekranda tekrar etmeleri gürültüydü.
+  // sayı kartları da çekmeceye iner. Geçmiş günlerin sayısı hiçbir yerde yok
+  // (kullanıcı kararı, 23 Kasım 2026: "önceki günleri gösterme").
   const metricsHTML = `
-      <div class="grid grid-3" style="margin-top:1.25rem">
+      <div class="grid grid-2" style="margin-top:1.25rem">
         <div class="metric">
           <div class="metric-k">Sınava kalan</div>
           <div class="metric-v">${d}<span style="font-size:0.85rem;font-weight:600"> gün</span></div>
           <div class="metric-n">HMGS · ${examDateLabel()}</div>
-        </div>
-        <div class="metric">
-          <div class="metric-k">Son 7 gün</div>
-          <div class="metric-v">${rt.haftaToplam}<span style="font-size:0.85rem;font-weight:600;color:var(--ink-3)"> soru</span></div>
-          <div class="metric-n">${rt.haftaTamGun} / 7 gün minimum doldu${r.bugun.toplam ? ` · bugün isabet ${pct((r.bugun.dogru / r.bugun.toplam) * 100)}` : ''}</div>
-          <div class="metric-n">${rt.enIyi > rt.seri ? `en uzun zincir ${rt.enIyi} gün` : 'deneme cevapları dahil'}</div>
         </div>
         <div class="metric">
           <div class="metric-k">Son deneme neti</div>
@@ -301,58 +290,54 @@ function yarimSetHTML() {
 }
 
 /**
- * RİTİM KARTI — günlük minimum halkası + 14 günlük zincir (ritim.js).
- * Kahramanın sağ sütunu (telefonda en üstte). Tek bakışta üç şey:
- * bugün minimum doldu mu, zincir kaç gün, son iki hafta nasıl geçti.
+ * GÜNÜN BARI — yalnız bugün, üç renkli tek çizgi (ritim.js).
+ * Kahramanın sağ sütunu (telefonda en üstte). Fosforlu kalem gibi dolar:
+ * sarı asgariye kadar, yeşil hedefe kadar, mavi hedefin ötesi. Ekranda yalnız
+ * sayı, iki kelimelik durum ve renkler var; açıklama ipucunda (title).
+ * Geçmiş gün yok: seri, takvim, "son 7 gün" kaldırıldı (kullanıcı kararı,
+ * 23 Kasım 2026). Her gün sıfırdan, temiz bir bar.
  */
-const GUN_HARF = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
-const AY_KISA = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
 function ritimHTML(rt, k) {
-  const min = rt.minimum;
-  const oran = Math.min(1, rt.bugun / Math.max(1, min));
-  const R = 27, C = 2 * Math.PI * R;
-  const dolu = (C * oran).toFixed(1);
-  const tamam = rt.bugunTamam;
-  const hedef = k.hedef || 0;
+  const S = rt.olcek, min = rt.minimum, ust = rt.hedef, n = rt.bugun;
+  const yuzde = x => Math.max(0, Math.min(100, (x / S) * 100));
+  const pm = yuzde(min), pu = yuzde(ust), pn = yuzde(n);
+  const f = x => x.toFixed(2) + '%';
 
-  const hucre = h => {
-    const dt = new Date(h.key + 'T12:00:00Z');
-    const etiket = `${dt.getUTCDate()} ${AY_KISA[dt.getUTCMonth()]} ${GUN_HARF[dt.getUTCDay()]} · ${h.n} soru${h.serbest ? ' · serbest gün' : ''}${h.kopus ? ' · zincir koptu' : ''}`;
-    return `<i class="rc ${h.durum}${h.bugun ? ' bugun' : ''}${h.serbest ? ' serbest' : ''}" title="${esc(etiket)}"></i>`;
-  };
+  // Dolu kısımlar: her bölge kendi renginde; son dolu parça kalem ucu alır.
+  const parca = [
+    { c: 'sari', l: 0, w: Math.min(pn, pm) },
+    { c: 'yesil', l: pm, w: Math.max(0, Math.min(pn, pu) - pm) },
+    { c: 'mavi', l: pu, w: Math.max(0, pn - pu) }
+  ].filter(x => x.w > 0.01);
+  const dolu = parca.map((x, i) =>
+    `<i class="gb-f ${x.c}${i === parca.length - 1 ? ' uc' : ''}" style="left:${f(x.l)};width:${f(x.w)}"></i>`).join('');
+  const izler = (ust > min ? [[pm, min], [pu, ust]] : [[pm, min]])
+    .map(([p, v]) => `<span class="gb-t" style="left:${f(p)}">${v}</span>`).join('');
 
-  // Tek kısa satır. Uzun açıklama (ritim.js cumle + hesap) yalnız ipucunda.
-  const satir = !tamam
-    ? `${rt.kalan} soru daha · ~${Math.max(1, Math.round(rt.kalan * rt.dkSoru))} dk`
-    : (hedef > rt.bugun ? `Gün tamam · hedefe ${hedef - rt.bugun}` : 'Gün tamam');
   const ipucu = [rt.cumle, ...ritimMathLines(rt, k)].join('\n');
-
   return `
-    <aside class="ritim${tamam ? ' tamam' : ''}" aria-label="Günlük minimum ve çalışma zinciri" title="${esc(ipucu)}">
-      <div class="ritim-mid">
-        <div class="ritim-ring" role="img" aria-label="Günlük minimum: ${rt.bugun} / ${min} soru">
-          <svg viewBox="0 0 64 64" aria-hidden="true">
-            <circle class="rr-bg" cx="32" cy="32" r="${R}"></circle>
-            <circle class="rr-fg" cx="32" cy="32" r="${R}" stroke-dasharray="${dolu} ${C.toFixed(1)}"></circle>
-          </svg>
-          <div class="ritim-ring-n">${tamam
-            ? `<svg class="rr-tik" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"></path></svg><span>${rt.bugun}</span>`
-            : `<b>${rt.bugun}</b><span>/ ${min}</span>`}</div>
-        </div>
-        <div class="ritim-txt">
-          <div class="ritim-seri"><b>${rt.seri}</b> gün zincir</div>
-          <div class="ritim-satir">${esc(satir)}</div>
-        </div>
+    <aside class="ritim gb-${rt.bolge}" aria-label="Bugünün barı" title="${esc(ipucu)}">
+      <div class="gb-ust">
+        <div class="gb-n"><b>${n}</b> soru</div>
+        <div class="gb-durum">${esc(rt.etiket)}</div>
       </div>
-      <div class="ritim-strip" role="img" aria-label="Son 14 gün: ${rt.hucreler.filter(h => h.durum === 'tam').length} gün minimum doldu">${rt.hucreler.map(hucre).join('')}</div>
+      <div class="gb" role="img" aria-label="Bugün ${n} soru. Asgari ${min}${ust > min ? `, hedef ${ust}` : ''}.">
+        <div class="gb-iz">
+          <i class="gb-z sari" style="left:0;width:${f(pm)}"></i>
+          ${ust > min ? `<i class="gb-z yesil" style="left:${f(pm)};width:${f(pu - pm)}"></i>` : ''}
+          <i class="gb-z mavi" style="left:${f(pu)};right:0"></i>
+          ${dolu}
+        </div>
+        <div class="gb-tl" aria-hidden="true">${izler}</div>
+      </div>
     </aside>`;
 }
 
 function ritimMathLines(rt, k) {
   return [
-    `Minimum: ${rt.otomatik ? `koçun hedefinin yarısı, 15-30 aralığında → ${rt.minimum}. İlerleme sekmesinden sabitleyebilirsin.` : `senin seçimin (${rt.minimum}). İlerleme sekmesinden otomatiğe alabilirsin.`}`,
-    `Zincir: minimumu dolduran gün bir halka ekler. 7 günde bir boş gün serbest; iki gün üst üste boş geçerse zincir sıfırlanır. Gün 03.00'te döner.`,
+    `Asgari: ${rt.otomatik ? `koçun hedefinin yarısı, 15-30 aralığında → ${rt.minimum}. İlerleme sekmesinden sabitleyebilirsin.` : `senin seçimin (${rt.minimum}). İlerleme sekmesinden otomatiğe alabilirsin.`}`,
+    `Renkler: sarı asgariye kadar, yeşil hedefe kadar, mavi hedefin ötesi. Bar her gün 03.00'te sıfırdan başlar.`,
     ...kocMathLines(k)
   ];
 }
@@ -366,13 +351,13 @@ function kocMathLines(k) {
     return [
       `Hedef: son hafta yeni soru 0; hedef = tempo × 1,15 → 10'a yuvarlanınca ${hedef}.${k.tempo > 0 ? '' : ' Tempo henüz ölçülmedi, taban 40.'}`,
       `Vadesi gelen ${k.dueCount} tekrar bilgi olarak duruyor; hedefe eklenmiyor.`,
-      `Son 7 günün temposu günde ~${k.tempo} soru${k.tempoGun ? ` (${k.tempoGun} aktif gün)` : ' (henüz ölçüm yok)'} · tam deneme ${k.denemeAraligi} günde bir.`
+      `Tempon günde ~${k.tempo} soru${k.tempoGun ? '' : ' (henüz ölçülmedi)'} · tam deneme ${k.denemeAraligi} günde bir.`
     ];
   }
   return [
     `Hedef: görülmemiş ${unseen} soru (${k.havuzAdi || 'çekirdek havuz'}) sınavdan ${k.bitisPayi || 0} gün önce bitsin → ${k.yeniIsGunu || k.workDays} çalışma günü → günde ~${k.yeniGun} yeni.`,
     `Vadesi gelen ${k.dueCount} tekrar, ${pencere} güne yayılırsa günde ~${k.tekrarGun}. ${k.yeniGun} + ${k.tekrarGun} = ${ham}; 10'a yuvarlanınca hedef ${hedef}.`,
-    `Son 7 günün temposu günde ~${k.tempo} soru${k.tempoGun ? ` (${k.tempoGun} aktif gün)` : ' (henüz ölçüm yok)'} · tam deneme ${k.denemeAraligi} günde bir. Hedef öneridir; akışı kilitlemez.`
+    `Tempon günde ~${k.tempo} soru${k.tempoGun ? '' : ' (henüz ölçülmedi)'} · tam deneme ${k.denemeAraligi} günde bir. Hedef öneridir; akışı kilitlemez.`
   ];
 }
 
@@ -419,14 +404,14 @@ function kocHTML(k, denemeVar) {
     ? [
         `Son hafta: yeni soru 0; hedef = tempo × 1,15 → 10'a yuvarlanınca ${hedef}.${k.tempo > 0 ? '' : ' Tempo henüz ölçülmedi, taban 40.'}`,
         `Vadesi gelen ${k.dueCount} tekrar bilgi olarak duruyor (${pencere} güne yayılırsa günde ~${k.tekrarGun}); hedefe eklenmiyor.`,
-        `Son 7 günün temposu günde ~${k.tempo} soru${k.tempoGun ? ` (${k.tempoGun} aktif gün)` : ' (henüz ölçüm yok)'} · tam deneme ${k.denemeAraligi} günde bir.`,
+        `Tempon günde ~${k.tempo} soru${k.tempoGun ? '' : ' (henüz ölçülmedi)'} · tam deneme ${k.denemeAraligi} günde bir.`,
         `Bu bir öneri; akışı kilitlemez. Hedefi aşarsan akış açık kalır.`
       ]
     : [
         `Kalan çekirdek malzeme ${k.unseenReal} + ${k.unseenDeneme} = ${unseen} soru. Sınava ${k.D} gün, haftada 6 çalışma günü → ${k.workDays} gün → günde ~${k.yeniGun} yeni soru.`,
         `Vadesi gelen ${k.dueCount} tekrar, ${pencere} güne yayılırsa günde ~${k.tekrarGun}.`,
         `${k.yeniGun} + ${k.tekrarGun} = ${ham}; 10'a yuvarlanınca hedef ${hedef}.`,
-        `Son 7 günün temposu günde ~${k.tempo} soru${k.tempoGun ? ` (${k.tempoGun} aktif gün)` : ' (henüz ölçüm yok)'} · tam deneme ${k.denemeAraligi} günde bir.`,
+        `Tempon günde ~${k.tempo} soru${k.tempoGun ? '' : ' (henüz ölçülmedi)'} · tam deneme ${k.denemeAraligi} günde bir.`,
         `Bu bir öneri; akışı kilitlemez. Hedefi aşarsan akış açık kalır.`
       ];
 

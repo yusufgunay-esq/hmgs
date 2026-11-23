@@ -341,9 +341,18 @@ function mapRowHTML(subjectId, nowId, justSealed) {
   </div>`;
 }
 
+/** Harita kapalı bir çekmecede durur: 1.400+ kare açık ekranda boğuyordu
+    (23 Kasım 2026, "minimalist, ferah"). Başlıkta yalnız yanan/toplam. */
 function fullMapHTML(highlight = new Set()) {
   const m = hmgsMap();
   if (!m.total) return '';
+  return `<details class="akim-map-fold">
+    <summary><span class="ak-etiket">Harita</span><span class="akim-map-fold-n"><b>${m.lit}</b> / ${m.total}</span></summary>
+    ${fullMapBody(m, highlight)}
+  </details>`;
+}
+
+function fullMapBody(m, highlight) {
   const rows = m.rows.map(r => {
     const tiles = r.tiles.map(t =>
       `<i class="mt ${t.s}${highlight.has(t.id) ? ' now' : ''}${t.tier === 2 ? ' t2' : ''}"></i>`).join('');
@@ -368,17 +377,16 @@ function fullMapHTML(highlight = new Set()) {
   </div>`;
 }
 
+// Nasıl çalıştığı yalnız başlığın ipucunda: ekranda açıklama paragrafı yok
+// (23 Kasım 2026, ADHD: "etrafta çok şey olmasın").
+const AKIS_IPUCU = 'Şıkkı seç, bahsini koy: Eminim · Sanırım · Mantıkla. "Mantıkla" dediğin soru doğru çıksa bile tekrar gelir.\n'
+  + 'Yanlışlar birkaç soru sonra geri gelir; doğru çözünce haritadaki kare yanar ve sönmez.\n'
+  + 'Ders seçmezsen bütün dersler karışık gelir.';
+
 function landingHTML() {
   return `<div class="wrap-read akim-landing">
-    <h1 class="page">Akış</h1>
-    <p class="page-sub">Her kare bir HMGS sorusu. Doğru çözüp oturttuğun kare yanar ve bir daha sönmez;
-      gelmediğin gün hiçbir şey kaybolmaz.</p>
+    <h1 class="page" title="${esc(AKIS_IPUCU)}">Akış</h1>
     ${dersSeciciHTML()}
-    <div class="akim-how">
-      <div><b>Şıkkı seç, bahsini koy.</b> Eminim · Sanırım · Mantıkla. “Mantıkla” dediğin soru, doğru çıksa bile tekrar gelir. Emin olduğun bir yanlış, en iyi öğrenilen hatadır.</div>
-      <div><b>Yanlışlar açık halka olur.</b> Birkaç soru sonra geri gelir; doğru çözünce kare yanar.</div>
-      <div><b>On soru bir tur.</b> Bitirince yalnız bir satır özet, ekran kapanmaz.</div>
-    </div>
     ${fullMapHTML()}
   </div>`;
 }
@@ -418,18 +426,21 @@ function dersSeciciHTML(kapanis = false) {
     </button>`;
   };
 
+  // Başlat en üstte (tek ana iş); ders seçimi isteğe bağlı, altında.
+  // Diğer 17 ders kapalı çekmecede; içinden biri seçiliyse açık kalır.
+  const diger = rows.filter(r => !r.eksik);
+  const digerAcik = diger.some(r => seciliDers.has(r.id));
   return `<section class="ak-sec${kapanis ? ' kapanis' : ''}">
-    <div class="ak-sec-bas">
-      <span class="ak-etiket">Eksiğin burada</span>
-      ${n ? `<button class="ak-temizle" data-act="akim-ders-temizle">Seçimi kaldır</button>` : ''}
-    </div>
-    <div class="ak-kartlar">${rows.filter(r => r.eksik).map(kart).join('')}</div>
-    <span class="ak-etiket">Diğer dersler</span>
-    <div class="ak-cipler">${rows.filter(r => !r.eksik).map(cip).join('')}</div>
     <div class="ak-basla">
       <button class="btn akim-go" data-act="akim-start">${esc(baslat)}</button>
-      <span class="ak-basla-not">${n ? 'Yalnız seçtiğin dersler gelir.' : 'Seçmezsen bütün dersler karışık gelir.'}</span>
+      ${n ? `<button class="ak-temizle" data-act="akim-ders-temizle">Seçimi kaldır</button>` : ''}
     </div>
+    <span class="ak-etiket">Eksiğin burada</span>
+    <div class="ak-kartlar">${rows.filter(r => r.eksik).map(kart).join('')}</div>
+    <details class="ak-diger"${digerAcik ? ' open' : ''}>
+      <summary><span class="ak-etiket">Diğer dersler</span></summary>
+      <div class="ak-cipler">${diger.map(cip).join('')}</div>
+    </details>
   </section>`;
 }
 

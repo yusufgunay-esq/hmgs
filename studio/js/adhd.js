@@ -580,8 +580,8 @@ export function adhdSettingsPanelHTML() {
       <div class="adhd-set-grid">
         <div class="adhd-set-row">
           <div>
-            <div class="adhd-set-name">Günlük minimum</div>
-            <div class="adhd-set-sub">Kötü günde bile yapılacak taban. Dolunca gün tamam sayılır, zincir uzar.</div>
+            <div class="adhd-set-name">Günlük asgari</div>
+            <div class="adhd-set-sub">Kötü günde bile yapılacak taban: Bugün barının sarı kısmı.</div>
           </div>
           <div class="adhd-set-opts">
             ${[0, 10, 20, 30, 40].map(n => chip('dailyMin', n, s.dailyMin === n, n ? String(n) : 'Otomatik')).join('')}

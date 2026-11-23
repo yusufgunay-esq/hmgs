@@ -241,26 +241,10 @@ export function render() {
       ${pastExams.length > 1 ? pastExamsBlock(pastExams, res?.id) : ''}
 
       <!-- 1. BİRİNCİL ODAK: AKILLI ALGORİTMİK DENEME -->
-      <div class="card" style="margin-top:1.25rem;border:1px solid rgba(var(--accent-rgb, 99, 102, 241), 0.25);background:var(--surface)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.5rem">
-          <div>
-            <span class="chip accent" style="font-size:0.75rem;margin-bottom:0.35rem;display:inline-block">Kişisel Deneme Motoru</span>
-            <h2 style="font-size:1.2rem;font-weight:700;margin:0;color:var(--ink)">Akıllı Deneme Sınavı</h2>
-          </div>
-          <span style="font-size:0.85rem;color:var(--ink-2);font-weight:600">120 Soru · 155 Dakika</span>
-        </div>
-        <p style="font-size:0.92rem;color:var(--ink-2);line-height:1.5;margin-bottom:1.1rem">
-          Görmediğin sorular öncelikli, 20 ders kotasına tam uyumlu kişiselleştirilmiş sınav provası.
-        </p>
-
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border)">
-          <span style="font-size:0.85rem;color:var(--ink-2)">
-            Havuzda <strong style="color:var(--ink)">${prev.unseenAvailable}</strong> çözülmemiş soru hazır
-          </span>
-          <button class="btn" data-act="exam-start-smart" style="font-size:0.95rem;padding:0.65rem 1.3rem;font-weight:600">
-            Akıllı Denemeyi Başlat
-          </button>
-        </div>
+      <div class="card" style="margin-top:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem"
+           title="Görmediğin sorular önce gelir; ders dağılımı gerçek sınavla aynı. Havuzda ${prev.unseenAvailable} görülmemiş soru var.">
+        <h2 style="font-size:1.15rem;font-weight:700;margin:0;color:var(--ink)">Akıllı deneme</h2>
+        <button class="btn" data-act="exam-start-smart" style="font-size:0.95rem;padding:0.65rem 1.3rem;font-weight:600">Başlat</button>
       </div>
 
       <!-- 2. BÖLÜM: RESMİ ÇIKMIŞ SINAVLAR -->
