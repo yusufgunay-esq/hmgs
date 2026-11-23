@@ -229,39 +229,21 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   height: 1rem;
 }
 
+/* Sayfa dışı bağlantılar (Arşiv Röntgeni, Portal): renkli hap değil, sessiz
+   metin. 23 Kasım 2026 minimalizm turu: üst çubukta göz yalnız sekmeye gitsin. */
 .nav-portal-badge {
   text-decoration: none;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.4rem 0.75rem;
-  border-radius: var(--r-s);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink-3);
+  padding: 0.4rem 0.3rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  transition: all 0.15s ease;
   line-height: 1;
   white-space: nowrap;
+  transition: color 0.15s ease;
 }
-.nav-portal-badge:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-}
-.nav-portal-badge.emerald {
-  background: var(--ok-soft);
-  color: var(--ok);
-  border: 1px solid rgba(30, 138, 95, 0.25);
-}
-[data-theme="dark"] .nav-portal-badge.emerald {
-  border-color: rgba(52, 211, 153, 0.3);
-}
-.nav-portal-badge.indigo {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-  border: 1px solid rgba(32, 54, 86, 0.20);
-}
-[data-theme="dark"] .nav-portal-badge.indigo {
-  border-color: rgba(118, 151, 194, 0.25);
-}
+.nav-portal-badge:hover { color: var(--ink); }
 
 /* ---------- YERLEŞİM ---------- */
 main { padding: 2.25rem 1.5rem 6rem; }
@@ -2735,10 +2717,24 @@ body.molada { overflow: hidden; }
 .akim-sealed-line { margin-top: 0.45rem; font-size: 0.84rem; font-weight: 600; color: var(--ok); }
 
 /* giriş ve kapanış */
-.akim-landing .akim-how { display: grid; gap: 0.55rem; margin: 1.25rem 0 1.5rem; font-size: 0.92rem; color: var(--ink-2); line-height: 1.5; }
-.akim-landing .akim-how b { color: var(--ink); font-weight: 600; }
 .akim-go { font-size: 1rem; padding: 0.85rem 1.8rem; }
-.akim-map { margin-top: 1.75rem; }
+.akim-map { margin-top: 0.9rem; }
+/* Harita ve "Diğer dersler" kapalı çekmece: başlık tek satır, ok yok. */
+.akim-map-fold { margin-top: 1.5rem; border-top: 1px solid var(--line); padding-top: 0.9rem; }
+.bakim { margin-top: 2.25rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+.akim-map-fold > summary, .ak-diger > summary, .bakim > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 0.6rem;
+  min-height: 1.75rem; width: fit-content;
+}
+.akim-map-fold > summary::-webkit-details-marker, .ak-diger > summary::-webkit-details-marker, .bakim > summary::-webkit-details-marker { display: none; }
+.akim-map-fold > summary::after, .ak-diger > summary::after, .bakim > summary::after {
+  content: '+'; font-size: 0.85rem; color: var(--ink-3); transition: transform 0.2s ease;
+}
+.akim-map-fold[open] > summary::after, .ak-diger[open] > summary::after, .bakim[open] > summary::after { transform: rotate(45deg); }
+.akim-map-fold > summary:hover .ak-etiket, .ak-diger > summary:hover .ak-etiket { color: var(--ink-2); }
+.akim-map-fold-n { font-size: 0.82rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.akim-map-fold-n b { color: var(--ink-2); font-weight: 600; }
+.ak-diger .ak-cipler { margin-top: 0.55rem; }
 .akim-map-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
 .akim-map-big { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ok); font-variant-numeric: tabular-nums; }
 .akim-map-tot { color: var(--ink-2); font-size: 0.95rem; }
@@ -3262,7 +3258,7 @@ button.rv-stat.clickable:hover {
 .ak-sec.kapanis { margin: 1.5rem 0 1.25rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
 .ak-sec-bas { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
 .ak-etiket { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
-.ak-cipler + .ak-basla, .ak-kartlar + .ak-etiket { margin-top: 0.85rem; }
+.ak-basla + .ak-etiket { margin-top: 0.9rem; }
 .ak-temizle { font-size: 0.8rem; color: var(--ink-3); padding: 0.1rem 0; transition: color .2s ease; }
 .ak-temizle:hover { color: var(--ink); }
 
@@ -3306,8 +3302,6 @@ button.rv-stat.clickable:hover {
 .ak-cip-n { font-size: 0.72rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 
 .ak-basla { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.ak-basla-not { font-size: 0.8rem; color: var(--ink-3); }
-.akim-landing .ak-sec + .akim-how { margin-top: 0; }
 @media (max-width: 767px) {
   .ak-kartlar { grid-template-columns: 1fr; gap: 0.45rem; }
   .ak-kart { min-height: 0; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 1rem; row-gap: 0.2rem; padding: 0.8rem 0.9rem; }
@@ -3317,7 +3311,6 @@ button.rv-stat.clickable:hover {
   .ak-kart-net { grid-column: 2; grid-row: 1 / span 2; align-self: center; margin: 0; text-align: right; }
   .ak-kart-meta { grid-column: 1; }
   .ak-basla .akim-go { width: 100%; justify-content: center; text-align: center; }
-  .ak-basla-not { width: 100%; text-align: center; }
 }
 
 /* ==========================================================================
@@ -3783,12 +3776,12 @@ button.akim-round:hover {
 [data-theme="dark"] .adhd-set-chip.on { color: #121316; }
 
 
-/* ---------- RİTİM · GÜNLÜK MİNİMUM VE ZİNCİR (ritim.js, 22 Kasım 2026) ----------
-   Kahramanın sağ sütunu. Tek bakışta üç şey: bugün minimum doldu mu (halka),
-   zincir kaç gün (üst satır), son iki hafta nasıl geçti (şerit). Renk dili
-   rotayla aynı: tek aksan, "tamam" yalnız yeşil. Hareket yalnız halkanın
-   dolması; konfeti, titreşim, sayaç animasyonu yok (ADHD: dikkat çalan
-   hiçbir şey kahramanın yanına konmaz). */
+/* ---------- RİTİM · GÜNÜN BARI (ritim.js, 23 Kasım 2026) ----------
+   Kahramanın sağ sütunu. Yalnız bugün: sayı, iki kelimelik durum, tek bar.
+   Halka, zincir ve geçmiş gün takvimi kaldırıldı (kullanıcı: "seri beni
+   boğuyor", "önceki günleri gösterme"). Kutu yok, zemin yok: bar sayfanın
+   kendi boşluğunda durur (ADHD: "ferah olsun"). Konfeti, titreşim, sayaç
+   animasyonu yok; dikkat çalan hiçbir şey kahramanın yanına konmaz. */
 .rh-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18.5rem;
@@ -3799,64 +3792,53 @@ button.akim-round:hover {
 .rh-main .hero-title { margin-bottom: 1.15rem; }
 
 .ritim {
-  background: var(--bg-sunk);
-  border: 1px solid var(--line);
-  border-radius: var(--r-m);
-  padding: 0.95rem 1.05rem 0.8rem;
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.7rem;
+  padding-top: 0.35rem;
 }
-.ritim-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; }
-.ritim-k { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
-.ritim-seri { font-size: 0.8rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.ritim-seri b { font-weight: 700; color: var(--ink); }
-.ritim.tamam .ritim-seri b { color: var(--ok); }
+/* GÜNÜN BARI (23 Kasım 2026). Fosforlu kalem: gün, altı çizilen bir satır
+   gibi dolar. Sarı asgariye kadar, yeşil hedefe kadar, mavi hedefin ötesi.
+   Zincir ve halka kaldırıldı (kullanıcı: "seri beni boğuyor"). Renkler
+   iz zemini (--bg-raise) üstünde 3:1'i geçer; durum yazısı mürekkep renginde,
+   rengi yalnız yanındaki nokta taşır (küçük yazıda sarı 4,5:1'i tutmaz). */
+.ritim { --gb-sari: #BF840A; --gb-yesil: #2E8A5C; --gb-mavi: #2F6FB5; }
+[data-theme="dark"] .ritim { --gb-sari: #E8B931; --gb-yesil: #3FB37B; --gb-mavi: #5B9BE0; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ritim { --gb-sari: #E8B931; --gb-yesil: #3FB37B; --gb-mavi: #5B9BE0; }
+}
+.gb-ust { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; }
+.gb-n { font-size: 0.82rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.gb-n b { font-family: var(--serif); font-size: 1.7rem; font-weight: 600; color: var(--ink); line-height: 1; margin-right: 0.15rem; }
+.gb-durum { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gb-durum::before { content: ''; width: 0.55rem; height: 0.55rem; border-radius: 2px; background: var(--gb-sari); }
+.gb-yesil .gb-durum::before { background: var(--gb-yesil); }
+.gb-mavi .gb-durum::before { background: var(--gb-mavi); }
 
-.ritim-mid { display: flex; align-items: center; gap: 0.9rem; }
-.ritim-ring { position: relative; width: 4rem; height: 4rem; flex: none; }
-.ritim-ring > svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
-.ritim-ring circle { fill: none; stroke-width: 6; }
-.rr-bg { stroke: var(--line-strong); }
-.rr-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray 0.5s ease; }
-.ritim.tamam .rr-fg { stroke: var(--ok); }
-.ritim-ring-n {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  line-height: 1; font-variant-numeric: tabular-nums;
+.gb-iz {
+  position: relative; height: 1.1rem; overflow: hidden;
+  border-radius: 0.32rem; background: var(--bg-raise);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.ritim-ring-n b { font-family: var(--serif); font-size: 1.25rem; font-weight: 600; color: var(--ink); }
-.ritim-ring-n span { font-size: 0.66rem; color: var(--ink-3); margin-top: 0.12rem; }
-.rr-tik { width: 1.15rem; height: 1.15rem; fill: none; stroke: var(--ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.ritim.tamam .ritim-ring-n span { color: var(--ok); font-weight: 600; font-size: 0.72rem; }
+.gb-z, .gb-f { position: absolute; top: 0; bottom: 0; display: block; }
+.gb-z.sari { background: color-mix(in srgb, var(--gb-sari) 16%, transparent); }
+.gb-z.yesil { background: color-mix(in srgb, var(--gb-yesil) 14%, transparent); }
+.gb-z.mavi { background: color-mix(in srgb, var(--gb-mavi) 13%, transparent); }
+.gb-f.sari { background: var(--gb-sari); }
+.gb-f.yesil { background: var(--gb-yesil); box-shadow: inset 2px 0 0 var(--bg-raise); }
+.gb-f.mavi { background: var(--gb-mavi); box-shadow: inset 2px 0 0 var(--bg-raise); }
+/* Kalem ucu: dolu kısmın önü eğik kesilir. */
+.gb-f.uc { clip-path: polygon(0 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%); }
 
-.ritim-txt { min-width: 0; flex: 1; }
-.ritim-line { font-size: 0.8rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.ritim-line b { color: var(--ink-2); font-weight: 700; }
-.ritim-ok { color: var(--ok); font-weight: 700; }
-.ritim-txt .ritim-seri { font-size: 0.95rem; color: var(--ink-2); }
-.ritim-satir { font-size: 0.82rem; color: var(--ink-3); margin-top: 0.2rem; font-variant-numeric: tabular-nums; }
-.ritim.tamam .ritim-satir { color: var(--ok); font-weight: 600; }
-.ritim-cumle { font-size: 0.86rem; color: var(--ink); line-height: 1.45; margin-top: 0.22rem; }
-
-.ritim-strip { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px; }
-.rc {
-  display: block; height: 0.72rem; border-radius: 3px;
-  background: var(--line-strong);
+.gb-tl { position: relative; height: 1rem; margin-top: 0.25rem; }
+.gb-t {
+  position: absolute; top: 0; transform: translateX(-50%);
+  font-size: 0.68rem; color: var(--ink-3); font-variant-numeric: tabular-nums; line-height: 1;
 }
-.rc.tam { background: var(--ok); }
-.rc.yarim { background: var(--ok); opacity: 0.38; }
-.rc.once { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
-.rc.serbest { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ok); }
-.rc.bugun { outline: 1.5px solid var(--accent); outline-offset: 1.5px; }
-.ritim-strip-cap {
-  display: flex; justify-content: space-between; gap: 0.5rem;
-  margin-top: 0.35rem; font-size: 0.66rem; color: var(--ink-3);
+.gb-t::before {
+  content: ''; position: absolute; left: 50%; top: -0.5rem; width: 1px; height: 0.4rem;
+  background: var(--ink-3); opacity: 0.7;
 }
-.ritim-strip-cap span:nth-child(2) { text-align: center; }
-.ritim-not { font-size: 0.76rem; color: var(--ink-3); line-height: 1.45; }
-.ritim-det summary { font-size: 0.72rem; color: var(--ink-3); cursor: pointer; }
-.ritim-det[open] summary { margin-bottom: 0.1rem; }
 
 /* Yarım kalan set: Bugün'ün en üstünde tek satır geri dönüş yolu. */
 .yarim-set {
@@ -3882,10 +3864,6 @@ button.akim-round:hover {
   .ritim { max-width: 30rem; }
 }
 @media (max-width: 767px) {
-  .ritim { padding: 0.85rem 0.9rem 0.75rem; max-width: none; }
-  .ritim-ring { width: 3.6rem; height: 3.6rem; }
+  .ritim { max-width: none; padding-top: 0; }
   .yarim-set { flex-wrap: wrap; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .rr-fg { transition: none; }
 }
