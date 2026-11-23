@@ -254,11 +254,8 @@ function initSlotCommitListener() {
       } else {
         cur.seri = 0;
       }
-      const chipSeri = $('#pratik-chip-seri');
-      if (chipSeri) {
-        chipSeri.className = 'chip ' + (cur.seri >= 3 ? 'green' : '');
-        chipSeri.textContent = `Seri: ${cur.seri}${cur.enIyiSeri > cur.seri ? ` · en iyi ${cur.enIyiSeri}` : ''}`;
-      }
+      // Seri yalnız arka planda sayılır; ekranda gösterilmez (kullanıcı kararı,
+      // 23 Kasım 2026: seri/zincir sayaçları ADHD'de boğuyor).
     }
   });
 }
@@ -290,35 +287,20 @@ function katalogHTML() {
     <div class="wrap">
       <div class="pratik-header-row">
         <div>
-          <div class="section-kicker">Mevzuat Simülasyonu ve İnteraktif Muhakeme</div>
-          <h2 class="pratik-main-title">Pratik ve Simülasyon Alanı</h2>
-          <p class="pratik-subtitle">
-            Konu sayfası kuralları öğrenme, burası ise dinamik vakalarla refleks kazanma yeridir.
-            HMGS sınavında en yüksek soru ağırlığına sahip kritik kurumlar için tohumlu, sınırsız simülatörler.
-          </p>
+          <h2 class="pratik-main-title" title="Konu sayfası kuralı öğretir; burada her seferinde yeni bir vaka üretilir, kural refleks olur.">Pratik</h2>
         </div>
-        <div class="pratik-global-metric">
-          <span class="metric-val">${hepsi.n ? `%${Math.round(hepsi.ok / hepsi.n * 100)}` : '%0'}</span>
-          <span class="metric-lbl">${hepsi.n ? `${hepsi.ok}/${hepsi.n} doğru hücre` : 'Henüz vaka çözülmedi'}</span>
-        </div>
+        ${hepsi.n ? `<div class="pratik-global-metric">
+          <span class="metric-val">%${Math.round(hepsi.ok / hepsi.n * 100)}</span>
+          <span class="metric-lbl">${hepsi.ok}/${hepsi.n} doğru</span>
+        </div>` : ''}
       </div>
 
       <div class="pratik-spotlight-card">
         <div class="spotlight-content">
-          <div class="spotlight-kicker">Kesintisiz Karma Seans</div>
-          <h3 class="spotlight-title">Sonsuz Üreteç Modu</h3>
-          <p class="spotlight-desc">
-            Tüm mevzuat üreteçlerinden aralıksız vaka üretilir, başarı serin ölçülür ve zorlandığın senaryolar karşına daha sık getirilir.
-          </p>
-          <div class="spotlight-meta">
-            <span class="spotlight-tag">10 Temel Hukuk Alanı</span>
-            <span class="spotlight-tag">Canlı Seri Sayacı</span>
-            <span class="spotlight-tag">Sıfır Ezber</span>
-          </div>
+          <h3 class="spotlight-title" title="Bütün simülatörlerden sırayla vaka gelir; zorlandığın kalıp daha sık döner.">Karışık vakalar</h3>
         </div>
         <div class="spotlight-action">
-          <button class="btn btn-spotlight" data-act="pratik-sonsuz-basla">Başlat →</button>
-          <span class="spotlight-subtext">Karma havuzdan sonsuz akış</span>
+          <button class="btn btn-spotlight" data-act="pratik-sonsuz-basla">Başlat</button>
         </div>
       </div>
 
@@ -338,25 +320,18 @@ function katalogHTML() {
       <div class="pratik-grid">
         ${filteredGenerators.map(g => {
           const st = drillStats(g.id);
-          const topKaliplar = (g.kaliplar || []).filter(k => k.id).slice(0, 3);
-          const remainCount = (g.kaliplar || []).filter(k => k.id).length - topKaliplar.length;
           return `
             <div class="pratik-card" data-gen-ac="${esc(g.id)}">
               <div class="card-head">
                 <span class="card-subj">${esc(subjectName(g.subjectId))}</span>
-                <span class="card-basis">${esc(g.basis)}</span>
               </div>
               <div class="card-body">
                 <div class="card-title">${esc(g.title)}</div>
                 <div class="card-desc">${esc(g.desc)}</div>
-                <div class="card-tags">
-                  ${topKaliplar.map(k => `<span class="card-tag">${esc(k.label)}</span>`).join('')}
-                  ${remainCount > 0 ? `<span class="card-tag-more">+${remainCount} kalıp</span>` : ''}
-                </div>
               </div>
               <div class="card-foot">
-                <span class="card-stat">${st.n ? `${st.ok}/${st.n} doğru (%${Math.round(st.ok / st.n * 100)})` : 'Henüz çözülmedi'}</span>
-                <button class="btn btn-s btn-card-start">Başla →</button>
+                <span class="card-stat">${st.n ? `${st.ok}/${st.n} doğru` : ''}</span>
+                <button class="btn btn-s btn-card-start">Başla</button>
               </div>
             </div>`;
         }).join('')}
@@ -393,17 +368,13 @@ function renderGeneratorView(host) {
     <div class="wrap">
       <div class="btn-row" style="margin-bottom:1.25rem">
         <button class="btn btn-2 btn-s" id="btn-pratik-geri">‹ Pratik alanı</button>
-        <span class="chip">${esc(cur.gen.basis)}</span>
-        ${st.n ? `<span class="chip">${st.ok}/${st.n} · %${Math.round(st.ok / st.n * 100)}</span>` : ''}
-        ${cur.sonsuz ? `<span class="chip ${cur.seri >= 3 ? 'green' : ''}" id="pratik-chip-seri">Seri: ${cur.seri}${cur.enIyiSeri > cur.seri ? ` · en iyi ${cur.enIyiSeri}` : ''}</span>` : ''}
+        ${st.n ? `<span class="chip">${st.ok}/${st.n}</span>` : ''}
         <span style="margin-left:auto"></span>
         <button class="btn" id="btn-pratik-yeni">Yeni vaka →</button>
       </div>
 
       <h2>${esc(cur.sonsuz ? 'Sonsuz mod' : cur.gen.title)}</h2>
-      <div class="basisline">
-        Vaka #${cur.seed} · ${esc(cur.pkg.baslik || cur.pkg.title || '')} · ${esc(cur.gen.title)} (bu oturumda ${cur.sayac} vaka)
-      </div>
+${cur.sonsuz ? `<div class="basisline">${esc(cur.gen.title)}</div>` : ''}
 
       <div id="pratik-panels"></div>
       <div class="visual-slot hv3-host" id="pratik-fill"></div>
