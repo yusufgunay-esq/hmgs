@@ -4,7 +4,7 @@
    ==========================================================================
    engine.js — ÖĞRENME MOTORU
    Üç parça:
-     1. SRS   → aralıklı geri getirme (Leitner 1-3-7-14-30)
+     1. SRS   → sınav gününe kadar hatırlatan tekrar (öğrenme adımı + gün aralığı, v4)
      2. Mastery → otomatikleşme skoru (doğruluk × hız)
      3. Coach → "şimdi ne yapmalı" tek karar fonksiyonu
    Hepsi store.js'teki ham cevap günlüğünden beslenir.
@@ -17,182 +17,300 @@ import { state, TARGET_SEC, PASS_CORRECT, daysLeft, answersToday, lastExam, toda
 import { SUBJECTS, questionsOf, questionById, topicsOf, topicById, questionsOfTopic, shuffle, tierOf, TIER_REAL, TIER_DENEME, TIER_AI, TIER_ADV, aiModelRank } from './data.js';
 
 /* ==========================================================================
-   1. SRS — ARALIKLI GERİ GETİRME
-   Kutu aralıkları gün cinsinden. Yanlış → kutu 0'a döner, yarın tekrar.
-   Kutu 5 = mezun (bir daha sıraya girmez, sadece deneme sınavında çıkar).
-   ========================================================================== */
+   1. SRS — SINAV GÜNÜNE KADAR HATIRLATAN TEKRAR (v4, 23 Kasım 2026)
+   ----------------------------------------------------------------------
+   v3 (19 Eylül 2026) sınava 7 gün varken yazılmıştı: doğru bilinen soru
+   "bitti" sayılıp bir daha hiç sorulmuyordu, yanlış soru 10 cevap sonra
+   dönüyor ve tekrarında doğruysa o da bitiyordu. Bir hafta ufukta doğruydu.
+   Sınav 25 Nisan 2027'ye kayınca (150+ gün) aynı kural unutmayı
+   görmezden gelmek oldu: Kasım'da doğru çözülen bir soru Nisan'a kadar
+   hiç yoklanmıyordu. v4 iki adımlıdır, ikisi de literatürün standart
+   yöntemidir (Anki/SM-2 "öğrenme adımı + aralık", FSRS kararlılık modeli):
 
+   1. ÖĞRENME ADIMI (değişmedi): yanlış, boş ya da mantıkla → aynı akışta
+      SRS_WRONG_GAP cevap sonra yeniden. Sayaç `dueN` (cevap sayısı).
+   2. ARALIKLI YOKLAMA (yeni): doğru bilinen soru, GÜN sayısıyla ölçülen bir
+      aralıktan sonra bir kez yoklanır. Her başarılı yoklamada aralık
+      yaklaşık 2,5 katına çıkar; unutulursa küçülür. Takvim `dueD` (ISO).
+
+   KARARLILIK (stab, gün): bu kadar gün sonra hatırlama olasılığı %90 kabul
+   edilir; R(t) = 0,9^(t / stab). İlk aralıklar Cepeda vd. 2008'in (Psych.
+   Science, "temporal ridgeline") sonucuna göre seçildi: hatırlanacak süre
+   ~150 günken en verimli ilk ara ~10-20 gündür (aralığın %8-15'i).
+        ilk görüşte doğru, "Eminim"     SRS_S_SURE    14 gün
+        ilk görüşte doğru, diğer        SRS_S_GOOD     7 gün
+        yanlıştan sonra doğru           SRS_S_RELEARN  3 gün
+   Başarılı yoklama: stab' = max(stab, 0,6 × geçen gün) × kolaylık
+   (2,5, her takılış 0,15 düşer, taban 1,3; "Eminim" ×1,15). Geç gelip yine
+   hatırlanan soru, geçen sürenin kendisini kanıt sayar (FSRS: düşük R'de
+   başarı kararlılığı daha çok artırır). Unutulan yoklama: stab × 0,3.
+
+   SINAV UFKU: aralık sınav gününe ulaşıyorsa soru "sınava hazır"dır
+   (`hazir`): R(sınav) >= 0,9 tanım gereği, bir daha sorulmaz. Ufuk
+   kısaldıkça bu kendiliğinden devreye girer; ayrı bir "son hafta" kuralı
+   gerekmez. Deneme ya da akışta yine çıkarsa normal yoklama sayılır.
+
+   KENDİNİ AYARLAMA (srsKalibrasyon): her yoklamada modelin tahmin ettiği
+   hatırlama (R) ile gerçek sonuç kaydedilir (rvN, rvOk, rvP). Gerçek isabet
+   tahmini geçerse aralıklar uzar, geride kalırsa kısalır:
+        çarpan = clamp(sqrt(ln Ptahmin / ln Pgerçek), 0,6, 1,5)
+   (üstel unutmada gerçek kararlılık / tahmin = ln P / ln P'; karekök
+   sönümleme, 30 yoklamalık önsel: tek bir unutuş bütün aralıkları
+   sarsmasın). Geciken yığın (düşük R) çarpanı haksızca küçültmez, çünkü
+   karşılaştırma tahmine göredir, %90'a göre değil.
+
+   İLERİ HAVUZ (T4, hâkimlik) değişmedi: doğru → bitti; yanlış → bir kez
+   SRS_CONFIRM_GAP cevap sonra, ikinci yanlışta bırakılır. 2.100 soruluk
+   derin banka uzun vadeli tekrar bütçesini yemesin.
+
+   ESKİ CİHAZ UYUMU: yoklama tarihi bilerek `dueAt`'e değil `dueD`'ye
+   yazılır. Eski (v3) kod yalnız `dueAt`'e baktığı için v4 kaydını "bitti"
+   sanar ve dokunmaz; `dueAt`'e yazılsaydı her açılışta "şimdi vadesi geldi"
+   diye öğrenme adımına çevirirdi.
+   -------------------------------------------------------------------------- */
+
+/** Yalnız uyum: box === BOXES.length → soru bitti (hazır/bırakıldı). */
 export const BOXES = [1, 3, 7, 14, 30];
+const BITTI = BOXES.length;
+const DAY_MS = 86400000;
 
 function addDays(d, n) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
-  x.setHours(4, 0, 0, 0); // sabah 04:00 → "yarın" gün değişiminde net olsun
+  x.setHours(4, 0, 0, 0); // sabah 04:00 → gün değişimi net olsun
   return x;
 }
 
-/* --------------------------------------------------------------------------
-   TEKRAR POLİTİKASI v3 — SORU SAYISIYLA, GÜNLE DEĞİL (19 Eylül 2026)
-   ----------------------------------------------------------------------
-   Kullanıcı: "yarın gelmesine gerek yok, akışta bir daha önüme eklenebilir;
-   gün olarak düşünmene gerek yok, sınava yedi gün kaldı." Sınav ufku bir
-   haftayken takvim aralığı (1-3-7-14-30 gün, sonra "yarın", sonra "1 gün")
-   yanlış birimdi: tekrarı ertesi güne atmak, o gün çalışılmazsa hiç yapılmaması
-   ve yanlışın sıcakken düzeltilememesi demek. Aralık artık ÇÖZÜLEN SORU
-   SAYISIYLA ölçülür: `dueN` = bu soru, toplam cevap sayısı bu değere
-   ulaşınca yeniden sorulabilir. Aynı akışın içinde, araya başka sorular
-   girdikten sonra geri gelir; oturum kapanırsa sayaç sonraki oturumda sürer.
-
-                       DOĞRU                        YANLIŞ / BOŞ / MANTIKLA
-   HMGS (T1/T2)   bitti (tekrarında doğruysa    SRS_WRONG_GAP soru sonra tekrar;
-                  da bitti, son kontrol yok)    yine yanlışsa yine gelir
-   İleri havuz (T3)  bitti                         BİR kez, SRS_CONFIRM_GAP soru sonra,
-                                                HMGS tekrarlarının arkasında;
-                                                ikinci yanlışta bırakılır
-
-   Aralıklar KARARDIR. Gerekçe: yanlıştan hemen sonra aynı konudan bir kardeş
-   soru zaten 2 soru sonra geliyor (flowReinforce); sorunun KENDİSİ hemen
-   dönerse cevap kısa süreli bellekten okunur, geri çağırma olmaz. Araya
-   ~10 soru (birkaç farklı ders) girmesi bunu keser. Kontrol turu daha seyrek.
-   Akış kuyruğu 8 soruda bir dolduğu için gerçek dönüş ~10-20 soru sonradır.
-   Kutu alanı geriye dönük uyum için duruyor: bitti/bırakıldı = BOXES.length.
-   -------------------------------------------------------------------------- */
-
-/* --------------------------------------------------------------------------
-   v3.2 — LİTERATÜR KARŞILAŞTIRMASI (20 Eylül 2026)
-   ----------------------------------------------------------------------
-   Kullanıcı: "pekiştirmeli öğrenme yapıyorsun herhalde, makaleleri incele."
-   Dürüst yanıt: burada öğrenen (trained) bir RL politikası YOK — ödül
-   fonksiyonu optimize eden bir ajan değil, simülasyonla doğrulanmış bir
-   kural setiyiz (SM-2/Leitner ailesi). Gerçek RL/optimal-kontrol örneği
-   Tabibian, Upadhyay, De, Zarezade, Schölkopf, Gomez-Rodriguez'in
-   "Enhancing human learning via spaced repetition optimization" (PNAS 2019,
-   MEMORIZE) makalesi: unutmayı üstel bir süreç modelleyip tekrar YOĞUNLUĞUNUN
-   "unutma olasılığıyla orantılı" olması gerektiğini kanıtlıyor — yani bütçe,
-   unutmaya en yakın soruya gitmeli. `dueShare()` (aşağıda) bunu SET
-   düzeyinde zaten yapıyor: bekleyen yanlış biriktikçe tekrar payı büyüyor.
-   Bu turda aynı ilke SORU düzeyine indi: `spot` alanı (bkz. scheduleAfterAnswer)
-   ile 2+ kez takılıp sonra doğru yapılan soru TEK seferlik, çok uzak ve düşük
-   öncelikli bir nokta kontrolüne giriyor — 1 kez takılıp hemen toparlayandan
-   ayrılıyor. Modern SRS'lerin (FSRS: Difficulty-Stability-Retrievability
-   durumu; Duolingo'nun Half-Life Regression'ı, Settles & Meeder 2016) ortak
-   noktası tam bu: aralık sabit değil, sorunun GEÇMİŞİNE (kaç kez unutuldu)
-   göre uyarlanır. Tam FSRS/HLR (öğrenen, regresyonla eğitilen model) BURADA
-   KASITLI OLARAK kurulmadı: sınava 7 gün var, kullanıcının kendi veri hacmi
-   (~birkaç bin cevap) böyle bir modeli güvenilir eğitmeye yetmez ve şu anda
-   yeni bir hata riski almaya değmez — bu, ölçülmeden atılan bir adım olurdu.
-   Bjork'un "arzu edilir zorluk" (desirable difficulty) / "proximal learning
-   bölgesi" çerçevesi zaten karşılanıyor: edinim bloğu (KARMA_ACQ_BLOCK) çok
-   yeni bir dersi önce tek başına verip sonra harmana katıyor — tümüyle
-   yabancı malzemeyi hemen karıştırmak zorluğu "arzu edilir" olmaktan çıkarır.
-   Brunmair & Richter 2019 (interleaving, g=0,34) ve Rowland 2014 (test
-   etkisi, geri bildirimli g=0,73) zaten `interleave()` ve "her soru anında
-   doğru/yanlış gösterir" ilkeleriyle karşılanıyor durumda; bu turda onlara
-   dokunulmadı.
-   -------------------------------------------------------------------------- */
-
-/** Yanlış yapılan HMGS sorusu kaç cevap sonra yeniden sorulabilir. KARAR. */
+/** Öğrenme adımı: yanlış HMGS sorusu kaç cevap sonra yeniden sorulur. KARAR. */
 export const SRS_WRONG_GAP = 10;
-/** İleri havuz (T3) yanlışının tek tekrarı kaç cevap sonra. KARAR. */
+/** İleri havuz (T4) yanlışının tek tekrarı kaç cevap sonra. KARAR. */
 export const SRS_CONFIRM_GAP = 30;
-/**
- * 2+ kez takılıp sonra toparlanan HMGS sorusuna verilen TEK nokta kontrolü
- * kaç cevap sonra gelir (bkz. v3.2 notu yukarıda). SRS_WRONG_GAP'ten kasıtlı
- * olarak çok uzak: eski "son kontrol" turu (v3.1'de kaldırıldı) HERKESE
- * uygulandığı için kuyruğu tıkıyordu; bu yalnız gerçekten zorlanmış azınlığa
- * (lapses>=2) uygulanıyor ve geç/düşük öncelikli kalması bilinçli — amaç
- * bekleyen taze yanlışların önüne geçmemesi. KARAR.
- */
-export const SRS_SPOTCHECK_GAP = 60;
-/** 2+ kez takılmış eşiği — spot kontrolünü tetikleyen lapses sayısı. KARAR. */
-export const SRS_SPOTCHECK_LAPSES = 2;
+/** İlk aralıklar (gün). Gerekçe yukarıda (Cepeda vd. 2008). */
+export const SRS_S_SURE = 14;
+export const SRS_S_GOOD = 7;
+export const SRS_S_RELEARN = 3;
+/** Başarılı yoklamada aralık çarpanı (SM-2 kolaylığı), takılış başına düşüş, taban. */
+export const SRS_EASE = 2.5;
+export const SRS_EASE_LAPSE = 0.15;
+export const SRS_EASE_MIN = 1.3;
+export const SRS_SURE_BONUS = 1.15;
+/** Geçen sürenin kanıt payı: 60 gün sonra hatırlanan sorunun kararlılığı en az 36 gün. */
+export const SRS_ELAPSED_W = 0.6;
+/** Unutulan yoklamadan sonra kararlılığın kalan payı; mantıkla bulunan için daha yüksek. */
+export const SRS_LAPSE_KEEP = 0.3;
+export const SRS_LOGIC_KEEP = 0.5;
+export const SRS_S_MAX = 365;
+/** Aralık bu hatırlama olasılığına göre kurulur. */
+export const SRS_TARGET_R = 0.9;
+/** Kalibrasyon önseli (kaç yoklama ağırlığında) ve çarpan sınırları. */
+export const SRS_CAL_PRIOR = 30;
+export const SRS_CAL_MIN = 0.6;
+export const SRS_CAL_MAX = 1.5;
+/** Sınava bundan çok gün varken taşan yoklama yeni malzemenin arkasında
+ *  bekler (koc.js fazOf'taki inşa sınırıyla aynı: D > 90). */
+export const SRS_YENI_ONCE_GUN = 90;
 
 function answerCount() { return state().answers.length; }
+const r1 = x => Math.round(x * 10) / 10;
 
 function isHmgs(qId) {
   const q = questionById.get(qId);
   return !q || tierOf(q) !== TIER_ADV;   // bilinmeyen soru HMGS sayılır (güvenli taraf)
 }
 
-/** Soru hâlâ tekrar sırasında mı (vadesi gelmiş ya da gelecek). */
-export function isPending(r) { return !!r && (r.dueN != null || !!r.dueAt); }
+/** t gün sonra hatırlama olasılığı (kararlılık stab gün). */
+export function retrievability(stab, elapsedDays) {
+  if (!(stab > 0)) return 0;
+  return Math.pow(SRS_TARGET_R, Math.max(0, elapsedDays) / stab);
+}
 
-/** Vadesi geldi mi. Eski (tarihli) kayıtlar da okunur. */
+/**
+ * Aralıkları kullanıcının gerçek hatırlamasına göre ayarlayan çarpan.
+ * @returns {{n:number, ok:number, tahmin:number|null, gercek:number|null, carpan:number}}
+ */
+export function srsKalibrasyon(S = state()) {
+  let n = 0, ok = 0, p = 0;
+  for (const r of Object.values(S.srs || {})) {
+    if (!r || !r.rvN) continue;
+    n += r.rvN; ok += r.rvOk || 0; p += r.rvP || 0;
+  }
+  if (!n) return { n: 0, ok: 0, tahmin: null, gercek: null, carpan: 1 };
+  const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+  const tahmin = clamp(p / n, 0.05, 0.98);
+  const gercek = clamp((ok + tahmin * SRS_CAL_PRIOR) / (n + SRS_CAL_PRIOR), 0.05, 0.98);
+  const carpan = clamp(Math.sqrt(Math.log(tahmin) / Math.log(gercek)), SRS_CAL_MIN, SRS_CAL_MAX);
+  return { n, ok, tahmin, gercek: ok / n, carpan: Math.round(carpan * 100) / 100 };
+}
+
+/** Soru hâlâ tekrar sırasında mı (öğrenme adımında ya da yoklama bekliyor). */
+export function isPending(r) {
+  return !!r && (r.box || 0) < BITTI && (r.dueN != null || !!r.dueD || !!r.dueAt);
+}
+
+/** Vadesi geldi mi. Öğrenme adımı cevap sayısıyla, yoklama takvimle. */
 export function isDue(r, now = new Date()) {
-  if (!r) return false;
+  if (!r || (r.box || 0) >= BITTI) return false;
   if (r.dueN != null) return answerCount() >= r.dueN;
-  return !!r.dueAt && new Date(r.dueAt) <= now;
+  if (r.dueD) return new Date(r.dueD) <= now;
+  return !!r.dueAt && new Date(r.dueAt) <= now;   // v1/v2 kaydı, applySrsPolicy çevirir
 }
 
-function graduate(cur) { cur.box = BOXES.length; cur.dueAt = null; delete cur.dueN; }
+/** Kayıt öğrenme adımında mı (yanlıştan sonra, aynı akışta dönecek). */
+export function isRelearning(r) { return !!r && r.dueN != null && (r.box || 0) < BITTI; }
 
-function schedule(cur, gap) {
+function finish(cur) { cur.box = BITTI; cur.dueAt = null; delete cur.dueN; delete cur.dueD; }
+
+/** Sorunun son cevabındaki bahis (Eminim/Sanırım...). */
+function sonConf(qId) {
+  const A = state().answers;
+  for (let i = A.length - 1; i >= 0; i--) if (A[i].qId === qId) return A[i].conf || null;
+  return null;
+}
+
+/**
+ * v1/v2/v3 kaydını v4'e çevirir (yalnız HMGS). İdempotent.
+ *  - v3 "bitti" (doğru çözülmüş, sırada değil) → aralıklı yoklamaya girer:
+ *    son çözümden bu yana geçen süre kadar gecikmiş sayılır.
+ *  - v3.2 nokta kontrolü (spot) → yanlıştan sonra doğru: 3 gün.
+ *  - v1/v2 tarihli kutu (dueAt) → kutu 0 ise öğrenme adımı (şimdi), değilse
+ *    kutunun gün aralığı kararlılık olur.
+ * @returns {boolean} değişti mi
+ */
+function toV4(cur, qId) {
+  if (!cur || cur.stab != null || cur.dropped || cur.hazir) return false;
+  if (cur.spot) {
+    delete cur.spot; delete cur.dueN;
+    cur.stab = SRS_S_RELEARN;
+  } else if (cur.dueN != null) {
+    return false;                                   // öğrenme adımı: v3 ile aynı
+  } else if (cur.dueAt && (cur.box || 0) === 0) {
+    cur.dueN = answerCount();                       // v1/v2 "yanlış, yarın": öğrenme adımı, şimdi
+    cur.dueAt = null;
+    return true;
+  } else if (cur.dueAt) {
+    cur.stab = BOXES[Math.min(Math.max(cur.box || 0, 0), BOXES.length - 1)];
+    cur.dueD = new Date(cur.dueAt).toISOString();
+    cur.dueAt = null;
+    cur.box = Math.max(1, Math.min(4, cur.box || 1));
+    return true;
+  } else if ((cur.box || 0) >= 1) {
+    cur.stab = (cur.lapses || 0) > 0 ? SRS_S_RELEARN
+      : (sonConf(qId) === 'sure' ? SRS_S_SURE : SRS_S_GOOD);
+  } else {
+    return false;
+  }
+  const at = cur.lastAt ? new Date(cur.lastAt) : new Date();
+  cur.dueD = addDays(at, Math.round(cur.stab)).toISOString();
   cur.dueAt = null;
-  cur.dueN = answerCount() + gap;
+  cur.box = 1;
+  return true;
 }
 
-/** Cevaptan sonra SRS durumunu güncelle. Dönen not kullanıcıya gösterilir. */
-export function scheduleAfterAnswer(qId, ok, logicGuess = false) {
+/**
+ * Yeni kararlılığa göre sonraki yoklamayı kurar. Aralık sınav gününe
+ * ulaşıyorsa soru sınava hazırdır.
+ */
+function planla(cur, stab, now) {
+  cur.stab = r1(Math.min(SRS_S_MAX, Math.max(1, stab)));
+  const gun = Math.max(1, Math.round(cur.stab * srsKalibrasyon().carpan));
+  delete cur.dueN;
+  cur.dueAt = null;
+  if (gun >= daysLeft()) {
+    finish(cur);
+    cur.hazir = true;
+    return { gun, hazir: true };
+  }
+  cur.dueD = addDays(now, gun).toISOString();
+  return { gun, hazir: false };
+}
+
+function kolaylik(cur) {
+  return Math.max(SRS_EASE_MIN, SRS_EASE - SRS_EASE_LAPSE * (cur.lapses || 0));
+}
+
+/**
+ * Cevaptan sonra SRS durumunu güncelle. Dönen not kullanıcıya gösterilir.
+ * kind: 'ilk' ilk görüşte doğru · 'tekrar' öğrenme adımına girdi ·
+ *       'mezun' yanlıştan sonra doğru · 'hatirladi' aralıklı yoklamada doğru ·
+ *       'birakildi' ileri havuz sorusu bırakıldı. `gun` sonraki yoklamaya
+ *       kalan gün, `hazir` sınava kadar sorulmayacak.
+ * @param {{conf?:string, now?:Date|string}} [opts]
+ */
+export function scheduleAfterAnswer(qId, ok, logicGuess = false, opts = {}) {
   const S = state();
+  const now = opts.now ? new Date(opts.now) : new Date();
   const cur = S.srs[qId] || { box: 0, lapses: 0, dueAt: null, lastAt: null };
   const hmgs = isHmgs(qId);
   const solid = ok && !logicGuess;
-  const wasPending = isPending(cur) && cur.box < BOXES.length;
-  const wasSpot = !!cur.spot;   // bu doğru cevap TAM OLARAK nokta kontrolünü mü çözüyor
-  cur.lastAt = new Date().toISOString();
+  if (hmgs) toV4(cur, qId);
+  const conf = opts.conf || sonConf(qId);
+  const relearning = isRelearning(cur);
+  // Aralıklı yoklama: soru öğrenme adımında değil ve bir kararlılığı var
+  // (yoklama bekliyor ya da sınava hazır). Erken gelse de (deneme) sayılır.
+  const yoklama = hmgs && !relearning && cur.stab != null;
+  const gecen = cur.lastAt ? Math.max(0, (now - new Date(cur.lastAt)) / DAY_MS) : 0;
+  if (yoklama) {
+    cur.rvN = (cur.rvN || 0) + 1;
+    const R = retrievability(cur.stab * srsKalibrasyon().carpan, gecen);
+    cur.rvP = Math.round(((cur.rvP || 0) + R) * 1000) / 1000;
+    if (solid) cur.rvOk = (cur.rvOk || 0) + 1;
+  }
+  cur.lastAt = now.toISOString();
   delete cur.dropped;
   delete cur.spot;
+  delete cur.hazir;
   let res;
 
   if (!hmgs) {
-    // ---- İleri havuz ----
+    // ---- İleri havuz (v3 ile aynı) ----
     if (solid) {
-      graduate(cur);
+      finish(cur);
       res = { box: cur.box, kind: 'ilk', note: 'İleri havuz sorusu doğru: tekrar edilmeyecek.' };
     } else {
-      if (!ok) cur.lapses += 1;
+      if (!ok) cur.lapses = (cur.lapses || 0) + 1;
       cur.box = 0;
       if ((cur.t3Retry || 0) >= 1) {
-        graduate(cur); cur.dropped = true;
+        finish(cur); cur.dropped = true;
         res = { box: cur.box, kind: 'birakildi', note: 'İleri havuz sorusu: bir daha sorulmayacak, HMGS sorularına yer açıldı.' };
       } else {
         cur.t3Retry = (cur.t3Retry || 0) + 1;
-        schedule(cur, SRS_CONFIRM_GAP);
+        delete cur.dueD;
+        cur.dueAt = null;
+        cur.dueN = answerCount() + SRS_CONFIRM_GAP;
         res = { box: 0, kind: 'tekrar', note: 'İleri havuz sorusu: akışta ileride bir kez daha gelebilir.' };
       }
     }
   } else if (!solid) {
-    // ---- HMGS: yanlış, boş ya da mantıkla ----
-    if (!ok) cur.lapses += 1;
+    // ---- Yanlış, boş ya da mantıkla: öğrenme adımı ----
+    if (!ok) cur.lapses = (cur.lapses || 0) + 1;
+    if (cur.stab != null) cur.stab = r1(Math.max(1, cur.stab * (ok ? SRS_LOGIC_KEEP : SRS_LAPSE_KEEP)));
     cur.box = 0;
-    schedule(cur, SRS_WRONG_GAP);
+    delete cur.dueD;
+    cur.dueAt = null;
+    cur.dueN = answerCount() + SRS_WRONG_GAP;
     res = !ok
       ? { box: 0, kind: 'tekrar', note: `Birkaç soru sonra yeniden gelecek. (${cur.lapses}. kez takıldın)` }
-      : { box: 0, kind: 'tekrar', note: 'Doğru' };
-  } else if (!wasPending) {
-    // ---- HMGS: sırada değilken doğru (ilk kez ya da daha önce bitmiş) ----
-    graduate(cur);
-    res = { box: cur.box, kind: 'ilk', note: 'Doğru: tekrar sırasına girmedi.' };
-  } else if (!wasSpot && (cur.lapses || 0) >= SRS_SPOTCHECK_LAPSES) {
-    // ---- HMGS: 2+ kez takılıp şimdi doğru (nokta kontrolü İLK kez tetikleniyor) ----
-    // Genel "son kontrol" turu (v3.1'de kaldırıldı) HERKESE uygulandığı için
-    // kuyruğu tıkıyordu. Burada yalnız GERÇEKTEN zorlanmış (üst üste değil,
-    // toplamda 2+ kez yanlış) sorulara, çok daha uzak ve düşük öncelikli TEK
-    // bir nokta kontrolü veriliyor (SRS_SPOTCHECK_GAP, bkz. v3.2 notu). Bir
-    // kez takılıp hemen toparlayan soru (lapses===1) direkt biter — FSRS'in
-    // "tekrar unutulan sorunun kararlılığı tek doğrulukla dolmaz" ilkesiyle
-    // "her yanlış-doğru çifti aynı ağırlıkta değildir" arasındaki orta yol.
-    // `!wasSpot` ÖNEMLİ: lapses hiç sıfırlanmadığı için bu koşul olmasa
-    // nokta kontrolünün KENDİSİ doğru çözülünce de tekrar tetiklenir ve soru
-    // asla bitmez (sonsuz döngü) — bkz. smoke.mjs "nokta kontrolü de doğru
-    // yapılınca tam mezun oluyor" testi, 20 Eylül 2026'da bu haliyle yakalandı.
-    cur.spot = true;
-    schedule(cur, SRS_SPOTCHECK_GAP);
-    res = { box: cur.box, kind: 'tekrar', note: `Birkaç kez takıldığın bir soruydu (${cur.lapses}. kez): ileride, çok geriden bir kez daha gelecek.` };
+      : { box: 0, kind: 'tekrar', note: 'Doğru, ama kuralla değil: birkaç soru sonra yeniden gelecek.' };
+  } else if (relearning) {
+    // ---- Yanlıştan sonra doğru: kısa ilk yoklama ----
+    const p = planla(cur, Math.max(SRS_S_RELEARN, cur.stab || 0), now);
+    cur.box = p.hazir ? BITTI : 1;
+    res = { box: cur.box, kind: 'mezun', gun: p.gun, hazir: p.hazir,
+      note: p.hazir ? 'Tekrarında doğru: sınava kadar kalıcı.' : `Tekrarında doğru. ${p.gun} gün sonra bir kez daha sorulacak.` };
+  } else if (yoklama) {
+    // ---- Aralıklı yoklamada doğru ----
+    const taban = Math.max(cur.stab, SRS_ELAPSED_W * gecen);
+    const p = planla(cur, taban * kolaylik(cur) * (conf === 'sure' ? SRS_SURE_BONUS : 1), now);
+    cur.box = p.hazir ? BITTI : Math.min(4, (cur.box || 1) + 1);
+    const g = Math.round(gecen);
+    res = { box: cur.box, kind: 'hatirladi', gun: p.gun, hazir: p.hazir, gecen: g,
+      note: p.hazir ? `${g} gün sonra da hatırladın: sınava kadar kalıcı.` : `${g} gün sonra da hatırladın. Sıradaki: ${p.gun} gün sonra.` };
   } else {
-    // ---- HMGS: yanlış yapıp tekrarında doğru (yalnız 1 kez takılmış) ----
-    graduate(cur);
-    res = { box: cur.box, kind: 'mezun', note: 'Tekrarında doğru: bu kural oturdu, sıradan çıktı.' };
+    // ---- İlk görüşte doğru ----
+    const p = planla(cur, conf === 'sure' ? SRS_S_SURE : SRS_S_GOOD, now);
+    cur.box = p.hazir ? BITTI : 1;
+    res = { box: cur.box, kind: 'ilk', gun: p.gun, hazir: p.hazir,
+      note: p.hazir ? 'Doğru: sınava kadar kalıcı.' : `Doğru. ${p.gun} gün sonra bir kez yoklanacak.` };
   }
 
   S.srs[qId] = cur;
@@ -200,37 +318,21 @@ export function scheduleAfterAnswer(qId, ok, logicGuess = false) {
 }
 
 /**
- * Eski (tarihli) kayıtları v3'e çeker. Bitmesi gereken kaydı bitirir/bırakır;
- * sırada kalacak olanın tarihini SORU SAYACINA çevirir (vadesi şimdi gelir,
- * setin %30 tekrar sınırı onları akışa yayar). Kuyruğa YENİ soru eklemez.
- * İdempotent: her açılışta ve her Drive birleştirmesinden sonra çalışır
- * (telefondaki eski kopya birleşmede tarihli kaydı geri getirebilir).
+ * Eski kayıtları v4'e çeker (bkz. toV4). Kuyruğa YENİ soru eklemez; v3'te
+ * "bitti" sayılmış doğruları aralıklı yoklamaya alır. İdempotent: her
+ * açılışta ve her Drive birleştirmesinden sonra çalışır (eski kodlu bir
+ * cihazın birleşmede geri getirdiği kayıtlar da çevrilir).
+ * İleri havuz kaydına dokunmaz; onun tarihli eski kaydı öğrenme adımına döner.
  * @returns {number} değişen kayıt sayısı
  */
 export function applySrsPolicy() {
   const S = state();
-  const last = new Map();
-  for (const a of S.answers) last.set(a.qId, a);
   const n0 = S.answers.length;
   let n = 0;
   for (const [qId, r] of Object.entries(S.srs)) {
-    if (!r || !r.dueAt || r.dueN != null) continue;     // bitmiş ya da zaten v3
-    const a = last.get(qId);
-    let out = false;
-    if (a) {
-      const solid = a.ok && !a.logicGuess;
-      if (!isHmgs(qId)) out = solid || (r.lapses || 0) >= 2;
-      else if (solid) out = (r.lapses || 0) === 0 || (r.box || 0) >= 2;
-    }
-    if (out) {
-      const dropped = !isHmgs(qId) && !(a && a.ok);
-      graduate(r);
-      if (dropped) r.dropped = true;
-    } else {
-      r.dueN = n0;           // sıradaki tekrar: şimdi
-      r.dueAt = null;
-    }
-    n++;
+    if (!r) continue;
+    if (isHmgs(qId)) { if (toV4(r, qId)) n++; continue; }
+    if (r.dueAt && r.dueN == null && (r.box || 0) < BITTI) { r.dueN = n0; r.dueAt = null; n++; }
   }
   return n;
 }
@@ -261,36 +363,55 @@ export const SRS_LEECH = 3;
  * Bugün vadesi gelmiş (veya geçmiş) sorular — TAMAMI, leech filtresi YOK.
  * Filtre karma setin tekrar bloğunda uygulanır (buildKarmaSet); "Tekrarları
  * çöz" seansı bilinçli olarak takıldıklarını da gösterir.
+ * Her öğe: { q, srs, kind: 'relearn' (yanlıştan sonra) | 'review' (aralıklı
+ * yoklama), R (şimdiki hatırlama tahmini; öğrenme adımında 0) }.
  */
 export function dueQuestions(now = new Date()) {
   const S = state();
+  const carpan = srsKalibrasyon(S).carpan;
   const out = [];
   for (const [qId, r] of Object.entries(S.srs)) {
     if (!isDue(r, now)) continue;
     const q = questionById.get(qId);
-    if (q) out.push({ q, srs: r });
+    if (!q) continue;
+    const kind = (r.dueN != null || (!r.dueD && (r.box || 0) === 0)) ? 'relearn' : 'review';
+    const gecen = r.lastAt ? (now - new Date(r.lastAt)) / DAY_MS : 0;
+    out.push({ q, srs: r, kind, R: kind === 'review' ? retrievability((r.stab || SRS_S_GOOD) * carpan, gecen) : 0 });
   }
-  /* SIRALAMA — EN ESKİ VADE ÖNCE (takılı soru kuyruğu tıkamasın).
-     İleri havuz (T3) tekrarları HMGS tekrarlarının ARKASINDA durur: "gelebilir
-     ama illa gelmesi gerekmiyor". Vade: soru sayacı (dueN); eski tarihli
-     kayıtlar sayacı olmayanlar olarak en başa düşer. */
+  /* SIRALAMA (v4)
+     1. Öğrenme adımı (yanlıştan sonra), katman sırasıyla: çıkmış → YETKİ
+        denemesi → AI benzeri. Sıcak hata önce: aynı akışta dönmesi gerekiyor.
+     2. Aralıklı yoklama, katman sırasıyla; katman içinde EN DÜŞÜK hatırlama
+        önce (MEMORIZE, PNAS 2019: tekrar yoğunluğu unutma olasılığıyla
+        orantılı olmalı). Geciken yığında en çok unutulmuş olan öne geçer.
+     3. İleri havuz (T4) en sonda: "gelebilir ama illa gelmesi gerekmiyor".
+     Öğrenme adımında eşit vadede daha çok takılmış soru önce. */
   const vade = (x, y) => {
     const xn = x.dueN != null, yn = y.dueN != null;
     if (xn && yn) return x.dueN - y.dueN;
-    if (!xn && !yn) return new Date(x.dueAt) - new Date(y.dueAt);
+    if (!xn && !yn) return new Date(x.dueAt || 0) - new Date(y.dueAt || 0);
     return xn ? 1 : -1;                                   // eski tarihli kayıt önce
   };
-  // Öncelik: HMGS yanlışı → HMGS nokta kontrolü (spot) → ileri havuz. Nokta
-  // kontrolü zaten bir kez doğru çözülmüş, 2+ kez takılmış sorudur; bekleyen
-  // TAZE yanlışın önüne geçmemeli (v3.2, bkz. yukarıdaki not). Aynı vadede
-  // (dueN eşit) MEMORIZE (PNAS 2019)'ın "tekrar unutmaya yakınlıkla orantılı
-  // olmalı" sonucunun kaba bir yaklaşımı: daha çok takılmış soru (lapses
-  // yüksek) unutmaya daha yakın kabul edilir, önce o gelir.
-  // 23 Eylül 2026: HMGS yanlışları kendi içinde de katman sırasıyla gelir
-  // (çıkmış → YETKİ denemesi → AI benzeri), sonra nokta kontrolü, en son hâkimlik.
-  const sinif = d => { const t = tierOf(d.q); return t === TIER_ADV ? 9 : (d.srs.spot ? 5 : t); };
-  out.sort((a, b) => sinif(a) - sinif(b) || vade(a.srs, b.srs) || (b.srs.lapses || 0) - (a.srs.lapses || 0));
+  const sinif = d => { const t = tierOf(d.q); return t === TIER_ADV ? 9 : (d.kind === 'relearn' ? t : 4 + t / 10); };
+  out.sort((a, b) => sinif(a) - sinif(b)
+    || (a.kind === 'relearn' ? vade(a.srs, b.srs) || ((b.srs.lapses || 0) - (a.srs.lapses || 0)) : a.R - b.R));
   return out;
+}
+
+/**
+ * Önümüzdeki günlerin yoklama yükü (bugünden sonra, vadesi henüz gelmemiş).
+ * Koç günlük hedefe bunu da katar: aralıklı tekrar sürekli bir akıştır.
+ * @returns {{gun:number, n:number}} gun gün içinde vadesi gelecek yoklama sayısı
+ */
+export function srsForecast(gun = 14, now = new Date()) {
+  const ufuk = now.getTime() + gun * DAY_MS;
+  let n = 0;
+  for (const [qId, r] of Object.entries(state().srs)) {
+    if (!r || !r.dueD || (r.box || 0) >= BITTI || r.dueN != null) continue;
+    const t = new Date(r.dueD).getTime();
+    if (t > now.getTime() && t <= ufuk && isHmgs(qId)) n++;
+  }
+  return { gun, n };
 }
 
 /** Tekrar kuyruğuna takılıp öne çıkma ayrıcalığını yitiren sorular. */
@@ -313,12 +434,18 @@ export function unseenQuestions(subjectId = null) {
 
 export function srsSummary() {
   const S = state();
-  const rows = Object.values(S.srs);
+  const rows = Object.values(S.srs).filter(Boolean);
+  const due = dueQuestions();
   return {
     tracked: rows.length,
-    due: dueQuestions().length,
-    graduated: rows.filter(r => r.box >= BOXES.length).length,
-    struggling: rows.filter(r => r.lapses >= 2 && r.box < 2).length
+    due: due.length,
+    dueRelearn: due.filter(d => d.kind === 'relearn').length,
+    dueReview: due.filter(d => d.kind === 'review').length,
+    reviewing: rows.filter(r => r.dueD && (r.box || 0) < BITTI && r.dueN == null).length,
+    ready: rows.filter(r => r.hazir).length,
+    graduated: rows.filter(r => (r.box || 0) >= BITTI).length,
+    struggling: rows.filter(r => (r.lapses || 0) >= 2 && (r.box || 0) < 2).length,
+    kalibrasyon: srsKalibrasyon(S)
   };
 }
 
@@ -679,7 +806,10 @@ export const KARMA_DUE_BACKLOG_FULL = 120;
 export const KARMA_DUE_SHARE_T1BITTI = 0.40;
 export const KARMA_DUE_SHARE_T1BITTI_MAX = 0.50;
 function dueShare(dueList, t1Bitti = false) {
-  const bekleyen = dueList.filter(d => tierOf(d.q) !== TIER_ADV && !d.srs.spot).length;
+  // v4: aralıklı yoklama yarım ağırlıkla sayılır. Yığın (özellikle v3'ten
+  // devralınan eski doğrular) payı tavana iter ama yeni malzemeyi kesmez:
+  // tavan hâlâ yarının altında.
+  const bekleyen = dueList.reduce((n, d) => n + (tierOf(d.q) === TIER_ADV ? 0 : (d.kind === 'review' ? 0.5 : 1)), 0);
   const t = Math.min(1, bekleyen / KARMA_DUE_BACKLOG_FULL);
   const lo = t1Bitti ? KARMA_DUE_SHARE_T1BITTI : KARMA_DUE_SHARE;
   const hi = t1Bitti ? KARMA_DUE_SHARE_T1BITTI_MAX : KARMA_DUE_SHARE_MAX;
@@ -1141,6 +1271,20 @@ function secByTier(list, want, sayac, seenIds = new Set(), scope = 'core') {
   const gor = q => seenIds.has(q.id);
   const hmgs = q => tierOf(q) !== TIER_ADV;
   const t = q => tierOf(q);
+  // v4 (23 Kasım 2026): görülmüş HMGS adayı iki türdür. Öğrenme adımı (yanlış)
+  // eskisi gibi yeni hâkimlik sorusundan önce gelir. Gün aralıklı YOKLAMA ise
+  // inşa döneminde (koc.js fazOf: D > 90) yeni malzemenin ARKASINA geçer:
+  // yoklamanın kendi payı tekrar bloğudur (dueShare); taşan yoklama yeni
+  // malzemeyi yemesin. Simülasyonda bu kural olmadan akışın %86'sı tekrar oldu
+  // ve 2.105 hâkimlik sorusunun yalnız 78'i görüldü. D <= 90'da eski sıra.
+  const ogren = q => isRelearning(state().srs[q.id]);
+  const yeniOnce = daysLeft() > SRS_YENI_ONCE_GUN;
+  const yoklama = [
+    q => gor(q) && !ogren(q) && t(q) === TIER_REAL,
+    q => gor(q) && !ogren(q) && t(q) === TIER_DENEME,
+    q => gor(q) && !ogren(q) && t(q) === TIER_AI
+  ];
+  const yeniAdv = q => !gor(q) && t(q) === TIER_ADV;
   const asamalar = scope === 'all'
     ? [
       q => !gor(q),
@@ -1150,10 +1294,10 @@ function secByTier(list, want, sayac, seenIds = new Set(), scope = 'core') {
       q => !gor(q) && t(q) === TIER_REAL,
       q => !gor(q) && t(q) === TIER_DENEME,
       q => !gor(q) && t(q) === TIER_AI,
-      q => gor(q) && t(q) === TIER_REAL,
-      q => gor(q) && t(q) === TIER_DENEME,
-      q => gor(q) && t(q) === TIER_AI,
-      q => !gor(q) && t(q) === TIER_ADV,
+      q => gor(q) && ogren(q) && t(q) === TIER_REAL,
+      q => gor(q) && ogren(q) && t(q) === TIER_DENEME,
+      q => gor(q) && ogren(q) && t(q) === TIER_AI,
+      ...(yeniOnce ? [yeniAdv, ...yoklama] : [...yoklama, yeniAdv]),
       q => gor(q) && t(q) === TIER_ADV
     ];
   const out = [];
@@ -1270,7 +1414,10 @@ export function buildKarmaSet(count = 20, scope = 'core', opts = {}) {
   // ayrıcalığını korursa kuyruğun gerisi hiç görünmez (ölçüldü: aynı 36 soru
   // 2,9 kez dönüyordu). Soru havuzdan çıkmaz — görülmemiş kısmında ve
   // "Tekrarları çöz" seansında yine gelir.
-  const dueAll = dueQuestions().filter(d => (d.srs.lapses || 0) < SRS_LEECH);
+  // v4: leech filtresi yalnız öğrenme adımına uygulanır. Aralıklı yoklama günler
+  // sonra bir kez gelir, kuyruğu tıkamaz; inatçı kuralın uzun vadeli yoklaması
+  // tam da gereken şeydir.
+  const dueAll = dueQuestions().filter(d => d.kind === 'review' || (d.srs.lapses || 0) < SRS_LEECH);
   const dueCap = Math.floor(count * dueShare(dueAll, dueAll.length > 0 && !gorulmemisCikmisVar()));
   const due = dueAll.slice(0, dueCap);
   due.forEach(d => { used.add(d.q.id); });
@@ -1526,7 +1673,7 @@ export function flowFeedDers(count = FLOW_BATCH, subjectIds = [], scope = 'core'
   const used = new Set(excludeIds);
 
   const dueAll = dueQuestions().filter(d => secili.has(d.q.subjectId) && !used.has(d.q.id)
-    && (d.srs.lapses || 0) < SRS_LEECH);
+    && (d.kind === 'review' || (d.srs.lapses || 0) < SRS_LEECH));
   const due = dueAll.slice(0, Math.floor(count * dueShare(dueAll, false)));
   due.forEach(d => used.add(d.q.id));
 
@@ -1725,7 +1872,9 @@ export function tileState(qId, lastOk = null, S = state()) {
     }
     if (!seen) return 'bos';
   }
-  if (r && isPending(r) && (r.box || 0) < BOXES.length) return 'acik';
+  // v4: yoklama bekleyen doğru soru YANIK kalır; açık kare yalnız yanlıştan
+  // sonra öğrenme adımındaki sorudur.
+  if (r && isRelearning(r)) return 'acik';
   return lastOk ? 'yandi' : 'acik';
 }
 
@@ -1832,15 +1981,12 @@ export function flowScore(rows = null) {
 }
 
 /**
- * Akış içi yetkinlik anı. scheduleAfterAnswer "mezun" döndürdüğünde (kutu
- * 5) o sorunun temsil ettiği kural aralıklı tekrardan çıkmış demektir — bu
- * gerçek bir "otomatikleşti" sinyalidir, dekoratif rozet değil.
+ * Akış içi yetkinlik anı: bir kural günler sonra da hatırlandı (aralıklı
+ * yoklamada doğru). Dekoratif rozet değil, ölçülen bir şey.
  */
 export function flowMilestone(sched) {
   if (!sched) return null;
-  // v2: ilk seferde doğru olan soru da mezun oluyor; o bir "otomatikleşme anı"
-  // değil. Yalnız takılıp sonra oturan kural sayılır.
-  if (sched.kind === 'mezun') return 'Kural otomatikleşti, tekrar sırasından çıktı';
+  if (sched.kind === 'hatirladi' && sched.gecen >= 2) return `${sched.gecen} gün sonra da yerinde`;
   return null;
 }
 
