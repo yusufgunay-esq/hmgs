@@ -228,9 +228,24 @@ const ROMAN_ALT = 'I{1,3}|IV|V|VI{0,3}|VII|VIII|IX|X';
 function normalizeWrappedLines(raw) {
   const lines = raw.split('\n');
   const out = [];
+  /* Sarmalanmış sıra sayısı isminden kopmaz: son dolu satır "…51." / "…Ek 11."
+     / "…2/4." gibi rakam(+bölü)+nokta ile bitiyorsa VE aradaki boş satırları
+     izleyen ilk dolu satır madde/fıkra/bent/sayılı sözcüğüyle başlıyorsa bu
+     TEK ifadedir; rakam cümleye geri yapıştırılır (ölçüm: hakim_akad_millet_134,
+     hakim_akad_millet_136, hakim_akad_vergi_061 — öncül öksüz "2/4." ile
+     bitiyor, soru cümlesi "maddesindeki…" diye kopuk doğuyordu). */
+  const MADDE_DEVAM_RE = /^(madde|fıkra|bent|bend|sayılı)/i;
   for (const line of lines) {
     const curTrim = line.trim();
     if (out.length && curTrim) {
+      let j = out.length - 1;
+      while (j >= 0 && !out[j].trim()) j--;      // son DOLU satır (boşlar atlanır)
+      if (j >= 0 && MADDE_DEVAM_RE.test(curTrim) && /(?:\d+\/)?\d+\.$/.test(out[j].trim())) {
+        const birlesik = out[j].trim() + ' ' + curTrim;
+        out[j] = birlesik;                       // rakam + isim tek satırda birleşir
+        out.length = j + 1;                      // aradaki boş satırlar düşer
+        continue;
+      }
       const prevTrim = out[out.length - 1].trim();
       const prevIsLone = LONE_ITEM_RE.test(prevTrim);
       const prevIsItem = ITEM_LINE_RE.test(prevTrim);
